@@ -18,15 +18,26 @@ import BookmarkBorderIcon from '@mui/icons-material/BookmarkBorder';
 import BookmarkIcon from '@mui/icons-material/Bookmark';
 import ShareOutlinedIcon from '@mui/icons-material/ShareOutlined';
 import RestartAltIcon from '@mui/icons-material/RestartAlt';
-import { Question } from '../types';
+import TrendingUpIcon from '@mui/icons-material/TrendingUp';
+import { DifficultyLevel, Question } from '../types';
 import { PALETTE_COLORS } from '../theme/theme';
 import { useAppTheme } from '../theme/ThemeContext';
+import { submitQuestionAttempt } from '../services/api';
 
 interface QuestionCardProps {
   question: Question;
   onBookmarkClick?: (question: Question) => void;
   isSavedInAnyFolder?: boolean;
 }
+
+const getSessionId = (): string => {
+  let sId = sessionStorage.getItem('omq_session_id');
+  if (!sId) {
+    sId = 'session_' + Math.random().toString(36).substring(2, 12);
+    sessionStorage.setItem('omq_session_id', sId);
+  }
+  return sId;
+};
 
 export const QuestionCard: React.FC<QuestionCardProps> = ({
   question,
@@ -39,6 +50,16 @@ export const QuestionCard: React.FC<QuestionCardProps> = ({
   const [selectedAlternativeId, setSelectedAlternativeId] = useState<number | null>(null);
   const [isAnswered, setIsAnswered] = useState<boolean>(false);
   const [localBookmarked, setLocalBookmarked] = useState<boolean>(false);
+  const [hasAttemptedBefore, setHasAttemptedBefore] = useState<boolean>(false);
+
+  // Dynamic statistics state
+  const [difficultyLevel, setDifficultyLevel] = useState<DifficultyLevel>(
+    question.difficultyLevel || 'SEM_DADOS'
+  );
+  const [accuracyPercentage, setAccuracyPercentage] = useState<number>(
+    question.accuracyPercentage || 0
+  );
+  const [totalAttempts, setTotalAttempts] = useState<number>(question.totalAttempts || 0);
 
   const isBookmarked = isSavedInAnyFolder || localBookmarked;
 
@@ -53,15 +74,92 @@ export const QuestionCard: React.FC<QuestionCardProps> = ({
     setSelectedAlternativeId(id);
   };
 
-  const handleVerify = () => {
-    if (selectedAlternativeId !== null) {
-      setIsAnswered(true);
+  const handleVerify = async () => {
+    if (selectedAlternativeId === null) return;
+    setIsAnswered(true);
+
+    try {
+      const response = await submitQuestionAttempt(question.id, {
+        selectedAlternativeId,
+        isFirstAttempt: !hasAttemptedBefore,
+        sessionId: getSessionId(),
+      });
+      setHasAttemptedBefore(true);
+      if (response.difficultyLevel) {
+        setDifficultyLevel(response.difficultyLevel);
+      }
+      if (response.accuracyPercentage !== undefined) {
+        setAccuracyPercentage(response.accuracyPercentage);
+      }
+      if (response.totalAttempts !== undefined) {
+        setTotalAttempts(response.totalAttempts);
+      }
+    } catch (err) {
+      console.warn('Erro ao registrar tentativa da questão:', err);
     }
   };
 
   const handleReset = () => {
     setSelectedAlternativeId(null);
     setIsAnswered(false);
+  };
+
+  const renderDifficultyBadge = (diff: DifficultyLevel) => {
+    switch (diff) {
+      case 'FACIL':
+        return (
+          <Chip
+            size="small"
+            label="Fácil (≥ 80%)"
+            sx={{
+              backgroundColor: isDark ? 'rgba(75, 241, 81, 0.15)' : 'rgba(75, 241, 81, 0.2)',
+              color: PALETTE_COLORS.success,
+              fontWeight: 700,
+              border: `1px solid ${PALETTE_COLORS.success}`,
+            }}
+          />
+        );
+      case 'MEDIA':
+        return (
+          <Chip
+            size="small"
+            label="Média (50% - 79%)"
+            sx={{
+              backgroundColor: isDark ? 'rgba(243, 255, 61, 0.15)' : 'rgba(243, 255, 61, 0.25)',
+              color: isDark ? PALETTE_COLORS.warning : '#7a7000',
+              fontWeight: 700,
+              border: `1px solid ${PALETTE_COLORS.warning}`,
+            }}
+          />
+        );
+      case 'DIFICIL':
+        return (
+          <Chip
+            size="small"
+            label="Difícil (< 50%)"
+            sx={{
+              backgroundColor: isDark ? 'rgba(250, 66, 75, 0.15)' : 'rgba(250, 66, 75, 0.2)',
+              color: PALETTE_COLORS.danger,
+              fontWeight: 700,
+              border: `1px solid ${PALETTE_COLORS.danger}`,
+            }}
+          />
+        );
+      default:
+        return (
+          <Chip
+            size="small"
+            label="Sem dados"
+            sx={{
+              backgroundColor: isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)',
+              color: 'text.secondary',
+              fontWeight: 500,
+              border: '1px solid',
+              borderColor: 'divider',
+            }}
+          />
+        );
+    }
   };
 
   return (
@@ -72,6 +170,7 @@ export const QuestionCard: React.FC<QuestionCardProps> = ({
         mb: 3,
         transition: 'all 0.2s ease-in-out',
         position: 'relative',
+        borderRadius: 3,
       }}
     >
       {/* Header: Identifier and Metadata Chips */}
@@ -85,7 +184,7 @@ export const QuestionCard: React.FC<QuestionCardProps> = ({
           mb: 2,
         }}
       >
-        <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
+        <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" sx={{ gap: 0.8 }}>
           {/* Question Identifier Badge */}
           <Chip
             label={`Questão ${question.identifier}`}
@@ -97,6 +196,8 @@ export const QuestionCard: React.FC<QuestionCardProps> = ({
               height: 28,
             }}
           />
+
+          {renderDifficultyBadge(difficultyLevel)}
 
           {question.originName && (
             <Chip
@@ -172,6 +273,27 @@ export const QuestionCard: React.FC<QuestionCardProps> = ({
         </Box>
       </Box>
 
+      {/* Metrics Bar */}
+      {totalAttempts > 0 && (
+        <Box
+          sx={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 1.5,
+            mb: 2,
+            p: 1,
+            px: 1.5,
+            borderRadius: 2,
+            backgroundColor: isDark ? 'rgba(255, 255, 255, 0.03)' : 'rgba(0, 0, 0, 0.02)',
+          }}
+        >
+          <TrendingUpIcon fontSize="small" sx={{ color: PALETTE_COLORS.primary }} />
+          <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600 }}>
+            {accuracyPercentage.toFixed(0)}% de acerto na 1ª tentativa ({totalAttempts} {totalAttempts === 1 ? 'tentativa' : 'tentativas'})
+          </Typography>
+        </Box>
+      )}
+
       {/* Question Statement (Enunciado) */}
       <Typography
         variant="body1"
@@ -209,13 +331,11 @@ export const QuestionCard: React.FC<QuestionCardProps> = ({
             }
           } else {
             if (isCorrect) {
-              // Alternativa correta destacada com success (#4bf151)
               borderColor = PALETTE_COLORS.success;
               backgroundColor = isDark ? 'rgba(75, 241, 81, 0.12)' : 'rgba(75, 241, 81, 0.15)';
               letterBg = PALETTE_COLORS.success;
               letterColor = '#0f2910';
             } else if (isSelected && !isCorrect) {
-              // Seleção incorreta destacada com danger (#fa424b)
               borderColor = PALETTE_COLORS.danger;
               backgroundColor = isDark ? 'rgba(250, 66, 75, 0.12)' : 'rgba(250, 66, 75, 0.15)';
               letterBg = PALETTE_COLORS.danger;
@@ -248,7 +368,6 @@ export const QuestionCard: React.FC<QuestionCardProps> = ({
                 },
               }}
             >
-              {/* Radio Indicator */}
               <Radio
                 checked={isSelected}
                 disabled={isAnswered}
@@ -267,7 +386,6 @@ export const QuestionCard: React.FC<QuestionCardProps> = ({
                 }}
               />
 
-              {/* Letter identifier badge */}
               <Box
                 sx={{
                   width: 28,
@@ -288,7 +406,6 @@ export const QuestionCard: React.FC<QuestionCardProps> = ({
                 {alt.identifier}
               </Box>
 
-              {/* Alternative Text */}
               <Typography
                 variant="body2"
                 sx={{
@@ -301,7 +418,6 @@ export const QuestionCard: React.FC<QuestionCardProps> = ({
                 {alt.text}
               </Typography>
 
-              {/* Post-answer feedback icon */}
               {isAnswered && isCorrect && (
                 <CheckCircleOutlineIcon sx={{ color: PALETTE_COLORS.success, ml: 1 }} />
               )}
