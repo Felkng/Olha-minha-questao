@@ -33,5 +33,17 @@ services:
       - "8080:8080"
     restart: unless-stopped
 
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: olha_minha_questao_frontend
+    depends_on:
+      - app
+    ports:
+      - "3000:80"
+    restart: unless-stopped
+
 volumes:
   postgres_data:
+
