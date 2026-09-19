@@ -44,13 +44,33 @@ apiClient.interceptors.request.use((config) => {
 
 // Auth & User API
 export const loginUser = async (data: { email: string; password: string }): Promise<AuthResponse> => {
-  const response = await apiClient.post<AuthResponse>('/auth/login', data);
-  return response.data;
+  const response = await apiClient.post<any>('/auth/login', data);
+  const d = response.data;
+  const user: UserSummary = d.user || {
+    id: d.id,
+    name: d.name,
+    email: d.email,
+    role: d.role,
+  };
+  return {
+    token: d.token,
+    user,
+  };
 };
 
 export const registerUser = async (data: { name: string; email: string; password: string }): Promise<AuthResponse> => {
-  const response = await apiClient.post<AuthResponse>('/auth/register', data);
-  return response.data;
+  const response = await apiClient.post<any>('/auth/register', data);
+  const d = response.data;
+  const user: UserSummary = d.user || {
+    id: d.id,
+    name: d.name,
+    email: d.email,
+    role: d.role,
+  };
+  return {
+    token: d.token,
+    user,
+  };
 };
 
 export const getUserProfile = async (userId: number): Promise<UserProfile> => {
