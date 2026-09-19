@@ -20,6 +20,7 @@ import {
   AuthResponse,
   UserProfile,
   UserSummary,
+  QuestionBoardResponse,
 } from '../types';
 
 const apiClient = axios.create({
@@ -408,4 +409,26 @@ export const getFolderIdsForTest = async (testId: number): Promise<number[]> => 
     console.warn(`API /folders/by-test/${testId} error:`, err);
     return [];
   }
+};
+
+// Lousa de Raciocínio (Whiteboard)
+export const getQuestionBoard = async (questionId: number): Promise<QuestionBoardResponse | null> => {
+  try {
+    const response = await apiClient.get<QuestionBoardResponse>(`/questions/${questionId}/board`);
+    return response.data;
+  } catch (err) {
+    console.warn(`API /questions/${questionId}/board error:`, err);
+    return null;
+  }
+};
+
+export const saveQuestionBoard = async (
+  questionId: number,
+  xmlContent: string
+): Promise<QuestionBoardResponse> => {
+  const response = await apiClient.put<QuestionBoardResponse>(
+    `/questions/${questionId}/board`,
+    { xmlContent }
+  );
+  return response.data;
 };
