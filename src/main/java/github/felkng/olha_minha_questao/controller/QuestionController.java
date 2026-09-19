@@ -1,8 +1,11 @@
 package github.felkng.olha_minha_questao.controller;
 
+import github.felkng.olha_minha_questao.dto.question.QuestionAttemptRequestDTO;
+import github.felkng.olha_minha_questao.dto.question.QuestionAttemptResponseDTO;
 import github.felkng.olha_minha_questao.dto.question.QuestionRequestDTO;
 import github.felkng.olha_minha_questao.dto.question.QuestionResponseDTO;
 import github.felkng.olha_minha_questao.service.QuestionService;
+import github.felkng.olha_minha_questao.service.StatisticsService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -16,9 +19,12 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/v1/questions")
@@ -26,7 +32,8 @@ import org.springframework.web.bind.annotation.RestController;
 public class QuestionController {
 
     private final QuestionService questionService;
-    private final github.felkng.olha_minha_questao.service.StatisticsService statisticsService;
+    private final StatisticsService statisticsService;
+    private final github.felkng.olha_minha_questao.domain.repository.QuestionAttemptRepository questionAttemptRepository;
 
     @GetMapping
     public ResponseEntity<Page<QuestionResponseDTO>> findAll(
@@ -42,10 +49,27 @@ public class QuestionController {
     }
 
     @PostMapping("/{id}/attempts")
-    public ResponseEntity<github.felkng.olha_minha_questao.dto.question.QuestionAttemptResponseDTO> registerAttempt(
+    public ResponseEntity<QuestionAttemptResponseDTO> registerAttempt(
             @PathVariable Long id,
-            @RequestBody github.felkng.olha_minha_questao.dto.question.QuestionAttemptRequestDTO dto) {
+            @RequestBody QuestionAttemptRequestDTO dto,
+            @RequestHeader(value = "X-User-Id", required = false) Long userIdHeader) {
+        if (dto.getUserId() == null && userIdHeader != null) {
+            dto.setUserId(userIdHeader);
+        }
         return ResponseEntity.ok(statisticsService.registerQuestionAttempt(id, dto));
+    }
+
+    @GetMapping("/attempted-ids")
+    public ResponseEntity<List<Long>> getAttemptedQuestionIds(
+            @RequestHeader(value = "X-User-Id", required = false) Long userId) {
+        if (userId == null) {
+            return ResponseEntity.ok(List.of());
+        }
+        List<Long> qIds = questionAttemptRepository.findByUserId(userId).stream()
+                .map(qa -> qa.getQuestion().getId())
+                .distinct()
+                .toList();
+        return ResponseEntity.ok(qIds);
     }
 
     @GetMapping("/{id}")
@@ -54,8 +78,10 @@ public class QuestionController {
     }
 
     @PostMapping
-    public ResponseEntity<QuestionResponseDTO> create(@Valid @RequestBody QuestionRequestDTO dto) {
-        QuestionResponseDTO created = questionService.create(dto);
+    public ResponseEntity<QuestionResponseDTO> create(
+            @Valid @RequestBody QuestionRequestDTO dto,
+            @RequestHeader(value = "X-User-Id", required = false) Long userId) {
+        QuestionResponseDTO created = questionService.create(dto, userId);
         return ResponseEntity.status(HttpStatus.CREATED).body(created);
     }
 
