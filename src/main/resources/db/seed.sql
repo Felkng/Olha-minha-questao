@@ -156,7 +156,35 @@ UPDATE question SET correct_alternative_id = 38 WHERE id = 8;
 UPDATE question SET correct_alternative_id = 41 WHERE id = 9;
 UPDATE question SET correct_alternative_id = 49 WHERE id = 10;
 
--- 8. Atualização das sequências das tabelas
+-- 8. Inicialização de estatísticas padrão para questões e provas
+INSERT INTO question_statistic (question_id, total_attempts, first_attempts, first_attempt_correct, first_attempt_accuracy, difficulty_level)
+SELECT id, 0, 0, 0, 0.0, 'SEM_DADOS' FROM question
+ON CONFLICT (question_id) DO NOTHING;
+
+-- Popula dados demonstrativos de dificuldade (Fácil, Média, Difícil)
+-- Questão 1: 85% de acerto -> FACIL
+UPDATE question_statistic SET total_attempts = 25, first_attempts = 20, first_attempt_correct = 17, first_attempt_accuracy = 85.0, difficulty_level = 'FACIL' WHERE question_id = 1;
+-- Questão 2: 60% de acerto -> MEDIA
+UPDATE question_statistic SET total_attempts = 18, first_attempts = 15, first_attempt_correct = 9, first_attempt_accuracy = 60.0, difficulty_level = 'MEDIA' WHERE question_id = 2;
+-- Questão 3: 40% de acerto -> DIFICIL
+UPDATE question_statistic SET total_attempts = 12, first_attempts = 10, first_attempt_correct = 4, first_attempt_accuracy = 40.0, difficulty_level = 'DIFICIL' WHERE question_id = 3;
+-- Questão 4: 92% de acerto -> FACIL
+UPDATE question_statistic SET total_attempts = 30, first_attempts = 25, first_attempt_correct = 23, first_attempt_accuracy = 92.0, difficulty_level = 'FACIL' WHERE question_id = 4;
+-- Questão 5: 35.3% de acerto -> DIFICIL
+UPDATE question_statistic SET total_attempts = 20, first_attempts = 17, first_attempt_correct = 6, first_attempt_accuracy = 35.29, difficulty_level = 'DIFICIL' WHERE question_id = 5;
+
+INSERT INTO test_statistic (test_id, total_attempts, average_score, difficulty_level)
+SELECT id, 0, 0.0, 'SEM_DADOS' FROM test
+ON CONFLICT (test_id) DO NOTHING;
+
+-- Prova 1: 72.5% -> MEDIA
+UPDATE test_statistic SET total_attempts = 14, average_score = 72.5, difficulty_level = 'MEDIA' WHERE test_id = 1;
+-- Prova 2: 82.0% -> FACIL
+UPDATE test_statistic SET total_attempts = 18, average_score = 82.0, difficulty_level = 'FACIL' WHERE test_id = 2;
+-- Prova 3: 45.0% -> DIFICIL
+UPDATE test_statistic SET total_attempts = 22, average_score = 45.0, difficulty_level = 'DIFICIL' WHERE test_id = 3;
+
+-- 9. Atualização das sequências das tabelas
 SELECT setval('origin_id_seq', (SELECT MAX(id) FROM origin));
 SELECT setval('area_id_seq', (SELECT MAX(id) FROM area));
 SELECT setval('test_id_seq', (SELECT MAX(id) FROM test));
