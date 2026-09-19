@@ -13,6 +13,7 @@ public interface TestMapper {
     @Mapping(target = "id", ignore = true)
     @Mapping(target = "origin", ignore = true)
     @Mapping(target = "area", ignore = true)
+    @Mapping(target = "statistic", ignore = true)
     @Mapping(target = "createdAt", ignore = true)
     @Mapping(target = "updatedAt", ignore = true)
     Test toEntity(TestRequestDTO dto);
@@ -26,6 +27,7 @@ public interface TestMapper {
     @Mapping(target = "id", ignore = true)
     @Mapping(target = "origin", ignore = true)
     @Mapping(target = "area", ignore = true)
+    @Mapping(target = "statistic", ignore = true)
     @Mapping(target = "createdAt", ignore = true)
     @Mapping(target = "updatedAt", ignore = true)
     void updateEntityFromDTO(TestRequestDTO dto, @MappingTarget Test entity);
