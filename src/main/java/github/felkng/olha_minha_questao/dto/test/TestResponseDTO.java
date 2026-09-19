@@ -1,5 +1,6 @@
 package github.felkng.olha_minha_questao.dto.test;
 
+import github.felkng.olha_minha_questao.dto.user.UserSummaryDTO;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -21,6 +22,7 @@ public class TestResponseDTO {
     private String originName;
     private Long areaId;
     private String areaName;
+    private UserSummaryDTO createdByUser;
     private Instant createdAt;
     private Instant updatedAt;
 }
