@@ -1,4 +1,15 @@
 export type DifficultyLevel = 'FACIL' | 'MEDIA' | 'DIFICIL' | 'SEM_DADOS';
+export type FolderType = 'QUESTION' | 'TEST';
+
+export interface PageResponse<T> {
+  content: T[];
+  totalPages: number;
+  totalElements: number;
+  number: number;
+  size: number;
+  first: boolean;
+  last: boolean;
+}
 
 export interface Alternative {
   id?: number;
@@ -19,6 +30,14 @@ export interface Area {
   description?: string;
 }
 
+export interface Subject {
+  id: number;
+  name: string;
+  description?: string;
+  areaId: number;
+  areaName?: string;
+}
+
 export interface Test {
   id: number;
   name: string;
@@ -36,11 +55,14 @@ export interface Question {
   year?: number;
   origin?: Origin;
   area?: Area;
+  subject?: Subject;
   test?: Test;
   originId?: number;
   originName?: string;
   areaId?: number;
   areaName?: string;
+  subjectId?: number;
+  subjectName?: string;
   testId?: number;
   testName?: string;
   alternatives: Alternative[];
@@ -56,6 +78,7 @@ export interface FilterState {
   type: 'all' | 'questions' | 'tests';
   originId: number | '';
   areaId: number | '';
+  subjectId?: number | '';
   year: number | '';
   testId: number | '';
   difficulty?: string;
@@ -67,7 +90,9 @@ export interface Folder {
   name: string;
   description?: string;
   color: string;
+  folderType: FolderType;
   questionCount?: number;
+  testCount?: number;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -78,6 +103,16 @@ export interface SavedQuestion {
   folderName: string;
   folderColor?: string;
   question: Question;
+  notes?: string;
+  createdAt: string;
+}
+
+export interface SavedTest {
+  id: number;
+  folderId: number;
+  folderName: string;
+  folderColor?: string;
+  test: Test;
   notes?: string;
   createdAt: string;
 }
