@@ -36,6 +36,7 @@ public class FolderService {
     private final TestRepository testRepository;
     private final SavedQuestionRepository savedQuestionRepository;
     private final SavedTestRepository savedTestRepository;
+    private final github.felkng.olha_minha_questao.domain.repository.UserRepository userRepository;
     private final FolderMapper folderMapper;
     private final QuestionMapper questionMapper;
     private final TestMapper testMapper;
@@ -62,7 +63,18 @@ public class FolderService {
 
     @Transactional
     public FolderResponseDTO create(FolderRequestDTO dto) {
+        return create(dto, null);
+    }
+
+    @Transactional
+    public FolderResponseDTO create(FolderRequestDTO dto, Long userId) {
+        github.felkng.olha_minha_questao.domain.entity.User user = null;
+        if (userId != null) {
+            user = userRepository.findById(userId).orElse(null);
+        }
+
         Folder folder = folderMapper.toEntity(dto);
+        folder.setCreatedByUser(user);
         if (folder.getColor() == null || folder.getColor().isBlank()) {
             folder.setColor("#d9b763");
         }
