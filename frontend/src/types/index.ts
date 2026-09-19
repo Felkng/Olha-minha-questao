@@ -54,3 +54,24 @@ export interface FilterState {
   year: number | '';
   testId: number | '';
 }
+
+export interface Folder {
+  id: number;
+  name: string;
+  description?: string;
+  color: string;
+  questionCount?: number;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface SavedQuestion {
+  id: number;
+  folderId: number;
+  folderName: string;
+  folderColor?: string;
+  question: Question;
+  notes?: string;
+  createdAt: string;
+}
+
