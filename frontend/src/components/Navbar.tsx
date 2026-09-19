@@ -16,25 +16,34 @@ import MenuBookOutlinedIcon from '@mui/icons-material/MenuBookOutlined';
 import AccountBalanceOutlinedIcon from '@mui/icons-material/AccountBalanceOutlined';
 import CategoryOutlinedIcon from '@mui/icons-material/CategoryOutlined';
 import FolderSpecialOutlinedIcon from '@mui/icons-material/FolderSpecialOutlined';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useAppTheme } from '../theme/ThemeContext';
 import { PALETTE_COLORS } from '../theme/theme';
 
-interface NavbarProps {
-  activeTab: string;
-  onTabChange: (tab: string) => void;
-}
-
-export const Navbar: React.FC<NavbarProps> = ({ activeTab, onTabChange }) => {
+export const Navbar: React.FC = () => {
   const { mode, toggleColorMode } = useAppTheme();
   const isDark = mode === 'dark';
+  const location = useLocation();
+  const navigate = useNavigate();
 
   const navItems = [
-    { id: 'questoes', label: 'Questões', icon: <QuizOutlinedIcon fontSize="small" /> },
-    { id: 'provas', label: 'Provas', icon: <MenuBookOutlinedIcon fontSize="small" /> },
-    { id: 'bancas', label: 'Bancas', icon: <AccountBalanceOutlinedIcon fontSize="small" /> },
-    { id: 'areas', label: 'Áreas', icon: <CategoryOutlinedIcon fontSize="small" /> },
-    { id: 'pastas', label: 'Pastas Salvas', icon: <FolderSpecialOutlinedIcon fontSize="small" /> },
+    { id: 'questoes', path: '/questoes', label: 'Questões', icon: <QuizOutlinedIcon fontSize="small" /> },
+    { id: 'provas', path: '/provas', label: 'Provas', icon: <MenuBookOutlinedIcon fontSize="small" /> },
+    { id: 'bancas', path: '/bancas', label: 'Bancas', icon: <AccountBalanceOutlinedIcon fontSize="small" /> },
+    { id: 'areas', path: '/areas', label: 'Áreas', icon: <CategoryOutlinedIcon fontSize="small" /> },
+    { id: 'pastas', path: '/pastas', label: 'Pastas Salvas', icon: <FolderSpecialOutlinedIcon fontSize="small" /> },
   ];
+
+  const getActiveTab = () => {
+    const p = location.pathname;
+    if (p.startsWith('/provas')) return 'provas';
+    if (p.startsWith('/bancas')) return 'bancas';
+    if (p.startsWith('/areas')) return 'areas';
+    if (p.startsWith('/pastas')) return 'pastas';
+    return 'questoes';
+  };
+
+  const activeTab = getActiveTab();
 
   return (
     <AppBar position="sticky" color="inherit">
@@ -50,7 +59,7 @@ export const Navbar: React.FC<NavbarProps> = ({ activeTab, onTabChange }) => {
               userSelect: 'none',
               mr: { xs: 1, md: 3 },
             }}
-            onClick={() => onTabChange('questoes')}
+            onClick={() => navigate('/questoes')}
           >
             <Box
               sx={{
@@ -105,7 +114,7 @@ export const Navbar: React.FC<NavbarProps> = ({ activeTab, onTabChange }) => {
                 <Button
                   key={item.id}
                   startIcon={item.icon}
-                  onClick={() => onTabChange(item.id)}
+                  onClick={() => navigate(item.path)}
                   sx={{
                     px: 2,
                     py: 1,
