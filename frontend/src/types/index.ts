@@ -32,6 +32,9 @@ export interface Question {
   enunciado: string;
   identifier: string;
   year?: number;
+  origin?: Origin;
+  area?: Area;
+  test?: Test;
   originId?: number;
   originName?: string;
   areaId?: number;
