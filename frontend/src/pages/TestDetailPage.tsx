@@ -1,0 +1,202 @@
+import React, { useEffect, useState } from 'react';
+import {
+  Box,
+  Typography,
+  Paper,
+  Button,
+  Chip,
+  Stack,
+  CircularProgress,
+  Alert,
+  Snackbar,
+} from '@mui/material';
+import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import PlayArrowIcon from '@mui/icons-material/PlayArrow';
+import ShareIcon from '@mui/icons-material/Share';
+import BookmarkBorderIcon from '@mui/icons-material/BookmarkBorder';
+import MenuBookOutlinedIcon from '@mui/icons-material/MenuBookOutlined';
+import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
+import AccountBalanceIcon from '@mui/icons-material/AccountBalance';
+import CategoryIcon from '@mui/icons-material/Category';
+import { useParams, useNavigate } from 'react-router-dom';
+import { Question, TestCard } from '../types';
+import { getTestById, getTestEvaluation } from '../services/api';
+import { QuestionCard } from '../components/questions/QuestionCard';
+import { SaveTestToFolderModal } from '../components/folders/SaveTestToFolderModal';
+import { PALETTE_COLORS } from '../theme/theme';
+
+interface TestDetailPageProps {
+  onBookmarkQuestion?: (question: Question) => void;
+}
+
+export const TestDetailPage: React.FC<TestDetailPageProps> = ({
+  onBookmarkQuestion,
+}) => {
+  const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
+
+  const [test, setTest] = useState<TestCard | null>(null);
+  const [questions, setQuestions] = useState<Question[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+
+  const [saveModalOpen, setSaveModalOpen] = useState<boolean>(false);
+  const [toastOpen, setToastOpen] = useState<boolean>(false);
+
+  useEffect(() => {
+    if (id) {
+      loadTest(Number(id));
+    }
+  }, [id]);
+
+  const loadTest = async (tId: number) => {
+    setLoading(true);
+    try {
+      const [testData, evalData] = await Promise.all([
+        getTestById(tId),
+        getTestEvaluation(tId),
+      ]);
+      setTest(testData);
+      setQuestions(evalData.questions || []);
+    } catch (err) {
+      console.error('Erro ao carregar dados da prova:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleShare = () => {
+    navigator.clipboard.writeText(window.location.href);
+    setToastOpen(true);
+  };
+
+  if (loading) {
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
+        <CircularProgress sx={{ color: PALETTE_COLORS.primary }} />
+      </Box>
+    );
+  }
+
+  if (!test) {
+    return (
+      <Box sx={{ mb: 6 }}>
+        <Button
+          startIcon={<ArrowBackIcon />}
+          onClick={() => navigate('/provas')}
+          sx={{ mb: 3, color: 'text.secondary', fontWeight: 600 }}
+        >
+          Voltar para Provas
+        </Button>
+        <Alert severity="error" sx={{ borderRadius: 2 }}>
+          Prova não encontrada no sistema.
+        </Alert>
+      </Box>
+    );
+  }
+
+  return (
+    <Box sx={{ mb: 6 }}>
+      <Button
+        startIcon={<ArrowBackIcon />}
+        onClick={() => navigate('/provas')}
+        sx={{ mb: 3, color: 'text.secondary', fontWeight: 600 }}
+      >
+        Voltar para Lista de Provas
+      </Button>
+
+      {/* Header Card da Prova */}
+      <Paper elevation={4} sx={{ p: 4, borderRadius: 3, mb: 4 }}>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 2, mb: 2 }}>
+          <Box>
+            <Typography variant="h4" sx={{ fontWeight: 800, mb: 1 }}>
+              {test.name}
+            </Typography>
+            <Stack direction="row" spacing={1} flexWrap="wrap" gap={1}>
+              <Chip
+                icon={<CalendarTodayIcon fontSize="small" />}
+                label={`Ano: ${test.year}`}
+                size="small"
+                variant="outlined"
+              />
+              {test.originName && (
+                <Chip
+                  icon={<AccountBalanceIcon fontSize="small" />}
+                  label={`Banca: ${test.originName}`}
+                  size="small"
+                  variant="outlined"
+                />
+              )}
+              {test.areaName && (
+                <Chip
+                  icon={<CategoryIcon fontSize="small" />}
+                  label={`Área: ${test.areaName}`}
+                  size="small"
+                  variant="outlined"
+                />
+              )}
+              <Chip
+                icon={<MenuBookOutlinedIcon fontSize="small" />}
+                label={`${test.questionCount} questões`}
+                size="small"
+                sx={{ backgroundColor: 'rgba(217, 183, 99, 0.15)', color: PALETTE_COLORS.primary, fontWeight: 700 }}
+              />
+            </Stack>
+          </Box>
+
+          <Stack direction="row" spacing={1.5}>
+            <Button
+              variant="outlined"
+              startIcon={<BookmarkBorderIcon />}
+              onClick={() => setSaveModalOpen(true)}
+              sx={{ fontWeight: 700, borderRadius: 2 }}
+            >
+              Salvar Prova
+            </Button>
+            <Button
+              variant="outlined"
+              startIcon={<ShareIcon />}
+              onClick={handleShare}
+              sx={{ fontWeight: 700, borderRadius: 2 }}
+            >
+              Compartilhar
+            </Button>
+            <Button
+              variant="contained"
+              startIcon={<PlayArrowIcon />}
+              onClick={() => navigate(`/provas/${test.id}/avaliacao`)}
+              sx={{ fontWeight: 800, borderRadius: 2, backgroundColor: PALETTE_COLORS.primary }}
+            >
+              Iniciar Simulado
+            </Button>
+          </Stack>
+        </Box>
+      </Paper>
+
+      {/* Questões da Prova */}
+      <Typography variant="h5" sx={{ fontWeight: 800, mb: 3 }}>
+        Questões da Prova ({questions.length})
+      </Typography>
+
+      {questions.map((q) => (
+        <QuestionCard
+          key={q.id}
+          question={q}
+          onBookmarkClick={onBookmarkQuestion}
+        />
+      ))}
+
+      <SaveTestToFolderModal
+        open={saveModalOpen}
+        onClose={() => setSaveModalOpen(false)}
+        test={test}
+      />
+
+      <Snackbar
+        open={toastOpen}
+        autoHideDuration={3000}
+        onClose={() => setToastOpen(false)}
+        message="Link da prova copiado para a área de transferência!"
+      />
+    </Box>
+  );
+};
