@@ -14,10 +14,16 @@ import github.felkng.olha_minha_questao.dto.question.QuestionResponseDTO;
 import github.felkng.olha_minha_questao.exception.ResourceNotFoundException;
 import github.felkng.olha_minha_questao.mapper.AlternativeMapper;
 import github.felkng.olha_minha_questao.mapper.QuestionMapper;
+import github.felkng.olha_minha_questao.domain.entity.DifficultyLevel;
+import github.felkng.olha_minha_questao.domain.entity.QuestionStatistic;
+import jakarta.persistence.criteria.Join;
+import jakarta.persistence.criteria.JoinType;
 import jakarta.persistence.criteria.Predicate;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -38,6 +44,12 @@ public class QuestionService {
 
     @Transactional(readOnly = true)
     public Page<QuestionResponseDTO> findAll(Long originId, Long areaId, Long testId, Integer year, Pageable pageable) {
+        return findAll(originId, areaId, testId, year, null, null, null, pageable);
+    }
+
+    @Transactional(readOnly = true)
+    public Page<QuestionResponseDTO> findAll(Long originId, Long areaId, Long testId, Integer year,
+                                            String difficulty, String search, String sort, Pageable pageable) {
         Specification<Question> spec = (root, query, cb) -> {
             List<Predicate> predicates = new ArrayList<>();
             if (originId != null) {
@@ -52,11 +64,42 @@ public class QuestionService {
             if (year != null) {
                 predicates.add(cb.equal(root.get("year"), year));
             }
+            if (difficulty != null && !difficulty.isBlank()) {
+                try {
+                    DifficultyLevel level = DifficultyLevel.valueOf(difficulty.toUpperCase());
+                    Join<Question, QuestionStatistic> statJoin = root.join("statistic", JoinType.LEFT);
+                    predicates.add(cb.equal(statJoin.get("difficultyLevel"), level));
+                } catch (IllegalArgumentException ignored) {}
+            }
+            if (search != null && !search.isBlank()) {
+                predicates.add(cb.like(cb.lower(root.get("enunciado")), "%" + search.toLowerCase() + "%"));
+            }
             return cb.and(predicates.toArray(new Predicate[0]));
         };
 
-        return questionRepository.findAll(spec, pageable)
+        Pageable sortedPageable = pageable;
+        if ("mostAnswered".equalsIgnoreCase(sort)) {
+            sortedPageable = PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(),
+                    Sort.by(Sort.Direction.DESC, "statistic.totalAttempts")
+                            .and(Sort.by(Sort.Direction.DESC, "createdAt")));
+        } else if (pageable.getSort().isUnsorted()) {
+            sortedPageable = PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(),
+                    Sort.by(Sort.Direction.DESC, "year")
+                            .and(Sort.by(Sort.Direction.DESC, "id")));
+        }
+
+        return questionRepository.findAll(spec, sortedPageable)
                 .map(questionMapper::toDTO);
+    }
+
+    @Transactional(readOnly = true)
+    public Page<QuestionResponseDTO> findByOriginOrdered(Long originId, Pageable pageable) {
+        return findAll(originId, null, null, null, null, null, "mostAnswered", pageable);
+    }
+
+    @Transactional(readOnly = true)
+    public Page<QuestionResponseDTO> findByAreaOrdered(Long areaId, Pageable pageable) {
+        return findAll(null, areaId, null, null, null, null, "mostAnswered", pageable);
     }
 
     @Transactional(readOnly = true)
@@ -115,9 +158,22 @@ public class QuestionService {
 
         if (correct != null) {
             saved.setCorrectAlternative(correct);
-            saved = questionRepository.save(saved);
         }
 
+        if (saved.getStatistic() == null) {
+            QuestionStatistic stat = QuestionStatistic.builder()
+                    .question(saved)
+                    .questionId(saved.getId())
+                    .totalAttempts(0L)
+                    .firstAttempts(0L)
+                    .firstAttemptCorrect(0L)
+                    .firstAttemptAccuracy(0.0)
+                    .difficultyLevel(DifficultyLevel.SEM_DADOS)
+                    .build();
+            saved.setStatistic(stat);
+        }
+
+        saved = questionRepository.save(saved);
         return questionMapper.toDTO(saved);
     }
 
