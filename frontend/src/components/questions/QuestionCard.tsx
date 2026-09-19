@@ -19,10 +19,12 @@ import BookmarkIcon from '@mui/icons-material/Bookmark';
 import ShareOutlinedIcon from '@mui/icons-material/ShareOutlined';
 import RestartAltIcon from '@mui/icons-material/RestartAlt';
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
+import { Link } from 'react-router-dom';
 import { DifficultyLevel, Question } from '../../types';
 import { PALETTE_COLORS } from '../../theme/theme';
 import { useAppTheme } from '../../theme/ThemeContext';
 import { submitQuestionAttempt } from '../../services/api';
+import { useAuth } from '../../context/AuthContext';
 
 interface QuestionCardProps {
   question: Question;
@@ -46,11 +48,14 @@ export const QuestionCard: React.FC<QuestionCardProps> = ({
 }) => {
   const { mode } = useAppTheme();
   const isDark = mode === 'dark';
+  const { attemptedQuestionIds, markQuestionAttempted } = useAuth();
 
   const [selectedAlternativeId, setSelectedAlternativeId] = useState<number | null>(null);
   const [isAnswered, setIsAnswered] = useState<boolean>(false);
   const [localBookmarked, setLocalBookmarked] = useState<boolean>(false);
   const [hasAttemptedBefore, setHasAttemptedBefore] = useState<boolean>(false);
+
+  const isAttemptedByCurrentUser = attemptedQuestionIds.has(question.id);
 
   // Dynamic statistics state
   const [difficultyLevel, setDifficultyLevel] = useState<DifficultyLevel>(
@@ -85,6 +90,7 @@ export const QuestionCard: React.FC<QuestionCardProps> = ({
         sessionId: getSessionId(),
       });
       setHasAttemptedBefore(true);
+      markQuestionAttempted(question.id);
       if (response.difficultyLevel) {
         setDifficultyLevel(response.difficultyLevel);
       }
@@ -197,6 +203,20 @@ export const QuestionCard: React.FC<QuestionCardProps> = ({
             }}
           />
 
+          {isAttemptedByCurrentUser && (
+            <Chip
+              label="Já respondida"
+              size="small"
+              icon={<CheckCircleOutlineIcon style={{ color: PALETTE_COLORS.success }} />}
+              sx={{
+                backgroundColor: isDark ? 'rgba(75, 241, 81, 0.15)' : 'rgba(75, 241, 81, 0.2)',
+                color: PALETTE_COLORS.success,
+                fontWeight: 700,
+                border: `1px solid ${PALETTE_COLORS.success}`,
+              }}
+            />
+          )}
+
           {renderDifficultyBadge(difficultyLevel)}
 
           {question.originName && (
@@ -242,6 +262,23 @@ export const QuestionCard: React.FC<QuestionCardProps> = ({
                 color: 'text.secondary',
               }}
             />
+          )}
+
+          {question.createdByUser && (
+            <Typography
+              component={Link}
+              to={`/perfil/${question.createdByUser.id}`}
+              variant="caption"
+              sx={{
+                color: PALETTE_COLORS.secondary,
+                fontWeight: 600,
+                textDecoration: 'none',
+                ml: 1,
+                '&:hover': { textDecoration: 'underline' },
+              }}
+            >
+              Adicionado por {question.createdByUser.name}
+            </Typography>
           )}
         </Stack>
 
