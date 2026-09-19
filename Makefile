@@ -2,7 +2,8 @@ MVN = ./mvnw
 
 .PHONY: build up down logs status \
         clean compile test package package-all run \
-        mvn-clean mvn-compile mvn-test mvn-package mvn-package-all mvn-run
+        mvn-clean mvn-compile mvn-test mvn-package mvn-package-all mvn-run \
+        frontend-install frontend-dev frontend-build
 
 # ==========================================
 # Docker Commands
@@ -56,3 +57,20 @@ package-all mvn-package-all:
 # Executa a aplicação localmente via Spring Boot
 run mvn-run:
 	$(MVN) spring-boot:run
+
+# ==========================================
+# Frontend Commands
+# ==========================================
+
+# Instala as dependências do frontend
+frontend-install:
+	cd frontend && npm install
+
+# Executa o servidor de desenvolvimento do frontend
+frontend-dev:
+	cd frontend && npm run dev
+
+# Gera a build de produção do frontend
+frontend-build:
+	cd frontend && npm run build
+
