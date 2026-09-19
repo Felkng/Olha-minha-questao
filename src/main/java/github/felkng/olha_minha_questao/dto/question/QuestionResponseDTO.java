@@ -5,6 +5,7 @@ import github.felkng.olha_minha_questao.dto.area.AreaResponseDTO;
 import github.felkng.olha_minha_questao.dto.origin.OriginResponseDTO;
 import github.felkng.olha_minha_questao.dto.subject.SubjectResponseDTO;
 import github.felkng.olha_minha_questao.dto.test.TestResponseDTO;
+import github.felkng.olha_minha_questao.dto.user.UserSummaryDTO;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -29,6 +30,7 @@ public class QuestionResponseDTO {
     private AreaResponseDTO area;
     private SubjectResponseDTO subject;
     private TestResponseDTO test;
+    private UserSummaryDTO createdByUser;
     @Builder.Default
     private List<AlternativeResponseDTO> alternatives = new ArrayList<>();
     private Long correctAlternativeId;
