@@ -87,8 +87,9 @@ export const UserProfilePage: React.FC = () => {
     );
   }
 
-  // Visualizador do Heatmap de 30 dias (ou dias com atividades)
-  const activityMap = new Map(profile.dailyActivities.map((a) => [a.date, a.count]));
+  // Visualizador do Heatmap de 35 dias (ou dias com atividades)
+  const activities = profile.dailyActivities || (profile as any).dailyActivity || [];
+  const activityMap = new Map(activities.map((a: any) => [a.date, a.count]));
 
   // Gera os últimos 35 dias (5 semanas)
   const today = new Date();
@@ -176,7 +177,7 @@ export const UserProfilePage: React.FC = () => {
           <Card elevation={3} sx={{ textAlign: 'center', py: 2 }}>
             <CardContent>
               <Typography variant="h3" fontWeight="bold" color="primary">
-                {profile.totalResolved}
+                {profile.totalResolved ?? 0}
               </Typography>
               <Typography variant="subtitle2" color="text.secondary">
                 Questões Resolvidas
@@ -188,7 +189,7 @@ export const UserProfilePage: React.FC = () => {
           <Card elevation={3} sx={{ textAlign: 'center', py: 2 }}>
             <CardContent>
               <Typography variant="h3" fontWeight="bold" sx={{ color: '#4bf151' }}>
-                {profile.easyAccuracy.toFixed(1)}%
+                {(profile.easyAccuracy ?? 0).toFixed(1)}%
               </Typography>
               <Typography variant="subtitle2" color="text.secondary">
                 Acerto Questões Fáceis
@@ -200,7 +201,7 @@ export const UserProfilePage: React.FC = () => {
           <Card elevation={3} sx={{ textAlign: 'center', py: 2 }}>
             <CardContent>
               <Typography variant="h3" fontWeight="bold" sx={{ color: '#f3ff3d' }}>
-                {profile.mediumAccuracy.toFixed(1)}%
+                {(profile.mediumAccuracy ?? 0).toFixed(1)}%
               </Typography>
               <Typography variant="subtitle2" color="text.secondary">
                 Acerto Questões Médias
@@ -212,7 +213,7 @@ export const UserProfilePage: React.FC = () => {
           <Card elevation={3} sx={{ textAlign: 'center', py: 2 }}>
             <CardContent>
               <Typography variant="h3" fontWeight="bold" sx={{ color: '#fa424b' }}>
-                {profile.hardAccuracy.toFixed(1)}%
+                {(profile.hardAccuracy ?? 0).toFixed(1)}%
               </Typography>
               <Typography variant="subtitle2" color="text.secondary">
                 Acerto Questões Difíceis
