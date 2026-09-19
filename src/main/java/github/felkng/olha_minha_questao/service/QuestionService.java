@@ -8,11 +8,13 @@ import github.felkng.olha_minha_questao.domain.entity.Question;
 import github.felkng.olha_minha_questao.domain.entity.QuestionStatistic;
 import github.felkng.olha_minha_questao.domain.entity.Subject;
 import github.felkng.olha_minha_questao.domain.entity.Test;
+import github.felkng.olha_minha_questao.domain.entity.User;
 import github.felkng.olha_minha_questao.domain.repository.AreaRepository;
 import github.felkng.olha_minha_questao.domain.repository.OriginRepository;
 import github.felkng.olha_minha_questao.domain.repository.QuestionRepository;
 import github.felkng.olha_minha_questao.domain.repository.SubjectRepository;
 import github.felkng.olha_minha_questao.domain.repository.TestRepository;
+import github.felkng.olha_minha_questao.domain.repository.UserRepository;
 import github.felkng.olha_minha_questao.dto.question.QuestionRequestDTO;
 import github.felkng.olha_minha_questao.dto.question.QuestionResponseDTO;
 import github.felkng.olha_minha_questao.exception.ResourceNotFoundException;
@@ -42,6 +44,7 @@ public class QuestionService {
     private final AreaRepository areaRepository;
     private final SubjectRepository subjectRepository;
     private final TestRepository testRepository;
+    private final UserRepository userRepository;
     private final QuestionMapper questionMapper;
     private final AlternativeMapper alternativeMapper;
 
@@ -114,6 +117,11 @@ public class QuestionService {
 
     @Transactional
     public QuestionResponseDTO create(QuestionRequestDTO dto) {
+        return create(dto, null);
+    }
+
+    @Transactional
+    public QuestionResponseDTO create(QuestionRequestDTO dto, Long userId) {
         Origin origin = originRepository.findById(dto.getOriginId())
                 .orElseThrow(() -> new ResourceNotFoundException("Origem não encontrada com o id: " + dto.getOriginId()));
 
@@ -132,11 +140,17 @@ public class QuestionService {
                     .orElseThrow(() -> new ResourceNotFoundException("Prova não encontrada com o id: " + dto.getTestId()));
         }
 
+        User creator = null;
+        if (userId != null) {
+            creator = userRepository.findById(userId).orElse(null);
+        }
+
         Question question = questionMapper.toEntity(dto);
         question.setOrigin(origin);
         question.setArea(area);
         question.setSubject(subject);
         question.setTest(test);
+        question.setCreatedByUser(creator);
 
         if (dto.getAlternatives() != null && !dto.getAlternatives().isEmpty()) {
             List<Alternative> alternatives = dto.getAlternatives().stream()
