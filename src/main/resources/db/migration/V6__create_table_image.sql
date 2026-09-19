@@ -1,0 +1,8 @@
+CREATE TABLE IF NOT EXISTS image (
+    id BIGSERIAL PRIMARY KEY,
+    url TEXT NOT NULL,
+    alt_text VARCHAR(255),
+    file_name VARCHAR(255),
+    content_type VARCHAR(100),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL
+);
