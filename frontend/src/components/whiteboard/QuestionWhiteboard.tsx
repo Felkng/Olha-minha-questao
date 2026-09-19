@@ -14,7 +14,6 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
-  TextField,
   ToggleButton,
   ToggleButtonGroup,
   Table,
@@ -82,9 +81,16 @@ const STROKE_WIDTHS = [
   { label: 'Extra', value: 10 },
 ];
 
-// Cursor personalizado para rotação livre (ícone de setas circulares com contorno branco e preenchimento escuro)
+// Cursor personalizado para rotação livre
 const ROTATE_CURSOR =
   "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Cpath d='M12 4V1L8 5l4 4V6c3.31 0 6 2.69 6 6 0 1.01-.25 1.97-.7 2.8l1.46 1.46A7.93 7.93 0 0 0 20 12c0-4.42-3.58-8-8-8zm0 14c-3.31 0-6-2.69-6-6 0-1.01.25-1.97.7-2.8L5.24 7.74A7.93 7.93 0 0 0 4 12c0 4.42 3.58 8 8 8v3l4-4-4-4v3z' fill='%23000000' stroke='%23ffffff' stroke-width='1.5' stroke-linejoin='round'/%3E%3C/svg%3E\") 12 12, crosshair";
+
+// Cursores para resize handles
+const RESIZE_CURSORS: Record<string, string> = {
+  nw: 'nw-resize', n: 'n-resize', ne: 'ne-resize',
+  w: 'w-resize',                   e: 'e-resize',
+  sw: 'sw-resize', s: 's-resize', se: 'se-resize',
+};
 
 const generateId = () => 'el_' + Math.random().toString(36).substring(2, 10);
 
@@ -182,6 +188,88 @@ export const getElementBounds = (el: BoardElement): { cx: number; cy: number; wi
         maxX: el.x + textWidth,
         maxY: el.y,
       };
+    }
+  }
+};
+
+// Retorna bounds englobando múltiplos elementos
+const getMultiBounds = (els: BoardElement[]) => {
+  if (els.length === 0) return null;
+  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+  for (const el of els) {
+    const b = getElementBounds(el);
+    if (b.minX < minX) minX = b.minX;
+    if (b.maxX > maxX) maxX = b.maxX;
+    if (b.minY < minY) minY = b.minY;
+    if (b.maxY > maxY) maxY = b.maxY;
+  }
+  return { minX, maxX, minY, maxY, cx: (minX + maxX) / 2, cy: (minY + maxY) / 2, width: maxX - minX, height: maxY - minY };
+};
+
+// Aplica delta de posição a um elemento
+const moveElement = (el: BoardElement, dx: number, dy: number): BoardElement => {
+  switch (el.type) {
+    case 'brush':
+      return { ...el, points: el.points.map((p) => ({ x: p.x + dx, y: p.y + dy })) };
+    case 'rectangle':
+    case 'square':
+      return { ...el, x: el.x + dx, y: el.y + dy };
+    case 'triangle':
+      return { ...el, x1: el.x1 + dx, y1: el.y1 + dy, x2: el.x2 + dx, y2: el.y2 + dy, x3: el.x3 + dx, y3: el.y3 + dy };
+    case 'circle':
+    case 'star':
+      return { ...el, cx: el.cx + dx, cy: el.cy + dy };
+    case 'text':
+      return { ...el, x: el.x + dx, y: el.y + dy };
+  }
+};
+
+// Aplica escala a um elemento em relação a um ponto de âncora
+const scaleElement = (el: BoardElement, sx: number, sy: number, anchorX: number, anchorY: number): BoardElement => {
+  switch (el.type) {
+    case 'brush': {
+      const newPoints = el.points.map((p) => ({
+        x: anchorX + (p.x - anchorX) * sx,
+        y: anchorY + (p.y - anchorY) * sy,
+      }));
+      return { ...el, points: newPoints };
+    }
+    case 'rectangle': {
+      const newX = anchorX + (el.x - anchorX) * sx;
+      const newY = anchorY + (el.y - anchorY) * sy;
+      return { ...el, x: newX, y: newY, w: el.w * sx, h: el.h * sy };
+    }
+    case 'square': {
+      const newX = anchorX + (el.x - anchorX) * sx;
+      const newY = anchorY + (el.y - anchorY) * sy;
+      const newSize = el.size * Math.max(Math.abs(sx), Math.abs(sy));
+      return { ...el, x: newX, y: newY, size: newSize };
+    }
+    case 'triangle': {
+      return {
+        ...el,
+        x1: anchorX + (el.x1 - anchorX) * sx, y1: anchorY + (el.y1 - anchorY) * sy,
+        x2: anchorX + (el.x2 - anchorX) * sx, y2: anchorY + (el.y2 - anchorY) * sy,
+        x3: anchorX + (el.x3 - anchorX) * sx, y3: anchorY + (el.y3 - anchorY) * sy,
+      };
+    }
+    case 'circle': {
+      const newCx = anchorX + (el.cx - anchorX) * sx;
+      const newCy = anchorY + (el.cy - anchorY) * sy;
+      const newRadius = el.radius * Math.max(Math.abs(sx), Math.abs(sy));
+      return { ...el, cx: newCx, cy: newCy, radius: Math.max(5, newRadius) };
+    }
+    case 'star': {
+      const newCx = anchorX + (el.cx - anchorX) * sx;
+      const newCy = anchorY + (el.cy - anchorY) * sy;
+      const factor = Math.max(Math.abs(sx), Math.abs(sy));
+      return { ...el, cx: newCx, cy: newCy, outerRadius: Math.max(5, el.outerRadius * factor), innerRadius: Math.max(2, el.innerRadius * factor) };
+    }
+    case 'text': {
+      const newX = anchorX + (el.x - anchorX) * sx;
+      const newY = anchorY + (el.y - anchorY) * sy;
+      const newFontSize = Math.max(8, el.fontSize * Math.max(Math.abs(sx), Math.abs(sy)));
+      return { ...el, x: newX, y: newY, fontSize: Math.round(newFontSize) };
     }
   }
 };
@@ -342,6 +430,9 @@ export const xmlToBoard = (xml: string): BoardElement[] => {
   }
 };
 
+// --- Tipos de resize handle ---
+type ResizeHandle = 'nw' | 'n' | 'ne' | 'w' | 'e' | 'sw' | 's' | 'se';
+
 export const QuestionWhiteboard: React.FC<QuestionWhiteboardProps> = ({ questionId }) => {
   const { mode } = useAppTheme();
   const isDark = mode === 'dark';
@@ -349,6 +440,7 @@ export const QuestionWhiteboard: React.FC<QuestionWhiteboardProps> = ({ question
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
+  const inlineTextareaRef = useRef<HTMLTextAreaElement | null>(null);
 
   // Tools & Styling State
   const [activeTool, setActiveTool] = useState<BoardTool>('select');
@@ -364,13 +456,25 @@ export const QuestionWhiteboard: React.FC<QuestionWhiteboardProps> = ({ question
   const [isPanning, setIsPanning] = useState<boolean>(false);
   const [panStart, setPanStart] = useState<BoardPoint>({ x: 0, y: 0 });
 
-  // Selection & Transform State
-  const [selectedElementId, setSelectedElementId] = useState<string | null>(null);
+  // Multi-selection State
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  // Rubber-band (box selection) state
+  const [isBoxSelecting, setIsBoxSelecting] = useState<boolean>(false);
+  const [boxSelectStart, setBoxSelectStart] = useState<BoardPoint | null>(null);
+  const [boxSelectCurrent, setBoxSelectCurrent] = useState<BoardPoint | null>(null);
+
+  // Single element interaction (rotate / drag — applied to whole selection)
   const [isDraggingElement, setIsDraggingElement] = useState<boolean>(false);
   const [isRotatingElement, setIsRotatingElement] = useState<boolean>(false);
   const [dragStartPoint, setDragStartPoint] = useState<BoardPoint | null>(null);
   const [isHoveringRotationHandle, setIsHoveringRotationHandle] = useState<boolean>(false);
   const [isHoveringSelectedElement, setIsHoveringSelectedElement] = useState<boolean>(false);
+
+  // Resize state
+  const [activeResizeHandle, setActiveResizeHandle] = useState<ResizeHandle | null>(null);
+  const [resizeStartBounds, setResizeStartBounds] = useState<{ minX: number; maxX: number; minY: number; maxY: number } | null>(null);
+  const [resizeStartElements, setResizeStartElements] = useState<BoardElement[]>([]);
+  const [isHoveringResizeHandle, setIsHoveringResizeHandle] = useState<ResizeHandle | null>(null);
 
   // Drawing state
   const [elements, setElements] = useState<BoardElement[]>([]);
@@ -380,10 +484,14 @@ export const QuestionWhiteboard: React.FC<QuestionWhiteboardProps> = ({ question
   const [startPoint, setStartPoint] = useState<BoardPoint | null>(null);
   const [currentPreviewElement, setCurrentPreviewElement] = useState<BoardElement | null>(null);
 
-  // Text Dialog State
-  const [textDialogOpen, setTextDialogOpen] = useState<boolean>(false);
-  const [textInput, setTextInput] = useState<string>('');
-  const [textPosition, setTextPosition] = useState<BoardPoint | null>(null);
+  // Inline text editing state (no modal)
+  const [inlineTextState, setInlineTextState] = useState<{
+    elementId: string | null;  // null = new element being created
+    position: BoardPoint;      // world coords (x, y baseline)
+    text: string;
+    color: string;
+    fontSize: number;
+  } | null>(null);
 
   // Shortcuts Dialog State
   const [shortcutsDialogOpen, setShortcutsDialogOpen] = useState<boolean>(false);
@@ -402,7 +510,11 @@ export const QuestionWhiteboard: React.FC<QuestionWhiteboardProps> = ({ question
     height: 520,
   });
 
-  // Atualiza cor padrão se o tema mudar e a cor atual for de baixo contraste
+  // Helper: single selected element (for single-selection operations like rotate)
+  const singleSelectedId = selectedIds.size === 1 ? [...selectedIds][0] : null;
+  const selectedElements = elements.filter((e) => selectedIds.has(e.id));
+
+  // Atualiza cor padrão se o tema mudar
   useEffect(() => {
     if (isDark && selectedColor === '#1A1E24') {
       setSelectedColor(PALETTE_COLORS.primary);
@@ -482,13 +594,11 @@ export const QuestionWhiteboard: React.FC<QuestionWhiteboardProps> = ({ question
 
     measureSize();
 
-    // ResizeObserver monitora mudanças reais de dimensão no container
     const resizeObserver = new ResizeObserver(() => {
       measureSize();
     });
     resizeObserver.observe(container);
 
-    // Múltiplos disparos para cobrir o ciclo de renderização e montagem do Dialog no Portal
     const rafId = requestAnimationFrame(measureSize);
     const t1 = setTimeout(measureSize, 50);
     const t2 = setTimeout(measureSize, 200);
@@ -510,6 +620,16 @@ export const QuestionWhiteboard: React.FC<QuestionWhiteboardProps> = ({ question
       return {
         x: (screenX - viewportOffset.x) / zoom,
         y: (screenY - viewportOffset.y) / zoom,
+      };
+    },
+    [viewportOffset, zoom]
+  );
+
+  const worldToScreen = useCallback(
+    (worldX: number, worldY: number): BoardPoint => {
+      return {
+        x: worldX * zoom + viewportOffset.x,
+        y: worldY * zoom + viewportOffset.y,
       };
     },
     [viewportOffset, zoom]
@@ -545,7 +665,31 @@ export const QuestionWhiteboard: React.FC<QuestionWhiteboardProps> = ({ question
     ctx.stroke();
   };
 
-  // Renderiza todos os elementos no canvas com clipping rigoroso e transformações
+  // Calcula os 8 resize handles em coordenadas de mundo para a multi-seleção
+  const getResizeHandlesWorld = useCallback((bounds: { minX: number; maxX: number; minY: number; maxY: number }): Record<ResizeHandle, BoardPoint> => {
+    const { minX, maxX, minY, maxY } = bounds;
+    const mx = (minX + maxX) / 2;
+    const my = (minY + maxY) / 2;
+    return {
+      nw: { x: minX, y: minY }, n: { x: mx, y: minY }, ne: { x: maxX, y: minY },
+      w:  { x: minX, y: my  },                           e: { x: maxX, y: my  },
+      sw: { x: minX, y: maxY }, s: { x: mx, y: maxY }, se: { x: maxX, y: maxY },
+    };
+  }, []);
+
+  // Detecta se worldPt está sobre um resize handle
+  const findResizeHandleAtPoint = useCallback((worldPt: BoardPoint, bounds: { minX: number; maxX: number; minY: number; maxY: number }): ResizeHandle | null => {
+    const handles = getResizeHandlesWorld(bounds);
+    const hitRadius = 8 / zoom;
+    for (const [key, pt] of Object.entries(handles) as [ResizeHandle, BoardPoint][]) {
+      if (Math.hypot(worldPt.x - pt.x, worldPt.y - pt.y) <= hitRadius) {
+        return key;
+      }
+    }
+    return null;
+  }, [zoom, getResizeHandlesWorld]);
+
+  // Renderiza todos os elementos no canvas
   const renderCanvas = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -563,13 +707,13 @@ export const QuestionWhiteboard: React.FC<QuestionWhiteboardProps> = ({ question
     ctx.save();
     ctx.beginPath();
     ctx.rect(0, 0, width, height);
-    ctx.clip(); // CLIPPING RIGOROSO DE CENA
+    ctx.clip();
 
     const bgColor = isDark ? '#161a20' : '#FFFFFF';
     ctx.fillStyle = bgColor;
     ctx.fillRect(0, 0, width, height);
 
-    // 2. Desenha grade infinita ajustada ao deslocamento e zoom
+    // 2. Desenha grade infinita
     if (showGrid) {
       ctx.strokeStyle = isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)';
       ctx.lineWidth = 1;
@@ -601,7 +745,6 @@ export const QuestionWhiteboard: React.FC<QuestionWhiteboardProps> = ({ question
       ctx.save();
       const bounds = getElementBounds(el);
 
-      // Aplica transformações do elemento (rotação e espelhamento no centro do objeto)
       ctx.translate(bounds.cx, bounds.cy);
       if (el.rotation) {
         ctx.rotate((el.rotation * Math.PI) / 180);
@@ -658,6 +801,8 @@ export const QuestionWhiteboard: React.FC<QuestionWhiteboardProps> = ({ question
           break;
         }
         case 'text': {
+          // Não renderizar o texto que está sendo editado inline (o textarea cobre)
+          if (inlineTextState && inlineTextState.elementId === el.id) break;
           ctx.font = `600 ${el.fontSize}px Inter, sans-serif`;
           ctx.fillText(el.text, el.x, el.y);
           break;
@@ -667,54 +812,111 @@ export const QuestionWhiteboard: React.FC<QuestionWhiteboardProps> = ({ question
       ctx.restore();
     }
 
-    // 4. Desenha caixa de seleção e manipulador de rotação no elemento selecionado
-    if (selectedElementId) {
-      const selectedEl = elements.find((e) => e.id === selectedElementId);
-      if (selectedEl) {
-        const bounds = getElementBounds(selectedEl);
+    // 4. Desenha bounding boxes de seleção para cada elemento selecionado individualmente
+    for (const el of selectedElements) {
+      if (inlineTextState && inlineTextState.elementId === el.id) continue;
+      const bounds = getElementBounds(el);
+      const padding = 4 / zoom;
+
+      ctx.save();
+      ctx.translate(bounds.cx, bounds.cy);
+      if (el.rotation) {
+        ctx.rotate((el.rotation * Math.PI) / 180);
+      }
+      ctx.translate(-bounds.cx, -bounds.cy);
+
+      ctx.strokeStyle = PALETTE_COLORS.secondary + '88';
+      ctx.lineWidth = 1 / zoom;
+      ctx.setLineDash([3 / zoom, 3 / zoom]);
+      ctx.strokeRect(
+        bounds.minX - padding,
+        bounds.minY - padding,
+        bounds.width + padding * 2,
+        bounds.height + padding * 2
+      );
+      ctx.setLineDash([]);
+      ctx.restore();
+    }
+
+    // 5. Desenha bounding box global da multi-seleção + handles de resize + handle de rotação
+    if (selectedIds.size > 0 && !inlineTextState) {
+      const multiBounds = getMultiBounds(selectedElements);
+      if (multiBounds) {
         const padding = 8 / zoom;
+        const mMinX = multiBounds.minX - padding;
+        const mMinY = multiBounds.minY - padding;
+        const mW = multiBounds.width + padding * 2;
+        const mH = multiBounds.height + padding * 2;
 
+        // Bounding box tracejada principal
         ctx.save();
-        ctx.translate(bounds.cx, bounds.cy);
-        if (selectedEl.rotation) {
-          ctx.rotate((selectedEl.rotation * Math.PI) / 180);
-        }
-        ctx.translate(-bounds.cx, -bounds.cy);
-
-        // Bounding box tracejada
         ctx.strokeStyle = PALETTE_COLORS.secondary;
         ctx.lineWidth = 1.5 / zoom;
         ctx.setLineDash([4 / zoom, 4 / zoom]);
-        ctx.strokeRect(
-          bounds.minX - padding,
-          bounds.minY - padding,
-          bounds.width + padding * 2,
-          bounds.height + padding * 2
-        );
-
-        // Manipulador de rotação (haste e círculo no topo)
-        const rotHandleY = bounds.minY - padding - 22 / zoom;
+        ctx.strokeRect(mMinX, mMinY, mW, mH);
         ctx.setLineDash([]);
-        ctx.beginPath();
-        ctx.moveTo(bounds.cx, bounds.minY - padding);
-        ctx.lineTo(bounds.cx, rotHandleY);
-        ctx.stroke();
 
-        ctx.beginPath();
-        ctx.arc(bounds.cx, rotHandleY, 6 / zoom, 0, Math.PI * 2);
-        ctx.fillStyle = PALETTE_COLORS.primary;
-        ctx.fill();
-        ctx.strokeStyle = '#1a1e24';
-        ctx.lineWidth = 1.5 / zoom;
-        ctx.stroke();
+        // Handle de rotação (apenas para seleção de 1 elemento)
+        if (selectedIds.size === 1) {
+          const rotHandleY = mMinY - 22 / zoom;
+          ctx.beginPath();
+          ctx.moveTo(multiBounds.cx, mMinY);
+          ctx.lineTo(multiBounds.cx, rotHandleY);
+          ctx.stroke();
+
+          ctx.beginPath();
+          ctx.arc(multiBounds.cx, rotHandleY, 6 / zoom, 0, Math.PI * 2);
+          ctx.fillStyle = PALETTE_COLORS.primary;
+          ctx.fill();
+          ctx.strokeStyle = '#1a1e24';
+          ctx.lineWidth = 1.5 / zoom;
+          ctx.stroke();
+        }
+
+        // Resize handles (8 pontos)
+        const handleSize = 8 / zoom;
+        const handles = getResizeHandlesWorld({ minX: mMinX, maxX: mMinX + mW, minY: mMinY, maxY: mMinY + mH });
+        for (const [key, pt] of Object.entries(handles) as [ResizeHandle, BoardPoint][]) {
+          const isHovered = isHoveringResizeHandle === key;
+          ctx.beginPath();
+          ctx.rect(pt.x - handleSize / 2, pt.y - handleSize / 2, handleSize, handleSize);
+          ctx.fillStyle = isHovered ? PALETTE_COLORS.primary : '#ffffff';
+          ctx.fill();
+          ctx.strokeStyle = PALETTE_COLORS.secondary;
+          ctx.lineWidth = 1.5 / zoom;
+          ctx.stroke();
+        }
 
         ctx.restore();
       }
     }
 
+    // 6. Desenha rubber-band box de seleção
+    if (isBoxSelecting && boxSelectStart && boxSelectCurrent) {
+      const x = Math.min(boxSelectStart.x, boxSelectCurrent.x);
+      const y = Math.min(boxSelectStart.y, boxSelectCurrent.y);
+      const w = Math.abs(boxSelectCurrent.x - boxSelectStart.x);
+      const h = Math.abs(boxSelectCurrent.y - boxSelectStart.y);
+
+      ctx.save();
+      ctx.strokeStyle = PALETTE_COLORS.secondary;
+      ctx.lineWidth = 1.5 / zoom;
+      ctx.setLineDash([4 / zoom, 4 / zoom]);
+      ctx.strokeRect(x, y, w, h);
+      ctx.fillStyle = PALETTE_COLORS.secondary + '22';
+      ctx.fillRect(x, y, w, h);
+      ctx.setLineDash([]);
+      ctx.restore();
+    }
+
     ctx.restore(); // Restaura transform da câmera
     ctx.restore(); // Restaura clipping
-  }, [canvasDimensions, elements, currentPreviewElement, isDark, showGrid, viewportOffset, zoom, selectedElementId]);
+  }, [
+    canvasDimensions, elements, currentPreviewElement, isDark, showGrid,
+    viewportOffset, zoom, selectedIds, selectedElements, isBoxSelecting,
+    boxSelectStart, boxSelectCurrent, isHoveringResizeHandle, inlineTextState,
+    getResizeHandlesWorld,
+  ]);
 
   useEffect(() => {
     renderCanvas();
@@ -750,25 +952,22 @@ export const QuestionWhiteboard: React.FC<QuestionWhiteboardProps> = ({ question
     return () => clearTimeout(timer);
   }, [elements, hasUnsavedChanges]);
 
-  // Adiciona novo elemento ao histórico (sem selecionar automaticamente ao desenhar)
+  // Adiciona novo elemento ao histórico
   const addElement = (newEl: BoardElement, selectIt: boolean = false) => {
     setUndoStack((prev) => [...prev, elements]);
     setRedoStack([]);
     setElements((prev) => [...prev, newEl]);
     if (selectIt) {
-      setSelectedElementId(newEl.id);
+      setSelectedIds(new Set([newEl.id]));
     }
     setHasUnsavedChanges(true);
   };
 
-  // Atualiza elemento selecionado
-  const updateSelectedElement = (updater: (prev: BoardElement) => BoardElement) => {
-    if (!selectedElementId) return;
+  // Atualiza elementos por ids com um updater
+  const updateElementsByIds = (ids: Set<string>, updater: (prev: BoardElement) => BoardElement) => {
     setUndoStack((prev) => [...prev, elements]);
     setRedoStack([]);
-    setElements((prev) =>
-      prev.map((el) => (el.id === selectedElementId ? updater(el) : el))
-    );
+    setElements((prev) => prev.map((el) => ids.has(el.id) ? updater(el) : el));
     setHasUnsavedChanges(true);
   };
 
@@ -779,7 +978,7 @@ export const QuestionWhiteboard: React.FC<QuestionWhiteboardProps> = ({ question
     setRedoStack((prev) => [...prev, elements]);
     setUndoStack((prev) => prev.slice(0, prev.length - 1));
     setElements(previous);
-    setSelectedElementId(null);
+    setSelectedIds(new Set());
     setHasUnsavedChanges(true);
   };
 
@@ -789,7 +988,7 @@ export const QuestionWhiteboard: React.FC<QuestionWhiteboardProps> = ({ question
     setUndoStack((prev) => [...prev, elements]);
     setRedoStack((prev) => prev.slice(0, prev.length - 1));
     setElements(next);
-    setSelectedElementId(null);
+    setSelectedIds(new Set());
     setHasUnsavedChanges(true);
   };
 
@@ -798,20 +997,20 @@ export const QuestionWhiteboard: React.FC<QuestionWhiteboardProps> = ({ question
     setUndoStack((prev) => [...prev, elements]);
     setRedoStack([]);
     setElements([]);
-    setSelectedElementId(null);
+    setSelectedIds(new Set());
     setHasUnsavedChanges(true);
   };
 
-  // Funções de Transformação no Elemento Selecionado
+  // Funções de Transformação para seleção (aplica a todos os selecionados)
   const handleRotateSelected = (deltaDegrees: number) => {
-    updateSelectedElement((el) => ({
+    updateElementsByIds(selectedIds, (el) => ({
       ...el,
       rotation: ((el.rotation || 0) + deltaDegrees + 360) % 360,
     }));
   };
 
   const handleFlipSelected = (axis: 'x' | 'y') => {
-    updateSelectedElement((el) => ({
+    updateElementsByIds(selectedIds, (el) => ({
       ...el,
       flipX: axis === 'x' ? !el.flipX : el.flipX,
       flipY: axis === 'y' ? !el.flipY : el.flipY,
@@ -819,77 +1018,75 @@ export const QuestionWhiteboard: React.FC<QuestionWhiteboardProps> = ({ question
   };
 
   const handleDeleteSelected = () => {
-    if (!selectedElementId) return;
+    if (selectedIds.size === 0) return;
     setUndoStack((prev) => [...prev, elements]);
     setRedoStack([]);
-    setElements((prev) => prev.filter((el) => el.id !== selectedElementId));
-    setSelectedElementId(null);
+    setElements((prev) => prev.filter((el) => !selectedIds.has(el.id)));
+    setSelectedIds(new Set());
     setHasUnsavedChanges(true);
   };
 
   const handleDuplicateSelected = () => {
-    if (!selectedElementId) return;
-    const target = elements.find((el) => el.id === selectedElementId);
-    if (!target) return;
-
+    if (selectedIds.size === 0) return;
+    const targets = elements.filter((el) => selectedIds.has(el.id));
     const offset = 25;
-    let duplicated: BoardElement;
+    const newEls: BoardElement[] = [];
+    const newIds = new Set<string>();
 
-    switch (target.type) {
-      case 'brush':
-        duplicated = {
-          ...target,
-          id: generateId(),
-          points: target.points.map((p) => ({ x: p.x + offset, y: p.y + offset })),
-        };
-        break;
-      case 'rectangle':
-        duplicated = { ...target, id: generateId(), x: target.x + offset, y: target.y + offset };
-        break;
-      case 'square':
-        duplicated = { ...target, id: generateId(), x: target.x + offset, y: target.y + offset };
-        break;
-      case 'triangle':
-        duplicated = {
-          ...target,
-          id: generateId(),
-          x1: target.x1 + offset,
-          y1: target.y1 + offset,
-          x2: target.x2 + offset,
-          y2: target.y2 + offset,
-          x3: target.x3 + offset,
-          y3: target.y3 + offset,
-        };
-        break;
-      case 'circle':
-      case 'star':
-        duplicated = { ...target, id: generateId(), cx: target.cx + offset, cy: target.cy + offset };
-        break;
-      case 'text':
-        duplicated = { ...target, id: generateId(), x: target.x + offset, y: target.y + offset };
-        break;
+    for (const target of targets) {
+      let duplicated: BoardElement;
+      const newId = generateId();
+
+      switch (target.type) {
+        case 'brush':
+          duplicated = { ...target, id: newId, points: target.points.map((p) => ({ x: p.x + offset, y: p.y + offset })) };
+          break;
+        case 'rectangle':
+          duplicated = { ...target, id: newId, x: target.x + offset, y: target.y + offset };
+          break;
+        case 'square':
+          duplicated = { ...target, id: newId, x: target.x + offset, y: target.y + offset };
+          break;
+        case 'triangle':
+          duplicated = { ...target, id: newId, x1: target.x1 + offset, y1: target.y1 + offset, x2: target.x2 + offset, y2: target.y2 + offset, x3: target.x3 + offset, y3: target.y3 + offset };
+          break;
+        case 'circle':
+        case 'star':
+          duplicated = { ...target, id: newId, cx: target.cx + offset, cy: target.cy + offset };
+          break;
+        case 'text':
+          duplicated = { ...target, id: newId, x: target.x + offset, y: target.y + offset };
+          break;
+      }
+
+      newEls.push(duplicated);
+      newIds.add(newId);
     }
 
-    addElement(duplicated, true);
+    setUndoStack((prev) => [...prev, elements]);
+    setRedoStack([]);
+    setElements((prev) => [...prev, ...newEls]);
+    setSelectedIds(newIds);
+    setHasUnsavedChanges(true);
   };
 
-  // Alterar Cor do elemento selecionado ou da ferramenta ativa
+  // Alterar Cor dos elementos selecionados ou da ferramenta ativa
   const handleColorChange = (newColor: string) => {
     setSelectedColor(newColor);
-    if (selectedElementId) {
-      updateSelectedElement((el) => ({ ...el, color: newColor }));
+    if (selectedIds.size > 0) {
+      updateElementsByIds(selectedIds, (el) => ({ ...el, color: newColor }));
     }
   };
 
-  // Alterar Espessura do traço do elemento selecionado ou da ferramenta ativa
+  // Alterar Espessura do traço dos elementos selecionados ou da ferramenta ativa
   const handleStrokeWidthChange = (newWidth: number) => {
     setStrokeWidth(newWidth);
-    if (selectedElementId) {
-      updateSelectedElement((el) => ('width' in el ? { ...el, width: newWidth } : el));
+    if (selectedIds.size > 0) {
+      updateElementsByIds(selectedIds, (el) => ('width' in el ? { ...el, width: newWidth } : el));
     }
   };
 
-  // Navegação: Zoom In, Zoom Out, Reset (com suporte a zoom focado na posição do cursor)
+  // Navegação: Zoom In, Zoom Out, Reset
   const handleZoom = useCallback((delta: number, focalPoint?: BoardPoint) => {
     setZoom((prevZoom) => {
       const nextZoom = Math.max(0.3, Math.min(3.0, prevZoom + delta));
@@ -915,52 +1112,93 @@ export const QuestionWhiteboard: React.FC<QuestionWhiteboardProps> = ({ question
     setZoom(1.0);
   };
 
-  // Movimento fino com as setas do teclado (nudge)
+  // Movimento fino com as setas do teclado (nudge) — aplicado a todos os selecionados
   const moveSelectedBy = useCallback((dx: number, dy: number) => {
-    if (!selectedElementId) return;
+    if (selectedIds.size === 0) return;
     setElements((prev) =>
-      prev.map((item) => {
-        if (item.id !== selectedElementId) return item;
-        switch (item.type) {
-          case 'brush':
-            return {
-              ...item,
-              points: item.points.map((p) => ({ x: p.x + dx, y: p.y + dy })),
-            };
-          case 'rectangle':
-          case 'square':
-            return { ...item, x: item.x + dx, y: item.y + dy };
-          case 'triangle':
-            return {
-              ...item,
-              x1: item.x1 + dx,
-              y1: item.y1 + dy,
-              x2: item.x2 + dx,
-              y2: item.y2 + dy,
-              x3: item.x3 + dx,
-              y3: item.y3 + dy,
-            };
-          case 'circle':
-          case 'star':
-            return { ...item, cx: item.cx + dx, cy: item.cy + dy };
-          case 'text':
-            return { ...item, x: item.x + dx, y: item.y + dy };
-        }
-      })
+      prev.map((item) => selectedIds.has(item.id) ? moveElement(item, dx, dy) : item)
     );
     setHasUnsavedChanges(true);
-  }, [selectedElementId]);
+  }, [selectedIds]);
 
-  // Atalhos de teclado para ferramentas, figuras, edição e exclusão
+  // Confirma edição de texto inline
+  const commitInlineText = useCallback(() => {
+    if (!inlineTextState) return;
+    const trimmed = inlineTextState.text.trim();
+
+    if (inlineTextState.elementId) {
+      // Editando elemento existente
+      if (trimmed) {
+        setUndoStack((prev) => [...prev, elements]);
+        setRedoStack([]);
+        setElements((prev) =>
+          prev.map((el) =>
+            el.id === inlineTextState.elementId
+              ? { ...el, text: trimmed, color: inlineTextState.color, fontSize: inlineTextState.fontSize } as BoardElement
+              : el
+          )
+        );
+        setHasUnsavedChanges(true);
+      } else {
+        // Texto vazio: remove o elemento
+        setUndoStack((prev) => [...prev, elements]);
+        setRedoStack([]);
+        setElements((prev) => prev.filter((el) => el.id !== inlineTextState.elementId));
+        setSelectedIds(new Set());
+        setHasUnsavedChanges(true);
+      }
+    } else {
+      // Novo elemento de texto
+      if (trimmed) {
+        addElement({
+          id: generateId(),
+          type: 'text',
+          color: inlineTextState.color,
+          fontSize: inlineTextState.fontSize,
+          x: inlineTextState.position.x,
+          y: inlineTextState.position.y,
+          text: trimmed,
+        });
+      }
+    }
+
+    setInlineTextState(null);
+  }, [inlineTextState, elements]);
+
+  // Foca o textarea ao abrir edição inline
+  useEffect(() => {
+    if (inlineTextState) {
+      requestAnimationFrame(() => {
+        inlineTextareaRef.current?.focus();
+        inlineTextareaRef.current?.select();
+      });
+    }
+  }, [inlineTextState]);
+
+  // Atalhos de teclado
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Ignora se estiver digitando em campo de texto ou modais abertos
-      if (textDialogOpen || shortcutsDialogOpen) {
-        if (shortcutsDialogOpen && e.key === 'Escape') {
+      // Se está editando texto inline, só permite Esc (para cancelar) ou Enter sem Shift (para confirmar)
+      if (inlineTextState) {
+        if (e.key === 'Escape') {
+          e.preventDefault();
+          setInlineTextState(null);
+        }
+        // Enter confirma (Shift+Enter é nova linha)
+        if (e.key === 'Enter' && !e.shiftKey) {
+          e.preventDefault();
+          commitInlineText();
+        }
+        return;
+      }
+
+      if (shortcutsDialogOpen) {
+        if (e.key === 'Escape') {
           setShortcutsDialogOpen(false);
         }
         return;
       }
+
       const target = e.target as HTMLElement | null;
       if (
         target &&
@@ -972,31 +1210,27 @@ export const QuestionWhiteboard: React.FC<QuestionWhiteboardProps> = ({ question
         return;
       }
 
-      // Atalho de Ajuda: '?' ou Shift + '/' abre a lista de atalhos
+      // Ajuda
       if (e.key === '?' || (e.shiftKey && e.key === '/')) {
         e.preventDefault();
         setShortcutsDialogOpen(true);
         return;
       }
 
-      // Atalhos de Exclusão: Delete ou Backspace
+      // Exclusão
       if (e.key === 'Delete' || e.key === 'Backspace') {
-        if (selectedElementId) {
+        if (selectedIds.size > 0) {
           e.preventDefault();
           handleDeleteSelected();
         }
         return;
       }
 
-      // Atalhos com Ctrl / Cmd
+      // Ctrl / Cmd
       if (e.ctrlKey || e.metaKey) {
         if (e.key.toLowerCase() === 'z') {
           e.preventDefault();
-          if (e.shiftKey) {
-            handleRedo();
-          } else {
-            handleUndo();
-          }
+          if (e.shiftKey) { handleRedo(); } else { handleUndo(); }
           return;
         }
         if (e.key.toLowerCase() === 'y') {
@@ -1009,13 +1243,18 @@ export const QuestionWhiteboard: React.FC<QuestionWhiteboardProps> = ({ question
           handleDuplicateSelected();
           return;
         }
+        if (e.key.toLowerCase() === 'a') {
+          e.preventDefault();
+          setSelectedIds(new Set(elements.map((el) => el.id)));
+          return;
+        }
       }
 
-      // Desmarcar seleção com Escape ou sair da tela cheia
+      // Escape
       if (e.key === 'Escape') {
-        if (selectedElementId) {
+        if (selectedIds.size > 0) {
           e.preventDefault();
-          setSelectedElementId(null);
+          setSelectedIds(new Set());
           return;
         }
         if (isFullscreen) {
@@ -1025,8 +1264,8 @@ export const QuestionWhiteboard: React.FC<QuestionWhiteboardProps> = ({ question
         }
       }
 
-      // Deslocamento fino com setas do teclado (Nudge)
-      if (selectedElementId && (e.key === 'ArrowUp' || e.key === 'ArrowDown' || e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
+      // Nudge com setas
+      if (selectedIds.size > 0 && (e.key === 'ArrowUp' || e.key === 'ArrowDown' || e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
         e.preventDefault();
         const step = e.shiftKey ? 10 : 2;
         const dx = e.key === 'ArrowLeft' ? -step : e.key === 'ArrowRight' ? step : 0;
@@ -1035,76 +1274,30 @@ export const QuestionWhiteboard: React.FC<QuestionWhiteboardProps> = ({ question
         return;
       }
 
-      // Se tecla modificadora estiver ativa, não aciona atalhos simples de ferramentas
       if (e.ctrlKey || e.metaKey || e.altKey) return;
 
-      // Atalhos de Ferramentas e Figuras
+      // Atalhos de Ferramentas
       const key = e.key.toLowerCase();
       switch (key) {
-        case 'v':
-        case '1':
-          setActiveTool('select');
-          break;
-        case 'h':
-        case '2':
-          setActiveTool('pan');
-          setSelectedElementId(null);
-          break;
-        case 'b':
-        case '3':
-          setActiveTool('brush');
-          setSelectedElementId(null);
-          break;
-        case 'e':
-        case '4':
-          setActiveTool('eraser');
-          setSelectedElementId(null);
-          break;
-        case 't':
-        case '5':
-          setActiveTool('text');
-          setSelectedElementId(null);
-          break;
-        case 'r':
-        case '6':
-          setActiveTool('rectangle');
-          setSelectedElementId(null);
-          break;
-        case 's':
-        case '7':
-          setActiveTool('square');
-          setSelectedElementId(null);
-          break;
-        case 'c':
-        case '8':
-          setActiveTool('circle');
-          setSelectedElementId(null);
-          break;
-        case 'g':
-        case '9':
-          setActiveTool('triangle');
-          setSelectedElementId(null);
-          break;
-        case 'x':
-        case '0':
-          setActiveTool('star');
-          setSelectedElementId(null);
-          break;
+        case 'v': case '1': setActiveTool('select'); break;
+        case 'h': case '2': setActiveTool('pan'); setSelectedIds(new Set()); break;
+        case 'b': case '3': setActiveTool('brush'); setSelectedIds(new Set()); break;
+        case 'e': case '4': setActiveTool('eraser'); setSelectedIds(new Set()); break;
+        case 't': case '5': setActiveTool('text'); setSelectedIds(new Set()); break;
+        case 'r': case '6': setActiveTool('rectangle'); setSelectedIds(new Set()); break;
+        case 's': case '7': setActiveTool('square'); setSelectedIds(new Set()); break;
+        case 'c': case '8': setActiveTool('circle'); setSelectedIds(new Set()); break;
+        case 'g': case '9': setActiveTool('triangle'); setSelectedIds(new Set()); break;
+        case 'x': case '0': setActiveTool('star'); setSelectedIds(new Set()); break;
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [
-    selectedElementId,
-    textDialogOpen,
-    shortcutsDialogOpen,
-    isFullscreen,
-    handleDeleteSelected,
-    handleUndo,
-    handleRedo,
-    handleDuplicateSelected,
-    moveSelectedBy,
+    selectedIds, shortcutsDialogOpen, isFullscreen, inlineTextState,
+    handleDeleteSelected, handleUndo, handleRedo, handleDuplicateSelected,
+    moveSelectedBy, commitInlineText, elements,
   ]);
 
   // Helper de coordenadas relativas ao Canvas na tela
@@ -1134,13 +1327,11 @@ export const QuestionWhiteboard: React.FC<QuestionWhiteboardProps> = ({ question
 
   // Detecção de colisão / Hit Test para seleção de objetos
   const findElementAtPoint = (worldPt: BoardPoint): BoardElement | null => {
-    // Procura de trás para frente (elementos superiores primeiro)
     for (let i = elements.length - 1; i >= 0; i--) {
       const el = elements[i];
       const bounds = getElementBounds(el);
       const hitPadding = 12;
 
-      // Se rotacionado, faz teste rotacionando o ponto em torno do centro do objeto
       let testPt = worldPt;
       if (el.rotation) {
         const rad = (-el.rotation * Math.PI) / 180;
@@ -1164,10 +1355,26 @@ export const QuestionWhiteboard: React.FC<QuestionWhiteboardProps> = ({ question
     return null;
   };
 
-  // Testa se o clique foi no manipulador de rotação do elemento selecionado
-  const isClickOnRotationHandle = (worldPt: BoardPoint, el: BoardElement): boolean => {
+  // Encontra elementos dentro de um rect de rubber-band (coords de mundo)
+  const findElementsInRect = (r1: BoardPoint, r2: BoardPoint): BoardElement[] => {
+    const minX = Math.min(r1.x, r2.x);
+    const maxX = Math.max(r1.x, r2.x);
+    const minY = Math.min(r1.y, r2.y);
+    const maxY = Math.max(r1.y, r2.y);
+    return elements.filter((el) => {
+      const b = getElementBounds(el);
+      return b.cx >= minX && b.cx <= maxX && b.cy >= minY && b.cy <= maxY;
+    });
+  };
+
+  // Testa se o clique foi no manipulador de rotação do elemento selecionado (apenas 1 seleção)
+  const isClickOnRotationHandle = (worldPt: BoardPoint): boolean => {
+    if (selectedIds.size !== 1) return false;
+    const el = elements.find((e) => e.id === [...selectedIds][0]);
+    if (!el) return false;
     const bounds = getElementBounds(el);
     const rotHandleDist = 22 / zoom;
+    const padding = 8 / zoom;
 
     let testPt = worldPt;
     if (el.rotation) {
@@ -1180,14 +1387,21 @@ export const QuestionWhiteboard: React.FC<QuestionWhiteboardProps> = ({ question
       };
     }
 
-    const handlePt = { x: bounds.cx, y: bounds.minY - 8 / zoom - rotHandleDist };
+    const handlePt = { x: bounds.cx, y: bounds.minY - padding - rotHandleDist };
     return Math.hypot(testPt.x - handlePt.x, testPt.y - handlePt.y) <= 12 / zoom;
   };
 
   // Handlers de Interação do Canvas
   const handleStart = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
+    // Commit inline text se estiver aberto
+    if (inlineTextState) {
+      commitInlineText();
+      return;
+    }
+
     const screenPt = getScreenPoint(e);
     const worldPt = screenToWorld(screenPt.x, screenPt.y);
+    const isShift = 'shiftKey' in e && e.shiftKey;
 
     // Ferramenta de Navegação (Pan) ou clique com botão do meio
     if (activeTool === 'pan' || ('button' in e && e.button === 1)) {
@@ -1196,38 +1410,87 @@ export const QuestionWhiteboard: React.FC<QuestionWhiteboardProps> = ({ question
       return;
     }
 
-    // Ferramenta de Seleção / Cursor Comum
+    // Ferramenta de Seleção
     if (activeTool === 'select') {
-      if (selectedElementId) {
-        const selectedEl = elements.find((el) => el.id === selectedElementId);
-        if (selectedEl && isClickOnRotationHandle(worldPt, selectedEl)) {
-          setIsRotatingElement(true);
-          setDragStartPoint(worldPt);
-          return;
+      // Checa rotation handle primeiro (só quando 1 selecionado)
+      if (isClickOnRotationHandle(worldPt)) {
+        setIsRotatingElement(true);
+        setDragStartPoint(worldPt);
+        return;
+      }
+
+      // Checa resize handles
+      if (selectedIds.size > 0) {
+        const multiBounds = getMultiBounds(selectedElements);
+        if (multiBounds) {
+          const padding = 8 / zoom;
+          const paddedBounds = {
+            minX: multiBounds.minX - padding,
+            maxX: multiBounds.maxX + padding,
+            minY: multiBounds.minY - padding,
+            maxY: multiBounds.maxY + padding,
+          };
+          const rHandle = findResizeHandleAtPoint(worldPt, paddedBounds);
+          if (rHandle) {
+            setActiveResizeHandle(rHandle);
+            setResizeStartBounds(paddedBounds);
+            setResizeStartElements([...selectedElements]);
+            setDragStartPoint(worldPt);
+            return;
+          }
         }
       }
 
       const hit = findElementAtPoint(worldPt);
+
       if (hit) {
-        setSelectedElementId(hit.id);
-        setIsDraggingElement(true);
-        setDragStartPoint(worldPt);
+        if (isShift) {
+          // Shift+click: toggle no set de seleção
+          setSelectedIds((prev) => {
+            const next = new Set(prev);
+            if (next.has(hit.id)) {
+              next.delete(hit.id);
+            } else {
+              next.add(hit.id);
+            }
+            return next;
+          });
+        } else {
+          if (!selectedIds.has(hit.id)) {
+            // Clique sem Shift em elemento fora da seleção: seleciona só ele
+            setSelectedIds(new Set([hit.id]));
+          }
+          // Inicia drag de todos os selecionados
+          setIsDraggingElement(true);
+          setDragStartPoint(worldPt);
+        }
       } else {
-        setSelectedElementId(null);
+        if (!isShift) {
+          setSelectedIds(new Set());
+        }
+        // Inicia rubber-band box select
+        setIsBoxSelecting(true);
+        setBoxSelectStart(worldPt);
+        setBoxSelectCurrent(worldPt);
       }
       return;
     }
 
     // Desmarca qualquer elemento selecionado ao usar ferramentas que não sejam de seleção
-    if (selectedElementId) {
-      setSelectedElementId(null);
+    if (selectedIds.size > 0) {
+      setSelectedIds(new Set());
     }
 
-    // Ferramenta de Texto
+    // Ferramenta de Texto (inline)
     if (activeTool === 'text') {
-      setTextPosition(worldPt);
-      setTextInput('');
-      setTextDialogOpen(true);
+      const fontSize = Math.max(14, strokeWidth * 4);
+      setInlineTextState({
+        elementId: null,
+        position: { x: worldPt.x, y: worldPt.y },
+        text: '',
+        color: selectedColor,
+        fontSize,
+      });
       return;
     }
 
@@ -1252,24 +1515,47 @@ export const QuestionWhiteboard: React.FC<QuestionWhiteboardProps> = ({ question
     const screenPt = getScreenPoint(e);
     const worldPt = screenToWorld(screenPt.x, screenPt.y);
 
-    // Detecção de Hover no Manipulador de Rotação e Objeto Selecionado
-    if (activeTool === 'select' && selectedElementId && !isDraggingElement && !isRotatingElement && !isDrawing && !isPanning) {
-      const selectedEl = elements.find((item) => item.id === selectedElementId);
-      if (selectedEl && isClickOnRotationHandle(worldPt, selectedEl)) {
+    // Hover detection (selection tool, não arrastando)
+    if (activeTool === 'select' && !isDraggingElement && !isRotatingElement && !isDrawing && !isPanning && !isBoxSelecting && !activeResizeHandle) {
+      // Resize handle hover
+      if (selectedIds.size > 0) {
+        const multiBounds = getMultiBounds(selectedElements);
+        if (multiBounds) {
+          const padding = 8 / zoom;
+          const paddedBounds = {
+            minX: multiBounds.minX - padding,
+            maxX: multiBounds.maxX + padding,
+            minY: multiBounds.minY - padding,
+            maxY: multiBounds.maxY + padding,
+          };
+          const rHandle = findResizeHandleAtPoint(worldPt, paddedBounds);
+          setIsHoveringResizeHandle(rHandle);
+
+          if (rHandle) {
+            setIsHoveringRotationHandle(false);
+            setIsHoveringSelectedElement(false);
+            return;
+          }
+        }
+      }
+
+      // Rotation handle hover (1 selecionado)
+      if (isClickOnRotationHandle(worldPt)) {
         setIsHoveringRotationHandle(true);
         setIsHoveringSelectedElement(false);
-      } else {
-        setIsHoveringRotationHandle(false);
-        const hit = findElementAtPoint(worldPt);
-        setIsHoveringSelectedElement(hit?.id === selectedElementId);
+        setIsHoveringResizeHandle(null);
+        return;
       }
+
+      setIsHoveringRotationHandle(false);
+      setIsHoveringResizeHandle(null);
+      const hit = findElementAtPoint(worldPt);
+      setIsHoveringSelectedElement(hit !== null && selectedIds.has(hit.id));
+      return;
     } else {
-      if (isHoveringRotationHandle && !isRotatingElement) {
-        setIsHoveringRotationHandle(false);
-      }
-      if (isHoveringSelectedElement && !isDraggingElement) {
-        setIsHoveringSelectedElement(false);
-      }
+      if (!isRotatingElement) setIsHoveringRotationHandle(false);
+      if (!activeResizeHandle) setIsHoveringResizeHandle(null);
+      if (!isDraggingElement) setIsHoveringSelectedElement(false);
     }
 
     // Navegação (Pan)
@@ -1281,56 +1567,70 @@ export const QuestionWhiteboard: React.FC<QuestionWhiteboardProps> = ({ question
       return;
     }
 
-    // Rotação do elemento selecionado
-    if (isRotatingElement && selectedElementId) {
-      const el = elements.find((item) => item.id === selectedElementId);
+    // Rubber-band box select
+    if (isBoxSelecting && boxSelectStart) {
+      setBoxSelectCurrent(worldPt);
+      return;
+    }
+
+    // Rotação do elemento selecionado (apenas 1)
+    if (isRotatingElement && singleSelectedId) {
+      const el = elements.find((item) => item.id === singleSelectedId);
       if (el) {
         const bounds = getElementBounds(el);
         const angleRad = Math.atan2(worldPt.y - bounds.cy, worldPt.x - bounds.cx);
-        // O manipulador fica a -90 graus (topo)
         const degrees = ((angleRad * 180) / Math.PI + 90 + 360) % 360;
         setElements((prev) =>
-          prev.map((item) => (item.id === selectedElementId ? { ...item, rotation: Math.round(degrees) } : item))
+          prev.map((item) => (item.id === singleSelectedId ? { ...item, rotation: Math.round(degrees) } : item))
         );
         setHasUnsavedChanges(true);
       }
       return;
     }
 
-    // Movimentação / Drag do elemento selecionado
-    if (isDraggingElement && selectedElementId && dragStartPoint) {
+    // Resize de elementos selecionados
+    if (activeResizeHandle && resizeStartBounds && dragStartPoint && resizeStartElements.length > 0) {
+      const { minX: bMinX, maxX: bMaxX, minY: bMinY, maxY: bMaxY } = resizeStartBounds;
+      const bW = bMaxX - bMinX;
+      const bH = bMaxY - bMinY;
+
+      let newMinX = bMinX, newMaxX = bMaxX, newMinY = bMinY, newMaxY = bMaxY;
+
+      const h = activeResizeHandle;
+      if (h.includes('w')) newMinX = Math.min(worldPt.x, bMaxX - 10);
+      if (h.includes('e')) newMaxX = Math.max(worldPt.x, bMinX + 10);
+      if (h.includes('n')) newMinY = Math.min(worldPt.y, bMaxY - 10);
+      if (h.includes('s')) newMaxY = Math.max(worldPt.y, bMinY + 10);
+
+      const newW = newMaxX - newMinX;
+      const newH = newMaxY - newMinY;
+
+      const scaleX = bW > 0 ? newW / bW : 1;
+      const scaleY = bH > 0 ? newH / bH : 1;
+
+      // Âncora: canto oposto ao handle
+      const anchorX = h.includes('w') ? bMaxX : bMinX;
+      const anchorY = h.includes('n') ? bMaxY : bMinY;
+
+      const updatedEls = resizeStartElements.map((el) =>
+        scaleElement(el, scaleX, scaleY, anchorX, anchorY)
+      );
+
+      setElements((prev) => {
+        const updatedMap = new Map(updatedEls.map((el) => [el.id, el]));
+        return prev.map((el) => updatedMap.get(el.id) ?? el);
+      });
+      setHasUnsavedChanges(true);
+      return;
+    }
+
+    // Movimentação / Drag dos elementos selecionados
+    if (isDraggingElement && selectedIds.size > 0 && dragStartPoint) {
       const dx = worldPt.x - dragStartPoint.x;
       const dy = worldPt.y - dragStartPoint.y;
 
       setElements((prev) =>
-        prev.map((item) => {
-          if (item.id !== selectedElementId) return item;
-          switch (item.type) {
-            case 'brush':
-              return {
-                ...item,
-                points: item.points.map((p) => ({ x: p.x + dx, y: p.y + dy })),
-              };
-            case 'rectangle':
-            case 'square':
-              return { ...item, x: item.x + dx, y: item.y + dy };
-            case 'triangle':
-              return {
-                ...item,
-                x1: item.x1 + dx,
-                y1: item.y1 + dy,
-                x2: item.x2 + dx,
-                y2: item.y2 + dy,
-                x3: item.x3 + dx,
-                y3: item.y3 + dy,
-              };
-            case 'circle':
-            case 'star':
-              return { ...item, cx: item.cx + dx, cy: item.cy + dy };
-            case 'text':
-              return { ...item, x: item.x + dx, y: item.y + dy };
-          }
-        })
+        prev.map((item) => selectedIds.has(item.id) ? moveElement(item, dx, dy) : item)
       );
       setDragStartPoint(worldPt);
       setHasUnsavedChanges(true);
@@ -1343,10 +1643,7 @@ export const QuestionWhiteboard: React.FC<QuestionWhiteboardProps> = ({ question
     if (activeTool === 'brush') {
       setCurrentPreviewElement((prev) => {
         if (prev && prev.type === 'brush') {
-          return {
-            ...prev,
-            points: [...prev.points, worldPt],
-          };
+          return { ...prev, points: [...prev.points, worldPt] };
         }
         return prev;
       });
@@ -1357,40 +1654,15 @@ export const QuestionWhiteboard: React.FC<QuestionWhiteboardProps> = ({ question
       const y = Math.min(startPoint.y, worldPt.y);
       const w = Math.abs(worldPt.x - startPoint.x);
       const h = Math.abs(worldPt.y - startPoint.y);
-      setCurrentPreviewElement({
-        id: generateId(),
-        type: 'rectangle',
-        color: selectedColor,
-        width: strokeWidth,
-        x,
-        y,
-        w,
-        h,
-      });
+      setCurrentPreviewElement({ id: generateId(), type: 'rectangle', color: selectedColor, width: strokeWidth, x, y, w, h });
     } else if (activeTool === 'square') {
       const size = Math.max(Math.abs(worldPt.x - startPoint.x), Math.abs(worldPt.y - startPoint.y));
       const x = worldPt.x < startPoint.x ? startPoint.x - size : startPoint.x;
       const y = worldPt.y < startPoint.y ? startPoint.y - size : startPoint.y;
-      setCurrentPreviewElement({
-        id: generateId(),
-        type: 'square',
-        color: selectedColor,
-        width: strokeWidth,
-        x,
-        y,
-        size,
-      });
+      setCurrentPreviewElement({ id: generateId(), type: 'square', color: selectedColor, width: strokeWidth, x, y, size });
     } else if (activeTool === 'circle') {
       const radius = Math.hypot(worldPt.x - startPoint.x, worldPt.y - startPoint.y);
-      setCurrentPreviewElement({
-        id: generateId(),
-        type: 'circle',
-        color: selectedColor,
-        width: strokeWidth,
-        cx: startPoint.x,
-        cy: startPoint.y,
-        radius,
-      });
+      setCurrentPreviewElement({ id: generateId(), type: 'circle', color: selectedColor, width: strokeWidth, cx: startPoint.x, cy: startPoint.y, radius });
     } else if (activeTool === 'triangle') {
       const x1 = startPoint.x;
       const y1 = worldPt.y;
@@ -1398,31 +1670,10 @@ export const QuestionWhiteboard: React.FC<QuestionWhiteboardProps> = ({ question
       const y2 = startPoint.y;
       const x3 = worldPt.x;
       const y3 = worldPt.y;
-      setCurrentPreviewElement({
-        id: generateId(),
-        type: 'triangle',
-        color: selectedColor,
-        width: strokeWidth,
-        x1,
-        y1,
-        x2,
-        y2,
-        x3,
-        y3,
-      });
+      setCurrentPreviewElement({ id: generateId(), type: 'triangle', color: selectedColor, width: strokeWidth, x1, y1, x2, y2, x3, y3 });
     } else if (activeTool === 'star') {
       const outerRadius = Math.hypot(worldPt.x - startPoint.x, worldPt.y - startPoint.y);
-      setCurrentPreviewElement({
-        id: generateId(),
-        type: 'star',
-        color: selectedColor,
-        width: strokeWidth,
-        cx: startPoint.x,
-        cy: startPoint.y,
-        outerRadius,
-        innerRadius: outerRadius * 0.48,
-        spikes: 5,
-      });
+      setCurrentPreviewElement({ id: generateId(), type: 'star', color: selectedColor, width: strokeWidth, cx: startPoint.x, cy: startPoint.y, outerRadius, innerRadius: outerRadius * 0.48, spikes: 5 });
     }
   };
 
@@ -1439,12 +1690,40 @@ export const QuestionWhiteboard: React.FC<QuestionWhiteboardProps> = ({ question
       return;
     }
 
+    if (activeResizeHandle) {
+      setActiveResizeHandle(null);
+      setResizeStartBounds(null);
+      setResizeStartElements([]);
+      setDragStartPoint(null);
+      return;
+    }
+
     if (isDraggingElement) {
       setIsDraggingElement(false);
       setDragStartPoint(null);
       setIsHoveringSelectedElement(false);
       return;
     }
+
+    // Fim do rubber-band: seleciona elementos no rect
+    if (isBoxSelecting && boxSelectStart && boxSelectCurrent) {
+      const inRect = findElementsInRect(boxSelectStart, boxSelectCurrent);
+      if (inRect.length > 0) {
+        setSelectedIds((prev) => {
+          const next = new Set(prev);
+          for (const el of inRect) next.add(el.id);
+          return next;
+        });
+      }
+      setIsBoxSelecting(false);
+      setBoxSelectStart(null);
+      setBoxSelectCurrent(null);
+      return;
+    }
+
+    setIsBoxSelecting(false);
+    setBoxSelectStart(null);
+    setBoxSelectCurrent(null);
 
     if (!isDrawing) return;
     setIsDrawing(false);
@@ -1460,6 +1739,36 @@ export const QuestionWhiteboard: React.FC<QuestionWhiteboardProps> = ({ question
     handleEnd();
     setIsHoveringRotationHandle(false);
     setIsHoveringSelectedElement(false);
+    setIsHoveringResizeHandle(null);
+  };
+
+  // Clique duplo no canvas: editar texto inline se elemento de texto for clicado, ou criar novo texto
+  const handleDoubleClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    if (activeTool !== 'select' && activeTool !== 'text') return;
+    const screenPt = getScreenPoint(e);
+    const worldPt = screenToWorld(screenPt.x, screenPt.y);
+    const hit = findElementAtPoint(worldPt);
+    if (hit && hit.type === 'text') {
+      // Editar texto existente
+      setSelectedIds(new Set([hit.id]));
+      setInlineTextState({
+        elementId: hit.id,
+        position: { x: hit.x, y: hit.y },
+        text: hit.text,
+        color: hit.color,
+        fontSize: hit.fontSize,
+      });
+    } else if (activeTool === 'select') {
+      // Criar novo texto no local clicado com duplo clique
+      const fontSize = Math.max(14, strokeWidth * 4);
+      setInlineTextState({
+        elementId: null,
+        position: { x: worldPt.x, y: worldPt.y },
+        text: '',
+        color: selectedColor,
+        fontSize,
+      });
+    }
   };
 
   // Bloqueia scroll da página durante o modo tela cheia
@@ -1518,25 +1827,46 @@ export const QuestionWhiteboard: React.FC<QuestionWhiteboardProps> = ({ question
     });
   };
 
-  // Submete o texto digitado no modal
-  const handleConfirmText = () => {
-    if (textInput.trim() && textPosition) {
-      addElement({
-        id: generateId(),
-        type: 'text',
-        color: selectedColor,
-        fontSize: Math.max(14, strokeWidth * 4),
-        x: textPosition.x,
-        y: textPosition.y,
-        text: textInput.trim(),
-      });
-    }
-    setTextDialogOpen(false);
-    setTextInput('');
-    setTextPosition(null);
+  // Posição na tela do inline textarea (coords de tela, relativo ao container)
+  const getInlineTextScreenPos = (): { left: number; top: number; fontSize: number } | null => {
+    if (!inlineTextState || !canvasRef.current) return null;
+    const canvas = canvasRef.current;
+    const rect = canvas.getBoundingClientRect();
+    const { x: sx, y: sy } = worldToScreen(inlineTextState.position.x, inlineTextState.position.y);
+    // Offset relativo ao containerRef
+    const container = containerRef.current;
+    if (!container) return null;
+    const cRect = container.getBoundingClientRect();
+    return {
+      left: rect.left - cRect.left + sx,
+      top: rect.top - cRect.top + sy - inlineTextState.fontSize, // baseline offset
+      fontSize: inlineTextState.fontSize * zoom,
+    };
   };
 
-  const selectedElement = elements.find((e) => e.id === selectedElementId);
+  const inlineTextScreenPos = getInlineTextScreenPos();
+
+  // Cursor do canvas dependendo do estado
+  const getCanvasCursor = (): string => {
+    if (inlineTextState) return 'text';
+    if (isHoveringRotationHandle || isRotatingElement) return ROTATE_CURSOR;
+    if (activeResizeHandle || isHoveringResizeHandle) {
+      return RESIZE_CURSORS[activeResizeHandle || isHoveringResizeHandle!] || 'default';
+    }
+    if (activeTool === 'select') {
+      if (isDraggingElement) return 'grabbing';
+      if (isHoveringSelectedElement) return 'move';
+      return 'default';
+    }
+    if (activeTool === 'pan') return isPanning ? 'grabbing' : 'grab';
+    if (activeTool === 'brush') return 'crosshair';
+    if (activeTool === 'text') return 'text';
+    if (activeTool === 'eraser') return 'cell';
+    return 'crosshair';
+  };
+
+  const selectedCount = selectedIds.size;
+  const hasSelection = selectedCount > 0;
 
   const whiteboardBody = (
     <Box
@@ -1725,7 +2055,7 @@ export const QuestionWhiteboard: React.FC<QuestionWhiteboardProps> = ({ question
             if (newTool) {
               setActiveTool(newTool);
               if (newTool !== 'select') {
-                setSelectedElementId(null);
+                setSelectedIds(new Set());
               }
             }
           }}
@@ -1780,7 +2110,7 @@ export const QuestionWhiteboard: React.FC<QuestionWhiteboardProps> = ({ question
           </ToggleButton>
 
           <ToggleButton value="text" aria-label="texto">
-            <Tooltip title="Adicionar Texto (T ou 5)">
+            <Tooltip title="Adicionar Texto (T ou 5) — clique duplo para editar">
               <TextFieldsIcon fontSize="small" />
             </Tooltip>
           </ToggleButton>
@@ -1891,8 +2221,8 @@ export const QuestionWhiteboard: React.FC<QuestionWhiteboardProps> = ({ question
         </Stack>
       </Box>
 
-      {/* Selected Element Quick Transformation Bar */}
-      {selectedElement && (
+      {/* Selected Element(s) Quick Transformation Bar */}
+      {hasSelection && (
         <Box
           sx={{
             py: 1,
@@ -1907,7 +2237,9 @@ export const QuestionWhiteboard: React.FC<QuestionWhiteboardProps> = ({ question
           }}
         >
           <Typography variant="caption" sx={{ fontWeight: 700, color: PALETTE_COLORS.secondary, textTransform: 'uppercase' }}>
-            Objeto Selecionado ({selectedElement.type}):
+            {selectedCount === 1
+              ? `Objeto Selecionado (${selectedElements[0]?.type})`
+              : `${selectedCount} objetos selecionados`}:
           </Typography>
 
           <Tooltip title="Rotacionar 90° no sentido horário">
@@ -1946,7 +2278,7 @@ export const QuestionWhiteboard: React.FC<QuestionWhiteboardProps> = ({ question
             </Button>
           </Tooltip>
 
-          <Tooltip title="Duplicar Objeto (Ctrl+D)">
+          <Tooltip title="Duplicar Objeto(s) (Ctrl+D)">
             <Button
               size="small"
               variant="outlined"
@@ -1958,7 +2290,7 @@ export const QuestionWhiteboard: React.FC<QuestionWhiteboardProps> = ({ question
             </Button>
           </Tooltip>
 
-          <Tooltip title="Excluir Objeto Selecionado (Delete ou Backspace)">
+          <Tooltip title="Excluir Objeto(s) Selecionado(s) (Delete ou Backspace)">
             <Button
               size="small"
               variant="outlined"
@@ -1982,26 +2314,7 @@ export const QuestionWhiteboard: React.FC<QuestionWhiteboardProps> = ({ question
           height: isFullscreen ? '100%' : 520,
           flex: isFullscreen ? '1 1 0px' : undefined,
           minHeight: isFullscreen ? 0 : 520,
-          cursor:
-            isHoveringRotationHandle || isRotatingElement
-              ? ROTATE_CURSOR
-              : activeTool === 'select'
-              ? isDraggingElement
-                ? 'grabbing'
-                : isHoveringSelectedElement
-                ? 'move'
-                : 'default'
-              : activeTool === 'pan'
-              ? isPanning
-                ? 'grabbing'
-                : 'grab'
-              : activeTool === 'brush'
-              ? 'crosshair'
-              : activeTool === 'text'
-              ? 'text'
-              : activeTool === 'eraser'
-              ? 'cell'
-              : 'crosshair',
+          cursor: getCanvasCursor(),
           overflow: 'hidden',
           userSelect: 'none',
           touchAction: 'none',
@@ -2022,44 +2335,51 @@ export const QuestionWhiteboard: React.FC<QuestionWhiteboardProps> = ({ question
           onTouchStart={handleStart}
           onTouchMove={handleMove}
           onTouchEnd={handleEnd}
+          onDoubleClick={handleDoubleClick}
         />
-      </Box>
 
-      {/* Inline Text Modal */}
-      <Dialog open={textDialogOpen} onClose={() => setTextDialogOpen(false)} maxWidth="xs" fullWidth>
-        <DialogTitle sx={{ fontWeight: 700, fontSize: '1rem' }}>Inserir Texto na Lousa</DialogTitle>
-        <DialogContent>
-          <TextField
-            autoFocus
-            fullWidth
-            margin="dense"
-            label="Digite seu texto, fórmula ou anotação"
-            variant="outlined"
-            value={textInput}
-            onChange={(e) => setTextInput(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                e.preventDefault();
-                handleConfirmText();
+        {/* Inline Text Textarea sobreposto no canvas */}
+        {inlineTextState && inlineTextScreenPos && (
+          <textarea
+            ref={inlineTextareaRef}
+            value={inlineTextState.text}
+            onChange={(ev) => setInlineTextState((prev) => prev ? { ...prev, text: ev.target.value } : prev)}
+            onBlur={commitInlineText}
+            onKeyDown={(ev) => {
+              if (ev.key === 'Escape') {
+                ev.preventDefault();
+                setInlineTextState(null);
+              } else if (ev.key === 'Enter' && !ev.shiftKey) {
+                ev.preventDefault();
+                commitInlineText();
               }
             }}
+            style={{
+              position: 'absolute',
+              left: inlineTextScreenPos.left,
+              top: inlineTextScreenPos.top,
+              fontSize: `${inlineTextScreenPos.fontSize}px`,
+              fontFamily: 'Inter, sans-serif',
+              fontWeight: 600,
+              color: inlineTextState.color,
+              background: 'transparent',
+              border: `1px dashed ${inlineTextState.color}`,
+              borderRadius: 3,
+              outline: 'none',
+              resize: 'none',
+              padding: '2px 4px',
+              minWidth: 80,
+              minHeight: inlineTextScreenPos.fontSize + 8,
+              lineHeight: 1.2,
+              zIndex: 10,
+              overflow: 'hidden',
+              whiteSpace: 'nowrap',
+              caretColor: inlineTextState.color,
+            }}
+            rows={1}
           />
-        </DialogContent>
-        <DialogActions sx={{ px: 3, pb: 2 }}>
-          <Button onClick={() => setTextDialogOpen(false)} sx={{ textTransform: 'none' }}>
-            Cancelar
-          </Button>
-          <Button
-            variant="contained"
-            color="primary"
-            onClick={handleConfirmText}
-            disabled={!textInput.trim()}
-            sx={{ fontWeight: 700, textTransform: 'none' }}
-          >
-            Adicionar
-          </Button>
-        </DialogActions>
-      </Dialog>
+        )}
+      </Box>
 
       {/* Modal de Lista de Atalhos de Teclado */}
       <Dialog
@@ -2096,7 +2416,7 @@ export const QuestionWhiteboard: React.FC<QuestionWhiteboardProps> = ({ question
                       { action: 'Navegação / Mover Lousa (Mãozinha)', keys: ['H', '2'] },
                       { action: 'Pincel Livre', keys: ['B', '3'] },
                       { action: 'Borracha', keys: ['E', '4'] },
-                      { action: 'Inserir Texto', keys: ['T', '5'] },
+                      { action: 'Inserir Texto (clique na lousa)', keys: ['T', '5'] },
                       { action: 'Retângulo', keys: ['R', '6'] },
                       { action: 'Quadrado', keys: ['S', '7'] },
                       { action: 'Círculo / Bola', keys: ['C', '8'] },
@@ -2139,8 +2459,12 @@ export const QuestionWhiteboard: React.FC<QuestionWhiteboardProps> = ({ question
                 <Table size="small">
                   <TableBody>
                     {[
-                      { action: 'Excluir objeto selecionado', keys: ['Delete', 'Backspace'] },
-                      { action: 'Duplicar objeto selecionado', keys: ['Ctrl + D'] },
+                      { action: 'Selecionar todos os objetos', keys: ['Ctrl + A'] },
+                      { action: 'Adicionar à seleção (Shift+clique)', keys: ['Shift + Clique'] },
+                      { action: 'Selecionar por área (rubber-band)', keys: ['Arrastar em área vazia'] },
+                      { action: 'Editar texto (duplo clique)', keys: ['Duplo Clique'] },
+                      { action: 'Excluir objeto(s) selecionado(s)', keys: ['Delete', 'Backspace'] },
+                      { action: 'Duplicar objeto(s) selecionado(s)', keys: ['Ctrl + D'] },
                       { action: 'Desfazer ação (Undo)', keys: ['Ctrl + Z'] },
                       { action: 'Refazer ação (Redo)', keys: ['Ctrl + Y', 'Ctrl + Shift + Z'] },
                       { action: 'Desmarcar seleção / Fechar modal', keys: ['Esc'] },
@@ -2183,7 +2507,8 @@ export const QuestionWhiteboard: React.FC<QuestionWhiteboardProps> = ({ question
                       { action: 'Ajuste fino de posição (Nudge)', keys: ['↑', '↓', '←', '→ (2px)'] },
                       { action: 'Deslocamento rápido de posição', keys: ['Shift + Setas (10px)'] },
                       { action: 'Zoom focado no cursor', keys: ['Scroll do mouse'] },
-                      { action: 'Girar objeto livremente', keys: ['Arrastar manipulador superior'] },
+                      { action: 'Girar objeto livremente (1 selecionado)', keys: ['Arrastar manipulador superior'] },
+                      { action: 'Redimensionar elemento(s)', keys: ['Arrastar alças de resize'] },
                     ].map((row) => (
                       <TableRow key={row.action}>
                         <TableCell sx={{ py: 0.8, fontSize: '0.85rem' }}>{row.action}</TableCell>
@@ -2292,4 +2617,3 @@ export const QuestionWhiteboard: React.FC<QuestionWhiteboardProps> = ({ question
     </>
   );
 };
-
