@@ -14,4 +14,5 @@ public class QuestionAttemptRequestDTO {
     private Boolean isFirstAttempt;
     private Integer timeSpentSeconds;
     private String sessionId;
+    private Long userId;
 }
