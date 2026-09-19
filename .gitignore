@@ -28,6 +28,12 @@ target/
 ### VS Code ###
 .vscode/
 
+### Frontend & Node ###
+node_modules/
+dist/
+.vite/
+
 ### OS & Misc ###
 .DS_Store
 *.log
+
