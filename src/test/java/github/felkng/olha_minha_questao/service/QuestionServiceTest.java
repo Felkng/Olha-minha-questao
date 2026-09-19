@@ -195,4 +195,38 @@ class QuestionServiceTest {
 
         assertThat(alternativeRepository.findByQuestionIdOrderByIdentifierAsc(questionId)).isEmpty();
     }
+
+    @Test
+    @DisplayName("Deve buscar questões ordenadas com sort 'recent' e 'mostAnswered' sem lançar PropertyReferenceException")
+    void testSortingOptions() {
+        OriginResponseDTO origin = originService.create(OriginRequestDTO.builder().name("SORT_ORIGIN").build());
+        AreaResponseDTO area = areaService.create(AreaRequestDTO.builder().name("SORT_AREA").build());
+
+        questionService.create(QuestionRequestDTO.builder().enunciado("Q1").year(2022).originId(origin.getId()).areaId(area.getId()).build());
+        questionService.create(QuestionRequestDTO.builder().enunciado("Q2").year(2024).originId(origin.getId()).areaId(area.getId()).build());
+        entityManager.flush();
+
+        // 1. sort = "recent" with PageRequest containing "recent" sort
+        Page<QuestionResponseDTO> recentPage = questionService.findAll(
+                null, null, null, null, null, null, "recent",
+                PageRequest.of(0, 10, org.springframework.data.domain.Sort.by("recent"))
+        );
+        assertThat(recentPage.getContent()).isNotEmpty();
+        assertThat(recentPage.getContent().get(0).getYear()).isGreaterThanOrEqualTo(recentPage.getContent().get(1).getYear());
+
+        // 2. sort = "mostAnswered"
+        Page<QuestionResponseDTO> mostAnsweredPage = questionService.findAll(
+                null, null, null, null, null, null, "mostAnswered",
+                PageRequest.of(0, 10)
+        );
+        assertThat(mostAnsweredPage.getContent()).isNotEmpty();
+
+        // 3. search with multi-word keywords
+        Page<QuestionResponseDTO> searchPage = questionService.findAll(
+                null, null, null, null, null, "SORT_ORIGIN Q1", "recent",
+                PageRequest.of(0, 10)
+        );
+        assertThat(searchPage.getContent()).hasSize(1);
+        assertThat(searchPage.getContent().get(0).getEnunciado()).isEqualTo("Q1");
+    }
 }
