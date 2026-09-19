@@ -1169,8 +1169,13 @@ export const QuestionWhiteboard: React.FC<QuestionWhiteboardProps> = ({ question
   useEffect(() => {
     if (inlineTextState) {
       requestAnimationFrame(() => {
-        inlineTextareaRef.current?.focus();
-        inlineTextareaRef.current?.select();
+        const el = inlineTextareaRef.current;
+        if (!el) return;
+        el.focus();
+        // Ao editar texto existente, posiciona o cursor no final
+        // Ao criar novo texto, apenas foca (sem selecionar, para não sobrescrever ao digitar)
+        const len = el.value.length;
+        el.setSelectionRange(len, len);
       });
     }
   }, [inlineTextState]);
