@@ -1,0 +1,1 @@
+CREATE INDEX idx_question_statistic_difficulty ON question_statistic(difficulty_level);
