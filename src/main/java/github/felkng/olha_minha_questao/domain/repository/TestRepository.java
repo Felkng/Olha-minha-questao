@@ -12,4 +12,7 @@ public interface TestRepository extends JpaRepository<Test, Long> {
     List<Test> findByOriginId(Long originId);
     List<Test> findByAreaId(Long areaId);
     List<Test> findByOriginIdAndYear(Long originId, Integer year);
+    List<Test> findAllByOrderByYearDescIdDesc();
+    long countByOriginId(Long originId);
+    long countByAreaId(Long areaId);
 }
