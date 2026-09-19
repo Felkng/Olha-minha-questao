@@ -1,0 +1,1 @@
+CREATE INDEX idx_test_statistic_difficulty ON test_statistic(difficulty_level);
