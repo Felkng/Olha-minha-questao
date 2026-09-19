@@ -234,3 +234,105 @@ export interface TestSubmissionResponse {
     difficultyLevel: DifficultyLevel;
   }[];
 }
+
+export interface QuestionBoardResponse {
+  id?: number;
+  questionId: number;
+  userId?: number;
+  storagePath?: string;
+  fileName?: string;
+  xmlContent?: string | null;
+  updatedAt?: string;
+}
+
+export type BoardTool =
+  | 'brush'
+  | 'rectangle'
+  | 'square'
+  | 'triangle'
+  | 'star'
+  | 'circle'
+  | 'text'
+  | 'eraser';
+
+export interface BoardPoint {
+  x: number;
+  y: number;
+}
+
+export interface BoardBrushElement {
+  type: 'brush';
+  color: string;
+  width: number;
+  points: BoardPoint[];
+}
+
+export interface BoardRectElement {
+  type: 'rectangle';
+  color: string;
+  width: number;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
+export interface BoardSquareElement {
+  type: 'square';
+  color: string;
+  width: number;
+  x: number;
+  y: number;
+  size: number;
+}
+
+export interface BoardTriangleElement {
+  type: 'triangle';
+  color: string;
+  width: number;
+  x1: number;
+  y1: number;
+  x2: number;
+  y2: number;
+  x3: number;
+  y3: number;
+}
+
+export interface BoardCircleElement {
+  type: 'circle';
+  color: string;
+  width: number;
+  cx: number;
+  cy: number;
+  radius: number;
+}
+
+export interface BoardStarElement {
+  type: 'star';
+  color: string;
+  width: number;
+  cx: number;
+  cy: number;
+  spikes: number;
+  outerRadius: number;
+  innerRadius: number;
+}
+
+export interface BoardTextElement {
+  type: 'text';
+  color: string;
+  fontSize: number;
+  x: number;
+  y: number;
+  text: string;
+}
+
+export type BoardElement =
+  | BoardBrushElement
+  | BoardRectElement
+  | BoardSquareElement
+  | BoardTriangleElement
+  | BoardCircleElement
+  | BoardStarElement
+  | BoardTextElement;
+
