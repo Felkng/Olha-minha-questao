@@ -2,20 +2,22 @@ package github.felkng.olha_minha_questao.service;
 
 import github.felkng.olha_minha_questao.domain.entity.Alternative;
 import github.felkng.olha_minha_questao.domain.entity.Area;
+import github.felkng.olha_minha_questao.domain.entity.DifficultyLevel;
 import github.felkng.olha_minha_questao.domain.entity.Origin;
 import github.felkng.olha_minha_questao.domain.entity.Question;
+import github.felkng.olha_minha_questao.domain.entity.QuestionStatistic;
+import github.felkng.olha_minha_questao.domain.entity.Subject;
 import github.felkng.olha_minha_questao.domain.entity.Test;
 import github.felkng.olha_minha_questao.domain.repository.AreaRepository;
 import github.felkng.olha_minha_questao.domain.repository.OriginRepository;
 import github.felkng.olha_minha_questao.domain.repository.QuestionRepository;
+import github.felkng.olha_minha_questao.domain.repository.SubjectRepository;
 import github.felkng.olha_minha_questao.domain.repository.TestRepository;
 import github.felkng.olha_minha_questao.dto.question.QuestionRequestDTO;
 import github.felkng.olha_minha_questao.dto.question.QuestionResponseDTO;
 import github.felkng.olha_minha_questao.exception.ResourceNotFoundException;
 import github.felkng.olha_minha_questao.mapper.AlternativeMapper;
 import github.felkng.olha_minha_questao.mapper.QuestionMapper;
-import github.felkng.olha_minha_questao.domain.entity.DifficultyLevel;
-import github.felkng.olha_minha_questao.domain.entity.QuestionStatistic;
 import jakarta.persistence.criteria.Join;
 import jakarta.persistence.criteria.JoinType;
 import jakarta.persistence.criteria.Predicate;
@@ -38,6 +40,7 @@ public class QuestionService {
     private final QuestionRepository questionRepository;
     private final OriginRepository originRepository;
     private final AreaRepository areaRepository;
+    private final SubjectRepository subjectRepository;
     private final TestRepository testRepository;
     private final QuestionMapper questionMapper;
     private final AlternativeMapper alternativeMapper;
@@ -49,7 +52,7 @@ public class QuestionService {
 
     @Transactional(readOnly = true)
     public Page<QuestionResponseDTO> findAll(Long originId, Long areaId, Long testId, Integer year,
-                                            String difficulty, String search, String sort, Pageable pageable) {
+                                             String difficulty, String search, String sort, Pageable pageable) {
         Specification<Question> spec = (root, query, cb) -> {
             List<Predicate> predicates = new ArrayList<>();
             if (originId != null) {
@@ -117,6 +120,12 @@ public class QuestionService {
         Area area = areaRepository.findById(dto.getAreaId())
                 .orElseThrow(() -> new ResourceNotFoundException("Área não encontrada com o id: " + dto.getAreaId()));
 
+        Subject subject = null;
+        if (dto.getSubjectId() != null) {
+            subject = subjectRepository.findById(dto.getSubjectId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Matéria não encontrada com o id: " + dto.getSubjectId()));
+        }
+
         Test test = null;
         if (dto.getTestId() != null) {
             test = testRepository.findById(dto.getTestId())
@@ -126,6 +135,7 @@ public class QuestionService {
         Question question = questionMapper.toEntity(dto);
         question.setOrigin(origin);
         question.setArea(area);
+        question.setSubject(subject);
         question.setTest(test);
 
         if (dto.getAlternatives() != null && !dto.getAlternatives().isEmpty()) {
@@ -188,6 +198,12 @@ public class QuestionService {
         Area area = areaRepository.findById(dto.getAreaId())
                 .orElseThrow(() -> new ResourceNotFoundException("Área não encontrada com o id: " + dto.getAreaId()));
 
+        Subject subject = null;
+        if (dto.getSubjectId() != null) {
+            subject = subjectRepository.findById(dto.getSubjectId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Matéria não encontrada com o id: " + dto.getSubjectId()));
+        }
+
         Test test = null;
         if (dto.getTestId() != null) {
             test = testRepository.findById(dto.getTestId())
@@ -197,6 +213,7 @@ public class QuestionService {
         questionMapper.updateEntityFromDTO(dto, question);
         question.setOrigin(origin);
         question.setArea(area);
+        question.setSubject(subject);
         question.setTest(test);
 
         if (dto.getAlternatives() != null) {

@@ -1,19 +1,26 @@
 package github.felkng.olha_minha_questao.service;
 
 import github.felkng.olha_minha_questao.domain.entity.Folder;
+import github.felkng.olha_minha_questao.domain.entity.FolderType;
 import github.felkng.olha_minha_questao.domain.entity.Question;
 import github.felkng.olha_minha_questao.domain.entity.SavedQuestion;
+import github.felkng.olha_minha_questao.domain.entity.SavedTest;
+import github.felkng.olha_minha_questao.domain.entity.Test;
 import github.felkng.olha_minha_questao.domain.repository.FolderRepository;
 import github.felkng.olha_minha_questao.domain.repository.QuestionRepository;
 import github.felkng.olha_minha_questao.domain.repository.SavedQuestionRepository;
+import github.felkng.olha_minha_questao.domain.repository.SavedTestRepository;
+import github.felkng.olha_minha_questao.domain.repository.TestRepository;
 import github.felkng.olha_minha_questao.dto.folder.FolderRequestDTO;
 import github.felkng.olha_minha_questao.dto.folder.FolderResponseDTO;
 import github.felkng.olha_minha_questao.dto.folder.SavedQuestionResponseDTO;
 import github.felkng.olha_minha_questao.dto.question.QuestionResponseDTO;
+import github.felkng.olha_minha_questao.dto.test.TestResponseDTO;
 import github.felkng.olha_minha_questao.exception.ResourceNotFoundException;
 import github.felkng.olha_minha_questao.mapper.FolderMapper;
 import github.felkng.olha_minha_questao.mapper.QuestionMapper;
 import github.felkng.olha_minha_questao.mapper.SavedQuestionMapper;
+import github.felkng.olha_minha_questao.mapper.TestMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -26,13 +33,21 @@ public class FolderService {
 
     private final FolderRepository folderRepository;
     private final QuestionRepository questionRepository;
+    private final TestRepository testRepository;
     private final SavedQuestionRepository savedQuestionRepository;
+    private final SavedTestRepository savedTestRepository;
     private final FolderMapper folderMapper;
     private final QuestionMapper questionMapper;
+    private final TestMapper testMapper;
     private final SavedQuestionMapper savedQuestionMapper;
 
     @Transactional(readOnly = true)
-    public List<FolderResponseDTO> findAll() {
+    public List<FolderResponseDTO> findAll(FolderType type) {
+        if (type != null) {
+            return folderRepository.findByFolderTypeOrderByNameAsc(type).stream()
+                    .map(folderMapper::toDTO)
+                    .toList();
+        }
         return folderRepository.findAllByOrderByNameAsc().stream()
                 .map(folderMapper::toDTO)
                 .toList();
@@ -50,6 +65,9 @@ public class FolderService {
         Folder folder = folderMapper.toEntity(dto);
         if (folder.getColor() == null || folder.getColor().isBlank()) {
             folder.setColor("#d9b763");
+        }
+        if (folder.getFolderType() == null) {
+            folder.setFolderType(FolderType.QUESTION);
         }
         Folder saved = folderRepository.save(folder);
         return folderMapper.toDTO(saved);
@@ -72,6 +90,10 @@ public class FolderService {
         folderRepository.deleteById(id);
     }
 
+    // ==========================================
+    // Questões Salvas em Pastas (Tipo: QUESTION)
+    // ==========================================
+
     @Transactional(readOnly = true)
     public List<QuestionResponseDTO> getQuestionsInFolder(Long folderId) {
         if (!folderRepository.existsById(folderId)) {
@@ -87,10 +109,13 @@ public class FolderService {
         Folder folder = folderRepository.findById(folderId)
                 .orElseThrow(() -> new ResourceNotFoundException("Pasta não encontrada com o id: " + folderId));
 
+        if (folder.getFolderType() != FolderType.QUESTION) {
+            throw new IllegalArgumentException("Esta pasta é reservada para salvar Provas, não Questões.");
+        }
+
         Question question = questionRepository.findById(questionId)
                 .orElseThrow(() -> new ResourceNotFoundException("Questão não encontrada com o id: " + questionId));
 
-        // Se já existir na pasta, retorna o existente
         return savedQuestionRepository.findByFolderIdAndQuestionId(folderId, questionId)
                 .map(savedQuestionMapper::toDTO)
                 .orElseGet(() -> {
@@ -120,5 +145,57 @@ public class FolderService {
         return savedQuestionRepository.findByQuestionId(questionId).stream()
                 .map(sq -> sq.getFolder().getId())
                 .toList();
+    }
+
+    // ==========================================
+    // Provas Salvas em Pastas (Tipo: TEST)
+    // ==========================================
+
+    @Transactional(readOnly = true)
+    public List<TestResponseDTO> getTestsInFolder(Long folderId) {
+        if (!folderRepository.existsById(folderId)) {
+            throw new ResourceNotFoundException("Pasta não encontrada com o id: " + folderId);
+        }
+        return savedTestRepository.findByFolderId(folderId).stream()
+                .map(st -> testMapper.toDTO(st.getTest()))
+                .toList();
+    }
+
+    @Transactional
+    public void addTestToFolder(Long folderId, Long testId, String notes) {
+        Folder folder = folderRepository.findById(folderId)
+                .orElseThrow(() -> new ResourceNotFoundException("Pasta não encontrada com o id: " + folderId));
+
+        if (folder.getFolderType() != FolderType.TEST) {
+            throw new IllegalArgumentException("Esta pasta é reservada para salvar Questões, não Provas.");
+        }
+
+        Test test = testRepository.findById(testId)
+                .orElseThrow(() -> new ResourceNotFoundException("Prova não encontrada com o id: " + testId));
+
+        if (!savedTestRepository.existsByFolderIdAndTestId(folderId, testId)) {
+            SavedTest st = SavedTest.builder()
+                    .folder(folder)
+                    .test(test)
+                    .notes(notes)
+                    .build();
+            savedTestRepository.save(st);
+        }
+    }
+
+    @Transactional
+    public void removeTestFromFolder(Long folderId, Long testId) {
+        if (!folderRepository.existsById(folderId)) {
+            throw new ResourceNotFoundException("Pasta não encontrada com o id: " + folderId);
+        }
+        if (!testRepository.existsById(testId)) {
+            throw new ResourceNotFoundException("Prova não encontrada com o id: " + testId);
+        }
+        savedTestRepository.deleteByFolderIdAndTestId(folderId, testId);
+    }
+
+    @Transactional(readOnly = true)
+    public List<Long> getFolderIdsForTest(Long testId) {
+        return savedTestRepository.findFolderIdsByTestId(testId);
     }
 }
