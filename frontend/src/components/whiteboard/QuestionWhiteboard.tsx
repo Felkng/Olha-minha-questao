@@ -2226,90 +2226,6 @@ export const QuestionWhiteboard: React.FC<QuestionWhiteboardProps> = ({ question
         </Stack>
       </Box>
 
-      {/* Selected Element(s) Quick Transformation Bar */}
-      {hasSelection && (
-        <Box
-          sx={{
-            py: 1,
-            px: 2,
-            display: 'flex',
-            alignItems: 'center',
-            flexWrap: 'wrap',
-            gap: 1.5,
-            backgroundColor: isDark ? 'rgba(90, 166, 226, 0.12)' : 'rgba(90, 166, 226, 0.08)',
-            borderBottom: '1px solid',
-            borderColor: 'divider',
-          }}
-        >
-          <Typography variant="caption" sx={{ fontWeight: 700, color: PALETTE_COLORS.secondary, textTransform: 'uppercase' }}>
-            {selectedCount === 1
-              ? `Objeto Selecionado (${selectedElements[0]?.type})`
-              : `${selectedCount} objetos selecionados`}:
-          </Typography>
-
-          <Tooltip title="Rotacionar 90° no sentido horário">
-            <Button
-              size="small"
-              variant="outlined"
-              startIcon={<RotateRightIcon fontSize="small" />}
-              onClick={() => handleRotateSelected(90)}
-              sx={{ textTransform: 'none', py: 0.3, fontSize: '0.75rem' }}
-            >
-              Girar +90°
-            </Button>
-          </Tooltip>
-
-          <Tooltip title="Inverter Horizontalmente">
-            <Button
-              size="small"
-              variant="outlined"
-              startIcon={<FlipIcon fontSize="small" />}
-              onClick={() => handleFlipSelected('x')}
-              sx={{ textTransform: 'none', py: 0.3, fontSize: '0.75rem' }}
-            >
-              Inverter Horiz.
-            </Button>
-          </Tooltip>
-
-          <Tooltip title="Inverter Verticalmente">
-            <Button
-              size="small"
-              variant="outlined"
-              startIcon={<FlipIcon fontSize="small" sx={{ transform: 'rotate(90deg)' }} />}
-              onClick={() => handleFlipSelected('y')}
-              sx={{ textTransform: 'none', py: 0.3, fontSize: '0.75rem' }}
-            >
-              Inverter Vert.
-            </Button>
-          </Tooltip>
-
-          <Tooltip title="Duplicar Objeto(s) (Ctrl+D)">
-            <Button
-              size="small"
-              variant="outlined"
-              startIcon={<ContentCopyIcon fontSize="small" />}
-              onClick={handleDuplicateSelected}
-              sx={{ textTransform: 'none', py: 0.3, fontSize: '0.75rem' }}
-            >
-              Duplicar
-            </Button>
-          </Tooltip>
-
-          <Tooltip title="Excluir Objeto(s) Selecionado(s) (Delete ou Backspace)">
-            <Button
-              size="small"
-              variant="outlined"
-              color="error"
-              startIcon={<DeleteOutlineIcon fontSize="small" />}
-              onClick={handleDeleteSelected}
-              sx={{ textTransform: 'none', py: 0.3, fontSize: '0.75rem' }}
-            >
-              Excluir
-            </Button>
-          </Tooltip>
-        </Box>
-      )}
-
       {/* Canvas Area with Clipping */}
       <Box
         ref={containerRef}
@@ -2342,6 +2258,102 @@ export const QuestionWhiteboard: React.FC<QuestionWhiteboardProps> = ({ question
           onTouchEnd={handleEnd}
           onDoubleClick={handleDoubleClick}
         />
+
+        {/* Barra de transformação flutuante — sobrepõe a lousa sem empurrá-la */}
+        {hasSelection && (
+          <Box
+            sx={{
+              position: 'absolute',
+              top: 8,
+              left: '50%',
+              transform: 'translateX(-50%)',
+              zIndex: 20,
+              display: 'flex',
+              alignItems: 'center',
+              flexWrap: 'wrap',
+              gap: 0.75,
+              px: 1.5,
+              py: 0.75,
+              borderRadius: 2,
+              backgroundColor: isDark ? 'rgba(22, 26, 32, 0.92)' : 'rgba(255, 255, 255, 0.92)',
+              backdropFilter: 'blur(8px)',
+              border: '1px solid',
+              borderColor: isDark ? 'rgba(90, 166, 226, 0.35)' : 'rgba(90, 166, 226, 0.4)',
+              boxShadow: '0 4px 20px rgba(0,0,0,0.25)',
+              // Não captura eventos de mouse na área transparente além dos botões
+              pointerEvents: 'auto',
+            }}
+            // Impede que cliques na barra propaguem para o canvas e desfaçam a seleção
+            onMouseDown={(e) => e.stopPropagation()}
+          >
+            <Typography variant="caption" sx={{ fontWeight: 700, color: PALETTE_COLORS.secondary, textTransform: 'uppercase', whiteSpace: 'nowrap' }}>
+              {selectedCount === 1
+                ? `(${selectedElements[0]?.type})`
+                : `${selectedCount} obj.`}
+            </Typography>
+
+            <Tooltip title="Rotacionar 90° no sentido horário">
+              <Button
+                size="small"
+                variant="outlined"
+                startIcon={<RotateRightIcon fontSize="small" />}
+                onClick={() => handleRotateSelected(90)}
+                sx={{ textTransform: 'none', py: 0.3, fontSize: '0.75rem', whiteSpace: 'nowrap' }}
+              >
+                +90°
+              </Button>
+            </Tooltip>
+
+            <Tooltip title="Inverter Horizontalmente">
+              <Button
+                size="small"
+                variant="outlined"
+                startIcon={<FlipIcon fontSize="small" />}
+                onClick={() => handleFlipSelected('x')}
+                sx={{ textTransform: 'none', py: 0.3, fontSize: '0.75rem', whiteSpace: 'nowrap' }}
+              >
+                Horiz.
+              </Button>
+            </Tooltip>
+
+            <Tooltip title="Inverter Verticalmente">
+              <Button
+                size="small"
+                variant="outlined"
+                startIcon={<FlipIcon fontSize="small" sx={{ transform: 'rotate(90deg)' }} />}
+                onClick={() => handleFlipSelected('y')}
+                sx={{ textTransform: 'none', py: 0.3, fontSize: '0.75rem', whiteSpace: 'nowrap' }}
+              >
+                Vert.
+              </Button>
+            </Tooltip>
+
+            <Tooltip title="Duplicar Objeto(s) (Ctrl+D)">
+              <Button
+                size="small"
+                variant="outlined"
+                startIcon={<ContentCopyIcon fontSize="small" />}
+                onClick={handleDuplicateSelected}
+                sx={{ textTransform: 'none', py: 0.3, fontSize: '0.75rem', whiteSpace: 'nowrap' }}
+              >
+                Duplicar
+              </Button>
+            </Tooltip>
+
+            <Tooltip title="Excluir Objeto(s) Selecionado(s) (Delete ou Backspace)">
+              <Button
+                size="small"
+                variant="outlined"
+                color="error"
+                startIcon={<DeleteOutlineIcon fontSize="small" />}
+                onClick={handleDeleteSelected}
+                sx={{ textTransform: 'none', py: 0.3, fontSize: '0.75rem', whiteSpace: 'nowrap' }}
+              >
+                Excluir
+              </Button>
+            </Tooltip>
+          </Box>
+        )}
 
         {/* Inline Text Textarea sobreposto no canvas */}
         {inlineTextState && inlineTextScreenPos && (
