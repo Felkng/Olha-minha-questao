@@ -1,9 +1,11 @@
 package github.felkng.olha_minha_questao.controller;
 
+import github.felkng.olha_minha_questao.domain.entity.FolderType;
 import github.felkng.olha_minha_questao.dto.folder.FolderRequestDTO;
 import github.felkng.olha_minha_questao.dto.folder.FolderResponseDTO;
 import github.felkng.olha_minha_questao.dto.folder.SavedQuestionResponseDTO;
 import github.felkng.olha_minha_questao.dto.question.QuestionResponseDTO;
+import github.felkng.olha_minha_questao.dto.test.TestResponseDTO;
 import github.felkng.olha_minha_questao.service.FolderService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -29,8 +31,8 @@ public class FolderController {
     private final FolderService folderService;
 
     @GetMapping
-    public ResponseEntity<List<FolderResponseDTO>> findAll() {
-        return ResponseEntity.ok(folderService.findAll());
+    public ResponseEntity<List<FolderResponseDTO>> findAll(@RequestParam(required = false) FolderType type) {
+        return ResponseEntity.ok(folderService.findAll(type));
     }
 
     @GetMapping("/{id}")
@@ -55,6 +57,7 @@ public class FolderController {
         return ResponseEntity.noContent().build();
     }
 
+    // Questões Salvas
     @GetMapping("/{id}/questions")
     public ResponseEntity<List<QuestionResponseDTO>> getQuestionsInFolder(@PathVariable Long id) {
         return ResponseEntity.ok(folderService.getQuestionsInFolder(id));
@@ -80,5 +83,33 @@ public class FolderController {
     @GetMapping("/by-question/{questionId}")
     public ResponseEntity<List<Long>> getFolderIdsForQuestion(@PathVariable Long questionId) {
         return ResponseEntity.ok(folderService.getFolderIdsForQuestion(questionId));
+    }
+
+    // Provas Salvas
+    @GetMapping("/{id}/tests")
+    public ResponseEntity<List<TestResponseDTO>> getTestsInFolder(@PathVariable Long id) {
+        return ResponseEntity.ok(folderService.getTestsInFolder(id));
+    }
+
+    @PostMapping("/{id}/tests/{testId}")
+    public ResponseEntity<Void> addTestToFolder(
+            @PathVariable Long id,
+            @PathVariable Long testId,
+            @RequestParam(required = false) String notes) {
+        folderService.addTestToFolder(id, testId, notes);
+        return ResponseEntity.status(HttpStatus.CREATED).build();
+    }
+
+    @DeleteMapping("/{id}/tests/{testId}")
+    public ResponseEntity<Void> removeTestFromFolder(
+            @PathVariable Long id,
+            @PathVariable Long testId) {
+        folderService.removeTestFromFolder(id, testId);
+        return ResponseEntity.noContent().build();
+    }
+
+    @GetMapping("/by-test/{testId}")
+    public ResponseEntity<List<Long>> getFolderIdsForTest(@PathVariable Long testId) {
+        return ResponseEntity.ok(folderService.getFolderIdsForTest(testId));
     }
 }
