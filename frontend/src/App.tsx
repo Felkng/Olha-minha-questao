@@ -12,6 +12,8 @@ import { Navbar } from './components/Navbar';
 import { SearchBar } from './components/SearchBar';
 import { QuestionCard } from './components/QuestionCard';
 import { QuestionSkeleton } from './components/QuestionSkeleton';
+import { FoldersView } from './components/FoldersView';
+import { SaveToFolderModal } from './components/SaveToFolderModal';
 import { Area, FilterState, Origin, Question, Test } from './types';
 import { getAreas, getOrigins, getQuestions, getTests } from './services/api';
 import { PALETTE_COLORS } from './theme/theme';
@@ -24,6 +26,10 @@ export const App: React.FC = () => {
   const [areas, setAreas] = useState<Area[]>([]);
   const [tests, setTests] = useState<Test[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
+
+  // Modal de salvar questão em pasta
+  const [saveModalOpen, setSaveModalOpen] = useState<boolean>(false);
+  const [selectedQuestionForSave, setSelectedQuestionForSave] = useState<Question | null>(null);
 
   const [filters, setFilters] = useState<FilterState>({
     search: '',
@@ -63,7 +69,6 @@ export const App: React.FC = () => {
   const handleFilterChange = async (newFilters: FilterState) => {
     setFilters(newFilters);
 
-    // Se mudou banca, área, ano ou prova, consulta a API com os parâmetros
     const needsServerFetch =
       newFilters.originId !== filters.originId ||
       newFilters.areaId !== filters.areaId ||
@@ -88,19 +93,18 @@ export const App: React.FC = () => {
     }
   };
 
+  const handleOpenSaveModal = (question: Question) => {
+    setSelectedQuestionForSave(question);
+    setSaveModalOpen(true);
+  };
+
   // Filtragem dinâmica no cliente (busca textual e categoria)
   const filteredQuestions = useMemo(() => {
     return questions.filter((q) => {
-      // Filtro de tipo (questões com ou sem prova)
-      if (filters.type === 'questions' && q.testId) {
-        // Mostra apenas questões avulsas se selecionado 'questions'
-        // ou todas dependendo do contexto
-      }
       if (filters.type === 'tests' && !q.testId) {
         return false;
       }
 
-      // Busca textual no enunciado, identificador, banca ou área
       if (filters.search) {
         const searchLower = filters.search.toLowerCase();
         const matchesEnunciado = q.enunciado.toLowerCase().includes(searchLower);
@@ -119,7 +123,7 @@ export const App: React.FC = () => {
 
   return (
     <Box sx={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
-      {/* Horizontal Navbar at top with theme toggle only */}
+      {/* Horizontal Navbar at top */}
       <Navbar
         activeTab={activeTab}
         onTabChange={setActiveTab}
@@ -127,79 +131,95 @@ export const App: React.FC = () => {
 
       {/* Main Content Area */}
       <Container maxWidth="lg" sx={{ py: 4, flexGrow: 1 }}>
-        {/* Search & Multi-filter Bar */}
-        <SearchBar
-          filters={filters}
-          onFilterChange={handleFilterChange}
-          origins={origins}
-          areas={areas}
-          tests={tests}
-          totalResults={filteredQuestions.length}
-        />
-
-        {/* Section Title */}
-        <Box sx={{ mb: 3, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <Box>
-            <Typography variant="h5" sx={{ fontWeight: 700, color: 'text.primary' }}>
-              {activeTab === 'questoes' && 'Banco de Questões'}
-              {activeTab === 'provas' && 'Provas & Vestibulares'}
-              {activeTab === 'bancas' && 'Bancas Examinadoras'}
-              {activeTab === 'areas' && 'Áreas do Conhecimento'}
-            </Typography>
-            <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-              Questões reais integradas diretamente ao banco de dados com resolução interativa
-            </Typography>
-          </Box>
-        </Box>
-
-        {/* Question Cards or Loading Skeletons */}
-        {isLoading ? (
-          <Stack spacing={0}>
-            <QuestionSkeleton />
-            <QuestionSkeleton />
-            <QuestionSkeleton />
-          </Stack>
-        ) : filteredQuestions.length > 0 ? (
-          <Stack spacing={0}>
-            {filteredQuestions.map((q) => (
-              <QuestionCard key={q.id} question={q} />
-            ))}
-          </Stack>
+        {activeTab === 'pastas' ? (
+          /* Aba de Pastas e Cadernos Salvos */
+          <FoldersView onOpenSaveModal={handleOpenSaveModal} />
         ) : (
-          <Paper
-            elevation={4}
-            sx={{
-              p: 6,
-              textAlign: 'center',
-              borderRadius: 3,
-            }}
-          >
-            <SearchOffIcon sx={{ fontSize: 48, color: 'text.secondary', mb: 2 }} />
-            <Typography variant="h6" sx={{ fontWeight: 600, mb: 1 }}>
-              Nenhuma questão encontrada
-            </Typography>
-            <Typography variant="body2" sx={{ color: 'text.secondary', mb: 3 }}>
-              Tente ajustar ou limpar os filtros de busca para visualizar mais questões.
-            </Typography>
-            <Button
-              variant="outlined"
-              onClick={() =>
-                handleFilterChange({
-                  search: '',
-                  type: 'all',
-                  originId: '',
-                  areaId: '',
-                  year: '',
-                  testId: '',
-                })
-              }
-              sx={{ borderColor: PALETTE_COLORS.primary, color: PALETTE_COLORS.primary }}
-            >
-              Limpar Todos os Filtros
-            </Button>
-          </Paper>
+          /* Aba de Questões / Provas / Bancas / Áreas */
+          <>
+            <SearchBar
+              filters={filters}
+              onFilterChange={handleFilterChange}
+              origins={origins}
+              areas={areas}
+              tests={tests}
+              totalResults={filteredQuestions.length}
+            />
+
+            <Box sx={{ mb: 3, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <Box>
+                <Typography variant="h5" sx={{ fontWeight: 700, color: 'text.primary' }}>
+                  {activeTab === 'questoes' && 'Banco de Questões'}
+                  {activeTab === 'provas' && 'Provas & Vestibulares'}
+                  {activeTab === 'bancas' && 'Bancas Examinadoras'}
+                  {activeTab === 'areas' && 'Áreas do Conhecimento'}
+                </Typography>
+                <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+                  Questões reais integradas diretamente ao banco de dados com resolução interativa
+                </Typography>
+              </Box>
+            </Box>
+
+            {isLoading ? (
+              <Stack spacing={0}>
+                <QuestionSkeleton />
+                <QuestionSkeleton />
+                <QuestionSkeleton />
+              </Stack>
+            ) : filteredQuestions.length > 0 ? (
+              <Stack spacing={0}>
+                {filteredQuestions.map((q) => (
+                  <QuestionCard
+                    key={q.id}
+                    question={q}
+                    onBookmarkClick={handleOpenSaveModal}
+                  />
+                ))}
+              </Stack>
+            ) : (
+              <Paper
+                elevation={4}
+                sx={{
+                  p: 6,
+                  textAlign: 'center',
+                  borderRadius: 3,
+                }}
+              >
+                <SearchOffIcon sx={{ fontSize: 48, color: 'text.secondary', mb: 2 }} />
+                <Typography variant="h6" sx={{ fontWeight: 600, mb: 1 }}>
+                  Nenhuma questão encontrada
+                </Typography>
+                <Typography variant="body2" sx={{ color: 'text.secondary', mb: 3 }}>
+                  Tente ajustar ou limpar os filtros de busca para visualizar mais questões.
+                </Typography>
+                <Button
+                  variant="outlined"
+                  onClick={() =>
+                    handleFilterChange({
+                      search: '',
+                      type: 'all',
+                      originId: '',
+                      areaId: '',
+                      year: '',
+                      testId: '',
+                    })
+                  }
+                  sx={{ borderColor: PALETTE_COLORS.primary, color: PALETTE_COLORS.primary }}
+                >
+                  Limpar Todos os Filtros
+                </Button>
+              </Paper>
+            )}
+          </>
         )}
       </Container>
+
+      {/* Modal para salvar em pastas */}
+      <SaveToFolderModal
+        open={saveModalOpen}
+        onClose={() => setSaveModalOpen(false)}
+        question={selectedQuestionForSave}
+      />
 
       {/* Footer */}
       <Box
