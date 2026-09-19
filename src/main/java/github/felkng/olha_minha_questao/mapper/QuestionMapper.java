@@ -16,12 +16,16 @@ public interface QuestionMapper {
     @Mapping(target = "test", ignore = true)
     @Mapping(target = "images", ignore = true)
     @Mapping(target = "correctAlternative", ignore = true)
+    @Mapping(target = "statistic", ignore = true)
     @Mapping(target = "createdAt", ignore = true)
     @Mapping(target = "updatedAt", ignore = true)
     Question toEntity(QuestionRequestDTO dto);
 
     @Mapping(target = "correctAlternativeId", source = "correctAlternative.id")
     @Mapping(target = "correctAlternativeIdentifier", source = "correctAlternative.identifier")
+    @Mapping(target = "difficultyLevel", source = "statistic.difficultyLevel")
+    @Mapping(target = "accuracyPercentage", source = "statistic.firstAttemptAccuracy")
+    @Mapping(target = "totalAttempts", source = "statistic.totalAttempts")
     QuestionResponseDTO toDTO(Question entity);
 
     @Mapping(target = "id", ignore = true)
@@ -30,6 +34,7 @@ public interface QuestionMapper {
     @Mapping(target = "test", ignore = true)
     @Mapping(target = "images", ignore = true)
     @Mapping(target = "correctAlternative", ignore = true)
+    @Mapping(target = "statistic", ignore = true)
     @Mapping(target = "createdAt", ignore = true)
     @Mapping(target = "updatedAt", ignore = true)
     void updateEntityFromDTO(QuestionRequestDTO dto, @MappingTarget Question entity);
