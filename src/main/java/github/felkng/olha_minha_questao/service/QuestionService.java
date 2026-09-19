@@ -78,7 +78,63 @@ public class QuestionService {
                 } catch (IllegalArgumentException ignored) {}
             }
             if (search != null && !search.isBlank()) {
-                predicates.add(cb.like(cb.lower(root.get("enunciado")), "%" + search.toLowerCase() + "%"));
+                String term = search.trim();
+                String normalizedTerm = java.text.Normalizer.normalize(term, java.text.Normalizer.Form.NFD)
+                        .replaceAll("\\p{M}", "")
+                        .toLowerCase();
+                String pattern = "%" + normalizedTerm + "%";
+
+                jakarta.persistence.criteria.Expression<String> unaccentEnunciado = cb.function("translate", String.class,
+                        cb.lower(root.get("enunciado")),
+                        cb.literal("áàâãäéèêëíìîïóòôõöúùûüçÁÀÂÃÄÉÈÊËÍÌÎÏÓÒÔÕÖÚÙÛÜÇ"),
+                        cb.literal("aaaaaeeeeiiiiooooouuuucAAAAAEEEEIIIIOOOOOUUUUC"));
+
+                jakarta.persistence.criteria.Expression<String> unaccentIdentifier = cb.function("translate", String.class,
+                        cb.lower(root.get("identifier")),
+                        cb.literal("áàâãäéèêëíìîïóòôõöúùûüçÁÀÂÃÄÉÈÊËÍÌÎÏÓÒÔÕÖÚÙÛÜÇ"),
+                        cb.literal("aaaaaeeeeiiiiooooouuuucAAAAAEEEEIIIIOOOOOUUUUC"));
+
+                Join<Question, Origin> originJoin = root.join("origin", JoinType.LEFT);
+                Join<Question, Area> areaJoin = root.join("area", JoinType.LEFT);
+                Join<Question, Test> testJoin = root.join("test", JoinType.LEFT);
+                Join<Question, Subject> subjectJoin = root.join("subject", JoinType.LEFT);
+
+                jakarta.persistence.criteria.Expression<String> unaccentOrigin = cb.function("translate", String.class,
+                        cb.lower(originJoin.get("name")),
+                        cb.literal("áàâãäéèêëíìîïóòôõöúùûüçÁÀÂÃÄÉÈÊËÍÌÎÏÓÒÔÕÖÚÙÛÜÇ"),
+                        cb.literal("aaaaaeeeeiiiiooooouuuucAAAAAEEEEIIIIOOOOOUUUUC"));
+
+                jakarta.persistence.criteria.Expression<String> unaccentArea = cb.function("translate", String.class,
+                        cb.lower(areaJoin.get("name")),
+                        cb.literal("áàâãäéèêëíìîïóòôõöúùûüçÁÀÂÃÄÉÈÊËÍÌÎÏÓÒÔÕÖÚÙÛÜÇ"),
+                        cb.literal("aaaaaeeeeiiiiooooouuuucAAAAAEEEEIIIIOOOOOUUUUC"));
+
+                jakarta.persistence.criteria.Expression<String> unaccentTest = cb.function("translate", String.class,
+                        cb.lower(testJoin.get("name")),
+                        cb.literal("áàâãäéèêëíìîïóòôõöúùûüçÁÀÂÃÄÉÈÊËÍÌÎÏÓÒÔÕÖÚÙÛÜÇ"),
+                        cb.literal("aaaaaeeeeiiiiooooouuuucAAAAAEEEEIIIIOOOOOUUUUC"));
+
+                jakarta.persistence.criteria.Expression<String> unaccentSubject = cb.function("translate", String.class,
+                        cb.lower(subjectJoin.get("name")),
+                        cb.literal("áàâãäéèêëíìîïóòôõöúùûüçÁÀÂÃÄÉÈÊËÍÌÎÏÓÒÔÕÖÚÙÛÜÇ"),
+                        cb.literal("aaaaaeeeeiiiiooooouuuucAAAAAEEEEIIIIOOOOOUUUUC"));
+
+                List<Predicate> searchPredicates = new ArrayList<>();
+                searchPredicates.add(cb.like(unaccentEnunciado, pattern));
+                searchPredicates.add(cb.like(unaccentIdentifier, pattern));
+                searchPredicates.add(cb.like(unaccentOrigin, pattern));
+                searchPredicates.add(cb.like(unaccentArea, pattern));
+                searchPredicates.add(cb.like(unaccentTest, pattern));
+                searchPredicates.add(cb.like(unaccentSubject, pattern));
+
+                if (term.matches("\\d+")) {
+                    try {
+                        int parsed = Integer.parseInt(term);
+                        searchPredicates.add(cb.equal(root.get("year"), parsed));
+                    } catch (NumberFormatException ignored) {}
+                }
+
+                predicates.add(cb.or(searchPredicates.toArray(new Predicate[0])));
             }
             return cb.and(predicates.toArray(new Predicate[0]));
         };
