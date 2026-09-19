@@ -52,11 +52,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [user]);
 
   const login = (newUser: UserSummary) => {
+    if (!newUser || !newUser.id) {
+      console.warn('Invalid user passed to login:', newUser);
+      return;
+    }
     setUser(newUser);
+    localStorage.setItem('user', JSON.stringify(newUser));
   };
 
   const logout = () => {
     setUser(null);
+    localStorage.removeItem('user');
   };
 
   const markQuestionAttempted = (questionId: number) => {
