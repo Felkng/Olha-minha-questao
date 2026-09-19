@@ -74,8 +74,20 @@ export const registerUser = async (data: { name: string; email: string; password
 };
 
 export const getUserProfile = async (userId: number): Promise<UserProfile> => {
-  const response = await apiClient.get<UserProfile>(`/users/${userId}/profile`);
-  return response.data;
+  const response = await apiClient.get<any>(`/users/${userId}/profile`);
+  const d = response.data;
+  return {
+    id: d.id,
+    name: d.name,
+    email: d.email,
+    role: d.role,
+    createdAt: d.createdAt,
+    totalResolved: d.totalResolved ?? d.totalQuestionsResolved ?? 0,
+    easyAccuracy: d.easyAccuracy ?? d.easyAccuracyPercentage ?? 0,
+    mediumAccuracy: d.mediumAccuracy ?? d.mediumAccuracyPercentage ?? 0,
+    hardAccuracy: d.hardAccuracy ?? d.hardAccuracyPercentage ?? 0,
+    dailyActivities: d.dailyActivities || d.dailyActivity || [],
+  };
 };
 
 export const promoteUserToAdmin = async (userId: number): Promise<UserSummary> => {
