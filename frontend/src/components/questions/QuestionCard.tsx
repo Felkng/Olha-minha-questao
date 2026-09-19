@@ -11,12 +11,14 @@ import {
   Divider,
   IconButton,
   Tooltip,
+  Snackbar,
 } from '@mui/material';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import HighlightOffIcon from '@mui/icons-material/HighlightOff';
 import BookmarkBorderIcon from '@mui/icons-material/BookmarkBorder';
 import BookmarkIcon from '@mui/icons-material/Bookmark';
 import ShareOutlinedIcon from '@mui/icons-material/ShareOutlined';
+import VisibilityOutlinedIcon from '@mui/icons-material/VisibilityOutlined';
 import RestartAltIcon from '@mui/icons-material/RestartAlt';
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import { Link } from 'react-router-dom';
@@ -30,6 +32,7 @@ interface QuestionCardProps {
   question: Question;
   onBookmarkClick?: (question: Question) => void;
   isSavedInAnyFolder?: boolean;
+  showViewDetails?: boolean;
 }
 
 const getSessionId = (): string => {
@@ -45,6 +48,7 @@ export const QuestionCard: React.FC<QuestionCardProps> = ({
   question,
   onBookmarkClick,
   isSavedInAnyFolder = false,
+  showViewDetails = true,
 }) => {
   const { mode } = useAppTheme();
   const isDark = mode === 'dark';
@@ -54,8 +58,15 @@ export const QuestionCard: React.FC<QuestionCardProps> = ({
   const [isAnswered, setIsAnswered] = useState<boolean>(false);
   const [localBookmarked, setLocalBookmarked] = useState<boolean>(false);
   const [hasAttemptedBefore, setHasAttemptedBefore] = useState<boolean>(false);
+  const [copiedToastOpen, setCopiedToastOpen] = useState<boolean>(false);
 
   const isAttemptedByCurrentUser = attemptedQuestionIds.has(question.id);
+
+  const handleShare = () => {
+    const questionUrl = `${window.location.origin}/questoes/${question.id}`;
+    navigator.clipboard.writeText(questionUrl);
+    setCopiedToastOpen(true);
+  };
 
   // Dynamic statistics state
   const [difficultyLevel, setDifficultyLevel] = useState<DifficultyLevel>(
@@ -282,8 +293,27 @@ export const QuestionCard: React.FC<QuestionCardProps> = ({
           )}
         </Stack>
 
-        {/* Actions: Bookmark and Share */}
-        <Box sx={{ display: 'flex', gap: 0.5 }}>
+        {/* Actions: View Details, Bookmark and Share */}
+        <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'center' }}>
+          {showViewDetails && (
+            <Tooltip title="Visualizar questão em detalhes">
+              <IconButton
+                size="small"
+                component={Link}
+                to={`/questoes/${question.id}`}
+                sx={{
+                  color: 'text.secondary',
+                  '&:hover': {
+                    color: PALETTE_COLORS.primary,
+                    backgroundColor: isDark ? 'rgba(255, 230, 0, 0.08)' : 'rgba(255, 230, 0, 0.15)',
+                  },
+                }}
+              >
+                <VisibilityOutlinedIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+          )}
+
           <Tooltip title={isBookmarked ? 'Gerenciar pastas salvas' : 'Salvar em uma pasta'}>
             <IconButton
               size="small"
@@ -294,6 +324,9 @@ export const QuestionCard: React.FC<QuestionCardProps> = ({
                   setLocalBookmarked(!localBookmarked);
                 }
               }}
+              sx={{
+                '&:hover': { color: PALETTE_COLORS.primary },
+              }}
             >
               {isBookmarked ? (
                 <BookmarkIcon fontSize="small" sx={{ color: PALETTE_COLORS.primary }} />
@@ -302,9 +335,17 @@ export const QuestionCard: React.FC<QuestionCardProps> = ({
               )}
             </IconButton>
           </Tooltip>
-          <Tooltip title="Compartilhar questão">
-            <IconButton size="small">
-              <ShareOutlinedIcon fontSize="small" sx={{ color: 'text.secondary' }} />
+
+          <Tooltip title="Compartilhar questão (copiar link)">
+            <IconButton
+              size="small"
+              onClick={handleShare}
+              sx={{
+                color: 'text.secondary',
+                '&:hover': { color: PALETTE_COLORS.secondary },
+              }}
+            >
+              <ShareOutlinedIcon fontSize="small" />
             </IconButton>
           </Tooltip>
         </Box>
@@ -521,6 +562,13 @@ export const QuestionCard: React.FC<QuestionCardProps> = ({
           </Button>
         )}
       </Box>
+
+      <Snackbar
+        open={copiedToastOpen}
+        autoHideDuration={3000}
+        onClose={() => setCopiedToastOpen(false)}
+        message="Link da questão copiado para a área de transferência!"
+      />
     </Paper>
   );
 };
