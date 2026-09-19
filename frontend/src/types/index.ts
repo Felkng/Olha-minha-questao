@@ -246,6 +246,8 @@ export interface QuestionBoardResponse {
 }
 
 export type BoardTool =
+  | 'select'
+  | 'pan'
   | 'brush'
   | 'rectangle'
   | 'square'
@@ -260,16 +262,22 @@ export interface BoardPoint {
   y: number;
 }
 
-export interface BoardBrushElement {
-  type: 'brush';
+export interface BoardBaseElement {
+  id: string;
   color: string;
+  rotation?: number; // em graus
+  flipX?: boolean;
+  flipY?: boolean;
+}
+
+export interface BoardBrushElement extends BoardBaseElement {
+  type: 'brush';
   width: number;
   points: BoardPoint[];
 }
 
-export interface BoardRectElement {
+export interface BoardRectElement extends BoardBaseElement {
   type: 'rectangle';
-  color: string;
   width: number;
   x: number;
   y: number;
@@ -277,18 +285,16 @@ export interface BoardRectElement {
   h: number;
 }
 
-export interface BoardSquareElement {
+export interface BoardSquareElement extends BoardBaseElement {
   type: 'square';
-  color: string;
   width: number;
   x: number;
   y: number;
   size: number;
 }
 
-export interface BoardTriangleElement {
+export interface BoardTriangleElement extends BoardBaseElement {
   type: 'triangle';
-  color: string;
   width: number;
   x1: number;
   y1: number;
@@ -298,18 +304,16 @@ export interface BoardTriangleElement {
   y3: number;
 }
 
-export interface BoardCircleElement {
+export interface BoardCircleElement extends BoardBaseElement {
   type: 'circle';
-  color: string;
   width: number;
   cx: number;
   cy: number;
   radius: number;
 }
 
-export interface BoardStarElement {
+export interface BoardStarElement extends BoardBaseElement {
   type: 'star';
-  color: string;
   width: number;
   cx: number;
   cy: number;
@@ -318,9 +322,8 @@ export interface BoardStarElement {
   innerRadius: number;
 }
 
-export interface BoardTextElement {
+export interface BoardTextElement extends BoardBaseElement {
   type: 'text';
-  color: string;
   fontSize: number;
   x: number;
   y: number;
