@@ -17,7 +17,13 @@ import {
   TextField,
   ToggleButton,
   ToggleButtonGroup,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableRow,
 } from '@mui/material';
+import KeyboardIcon from '@mui/icons-material/Keyboard';
 import NearMeIcon from '@mui/icons-material/NearMe';
 import PanToolIcon from '@mui/icons-material/PanTool';
 import BrushIcon from '@mui/icons-material/Brush';
@@ -378,6 +384,9 @@ export const QuestionWhiteboard: React.FC<QuestionWhiteboardProps> = ({ question
   const [textDialogOpen, setTextDialogOpen] = useState<boolean>(false);
   const [textInput, setTextInput] = useState<string>('');
   const [textPosition, setTextPosition] = useState<BoardPoint | null>(null);
+
+  // Shortcuts Dialog State
+  const [shortcutsDialogOpen, setShortcutsDialogOpen] = useState<boolean>(false);
 
   // Persistence status
   const [isSaving, setIsSaving] = useState<boolean>(false);
@@ -741,12 +750,14 @@ export const QuestionWhiteboard: React.FC<QuestionWhiteboardProps> = ({ question
     return () => clearTimeout(timer);
   }, [elements, hasUnsavedChanges]);
 
-  // Adiciona novo elemento ao histórico
-  const addElement = (newEl: BoardElement) => {
+  // Adiciona novo elemento ao histórico (sem selecionar automaticamente ao desenhar)
+  const addElement = (newEl: BoardElement, selectIt: boolean = false) => {
     setUndoStack((prev) => [...prev, elements]);
     setRedoStack([]);
     setElements((prev) => [...prev, newEl]);
-    setSelectedElementId(newEl.id);
+    if (selectIt) {
+      setSelectedElementId(newEl.id);
+    }
     setHasUnsavedChanges(true);
   };
 
@@ -859,7 +870,7 @@ export const QuestionWhiteboard: React.FC<QuestionWhiteboardProps> = ({ question
         break;
     }
 
-    addElement(duplicated);
+    addElement(duplicated, true);
   };
 
   // Alterar Cor do elemento selecionado ou da ferramenta ativa
@@ -943,8 +954,13 @@ export const QuestionWhiteboard: React.FC<QuestionWhiteboardProps> = ({ question
   // Atalhos de teclado para ferramentas, figuras, edição e exclusão
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Ignora se estiver digitando em campo de texto ou modal de texto aberto
-      if (textDialogOpen) return;
+      // Ignora se estiver digitando em campo de texto ou modais abertos
+      if (textDialogOpen || shortcutsDialogOpen) {
+        if (shortcutsDialogOpen && e.key === 'Escape') {
+          setShortcutsDialogOpen(false);
+        }
+        return;
+      }
       const target = e.target as HTMLElement | null;
       if (
         target &&
@@ -953,6 +969,13 @@ export const QuestionWhiteboard: React.FC<QuestionWhiteboardProps> = ({ question
           target.isContentEditable ||
           target.closest('.MuiInputBase-root'))
       ) {
+        return;
+      }
+
+      // Atalho de Ajuda: '?' ou Shift + '/' abre a lista de atalhos
+      if (e.key === '?' || (e.shiftKey && e.key === '/')) {
+        e.preventDefault();
+        setShortcutsDialogOpen(true);
         return;
       }
 
@@ -1070,6 +1093,7 @@ export const QuestionWhiteboard: React.FC<QuestionWhiteboardProps> = ({ question
   }, [
     selectedElementId,
     textDialogOpen,
+    shortcutsDialogOpen,
     handleDeleteSelected,
     handleUndo,
     handleRedo,
@@ -1186,6 +1210,11 @@ export const QuestionWhiteboard: React.FC<QuestionWhiteboardProps> = ({ question
         setSelectedElementId(null);
       }
       return;
+    }
+
+    // Desmarca qualquer elemento selecionado ao usar ferramentas que não sejam de seleção
+    if (selectedElementId) {
+      setSelectedElementId(null);
     }
 
     // Ferramenta de Texto
@@ -1518,10 +1547,29 @@ export const QuestionWhiteboard: React.FC<QuestionWhiteboardProps> = ({ question
           </Typography>
           <Chip
             size="small"
-            label="Persistência XML"
             variant="outlined"
             sx={{ fontSize: '0.7rem', height: 20 }}
           />
+          <Tooltip title="Ver lista completa de atalhos de teclado (?)">
+            <Button
+              size="small"
+              variant="outlined"
+              color="inherit"
+              startIcon={<KeyboardIcon fontSize="small" />}
+              onClick={() => setShortcutsDialogOpen(true)}
+              sx={{
+                fontSize: '0.7rem',
+                height: 22,
+                px: 1,
+                py: 0,
+                textTransform: 'none',
+                fontWeight: 600,
+                borderColor: 'divider',
+              }}
+            >
+              Atalhos (?)
+            </Button>
+          </Tooltip>
         </Stack>
 
         <Stack direction="row" spacing={1.5} alignItems="center">
@@ -1989,6 +2037,169 @@ export const QuestionWhiteboard: React.FC<QuestionWhiteboardProps> = ({ question
             sx={{ fontWeight: 700, textTransform: 'none' }}
           >
             Adicionar
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Modal de Lista de Atalhos de Teclado */}
+      <Dialog
+        open={shortcutsDialogOpen}
+        onClose={() => setShortcutsDialogOpen(false)}
+        maxWidth="sm"
+        fullWidth
+        PaperProps={{
+          sx: {
+            borderRadius: 3,
+            backgroundColor: isDark ? '#1a1e24' : '#ffffff',
+          },
+        }}
+      >
+        <DialogTitle sx={{ fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 1 }}>
+          <Stack direction="row" spacing={1} alignItems="center">
+            <KeyboardIcon sx={{ color: PALETTE_COLORS.primary }} />
+            <span>Atalhos de Teclado da Lousa</span>
+          </Stack>
+          <Chip label="Dica: pressione '?' para abrir" size="small" variant="outlined" sx={{ fontSize: '0.75rem' }} />
+        </DialogTitle>
+        <DialogContent dividers sx={{ p: 2.5 }}>
+          <Stack spacing={2.5}>
+            {/* Seção 1: Ferramentas e Desenho */}
+            <Box>
+              <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1, color: PALETTE_COLORS.primary }}>
+                Ferramentas e Desenho
+              </Typography>
+              <TableContainer component={Paper} variant="outlined" sx={{ borderRadius: 2 }}>
+                <Table size="small">
+                  <TableBody>
+                    {[
+                      { action: 'Cursor Comum e Seleção', keys: ['V', '1'] },
+                      { action: 'Navegação / Mover Lousa (Mãozinha)', keys: ['H', '2'] },
+                      { action: 'Pincel Livre', keys: ['B', '3'] },
+                      { action: 'Borracha', keys: ['E', '4'] },
+                      { action: 'Inserir Texto', keys: ['T', '5'] },
+                      { action: 'Retângulo', keys: ['R', '6'] },
+                      { action: 'Quadrado', keys: ['S', '7'] },
+                      { action: 'Círculo / Bola', keys: ['C', '8'] },
+                      { action: 'Triângulo', keys: ['G', '9'] },
+                      { action: 'Estrela (5 pontas)', keys: ['X', '0'] },
+                    ].map((row) => (
+                      <TableRow key={row.action}>
+                        <TableCell sx={{ py: 0.8, fontSize: '0.85rem' }}>{row.action}</TableCell>
+                        <TableCell align="right" sx={{ py: 0.8 }}>
+                          <Stack direction="row" spacing={0.5} justifyContent="flex-end">
+                            {row.keys.map((k) => (
+                              <Chip
+                                key={k}
+                                label={k}
+                                size="small"
+                                sx={{
+                                  fontWeight: 700,
+                                  fontSize: '0.75rem',
+                                  height: 22,
+                                  minWidth: 24,
+                                  backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)',
+                                }}
+                              />
+                            ))}
+                          </Stack>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            </Box>
+
+            {/* Seção 2: Edição e Manipulação */}
+            <Box>
+              <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1, color: PALETTE_COLORS.secondary }}>
+                Edição de Objetos e Histórico
+              </Typography>
+              <TableContainer component={Paper} variant="outlined" sx={{ borderRadius: 2 }}>
+                <Table size="small">
+                  <TableBody>
+                    {[
+                      { action: 'Excluir objeto selecionado', keys: ['Delete', 'Backspace'] },
+                      { action: 'Duplicar objeto selecionado', keys: ['Ctrl + D'] },
+                      { action: 'Desfazer ação (Undo)', keys: ['Ctrl + Z'] },
+                      { action: 'Refazer ação (Redo)', keys: ['Ctrl + Y', 'Ctrl + Shift + Z'] },
+                      { action: 'Desmarcar seleção / Fechar modal', keys: ['Esc'] },
+                    ].map((row) => (
+                      <TableRow key={row.action}>
+                        <TableCell sx={{ py: 0.8, fontSize: '0.85rem' }}>{row.action}</TableCell>
+                        <TableCell align="right" sx={{ py: 0.8 }}>
+                          <Stack direction="row" spacing={0.5} justifyContent="flex-end">
+                            {row.keys.map((k) => (
+                              <Chip
+                                key={k}
+                                label={k}
+                                size="small"
+                                sx={{
+                                  fontWeight: 700,
+                                  fontSize: '0.75rem',
+                                  height: 22,
+                                  backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)',
+                                }}
+                              />
+                            ))}
+                          </Stack>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            </Box>
+
+            {/* Seção 3: Navegação e Ajustes */}
+            <Box>
+              <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1, color: PALETTE_COLORS.success }}>
+                Navegação e Ajuste Fino
+              </Typography>
+              <TableContainer component={Paper} variant="outlined" sx={{ borderRadius: 2 }}>
+                <Table size="small">
+                  <TableBody>
+                    {[
+                      { action: 'Ajuste fino de posição (Nudge)', keys: ['↑', '↓', '←', '→ (2px)'] },
+                      { action: 'Deslocamento rápido de posição', keys: ['Shift + Setas (10px)'] },
+                      { action: 'Zoom focado no cursor', keys: ['Scroll do mouse'] },
+                      { action: 'Girar objeto livremente', keys: ['Arrastar manipulador superior'] },
+                    ].map((row) => (
+                      <TableRow key={row.action}>
+                        <TableCell sx={{ py: 0.8, fontSize: '0.85rem' }}>{row.action}</TableCell>
+                        <TableCell align="right" sx={{ py: 0.8 }}>
+                          <Stack direction="row" spacing={0.5} justifyContent="flex-end">
+                            {row.keys.map((k) => (
+                              <Chip
+                                key={k}
+                                label={k}
+                                size="small"
+                                sx={{
+                                  fontWeight: 700,
+                                  fontSize: '0.75rem',
+                                  height: 22,
+                                  backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)',
+                                }}
+                              />
+                            ))}
+                          </Stack>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            </Box>
+          </Stack>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, py: 1.5 }}>
+          <Button
+            variant="contained"
+            color="primary"
+            onClick={() => setShortcutsDialogOpen(false)}
+            sx={{ fontWeight: 700, textTransform: 'none' }}
+          >
+            Fechar
           </Button>
         </DialogActions>
       </Dialog>
