@@ -59,6 +59,10 @@ public class Question {
     @JoinColumn(name = "test_id")
     private Test test;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "subject_id")
+    private Subject subject;
+
     @OneToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "correct_alternative_id")
     private Alternative correctAlternative;
