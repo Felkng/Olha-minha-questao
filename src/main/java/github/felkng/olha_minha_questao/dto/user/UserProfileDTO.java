@@ -28,4 +28,24 @@ public class UserProfileDTO {
 
     @Builder.Default
     private List<DailyActivityDTO> dailyActivity = new ArrayList<>();
+
+    public long getTotalResolved() {
+        return totalQuestionsResolved;
+    }
+
+    public double getEasyAccuracy() {
+        return easyAccuracyPercentage;
+    }
+
+    public double getMediumAccuracy() {
+        return mediumAccuracyPercentage;
+    }
+
+    public double getHardAccuracy() {
+        return hardAccuracyPercentage;
+    }
+
+    public List<DailyActivityDTO> getDailyActivities() {
+        return dailyActivity;
+    }
 }
