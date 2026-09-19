@@ -158,15 +158,17 @@ public class QuestionService {
             return cb.and(predicates.toArray(new Predicate[0]));
         };
 
-        Pageable sortedPageable = pageable;
+        Pageable sortedPageable;
         if ("mostAnswered".equalsIgnoreCase(sort)) {
             sortedPageable = PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(),
                     Sort.by(Sort.Direction.DESC, "statistic.totalAttempts")
                             .and(Sort.by(Sort.Direction.DESC, "createdAt")));
-        } else if (pageable.getSort().isUnsorted()) {
+        } else if (sort == null || "recent".equalsIgnoreCase(sort) || pageable.getSort().isUnsorted() || pageable.getSort().getOrderFor("recent") != null) {
             sortedPageable = PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(),
                     Sort.by(Sort.Direction.DESC, "year")
                             .and(Sort.by(Sort.Direction.DESC, "id")));
+        } else {
+            sortedPageable = pageable;
         }
 
         return questionRepository.findAll(spec, sortedPageable)
