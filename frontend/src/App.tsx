@@ -11,8 +11,10 @@ import { AreasPage } from './pages/AreasPage';
 import { CategoryQuestionsPage } from './pages/CategoryQuestionsPage';
 import { FoldersPage } from './pages/FoldersPage';
 import { FolderDetailPage } from './pages/FolderDetailPage';
+import { UserProfilePage } from './pages/UserProfilePage';
 import { SaveToFolderModal } from './components/folders/SaveToFolderModal';
 import { Question } from './types';
+import { AuthProvider } from './context/AuthContext';
 
 export const App: React.FC = () => {
   const [saveModalOpen, setSaveModalOpen] = useState<boolean>(false);
@@ -24,60 +26,63 @@ export const App: React.FC = () => {
   };
 
   return (
-    <BrowserRouter>
-      <MainLayout>
-        <Routes>
-          <Route path="/" element={<Navigate to="/questoes" replace />} />
-          <Route
-            path="/questoes"
-            element={<QuestionsPage onBookmarkClick={handleOpenSaveModal} />}
-          />
-          <Route
-            path="/questoes/:id"
-            element={<QuestionDetailPage onBookmarkClick={handleOpenSaveModal} />}
-          />
-          <Route path="/provas" element={<TestsPage />} />
-          <Route
-            path="/provas/:id"
-            element={<TestDetailPage onBookmarkQuestion={handleOpenSaveModal} />}
-          />
-          <Route path="/provas/:id/avaliacao" element={<TestEvaluationPage />} />
-          <Route path="/bancas" element={<OriginsPage />} />
-          <Route
-            path="/bancas/:id"
-            element={
-              <CategoryQuestionsPage
-                type="origin"
-                onBookmarkClick={handleOpenSaveModal}
-              />
-            }
-          />
-          <Route path="/areas" element={<AreasPage />} />
-          <Route
-            path="/areas/:id"
-            element={
-              <CategoryQuestionsPage
-                type="area"
-                onBookmarkClick={handleOpenSaveModal}
-              />
-            }
-          />
-          <Route path="/pastas" element={<FoldersPage />} />
-          <Route
-            path="/pastas/:id"
-            element={<FolderDetailPage onBookmarkQuestion={handleOpenSaveModal} />}
-          />
-          {/* Fallback to questoes */}
-          <Route path="*" element={<Navigate to="/questoes" replace />} />
-        </Routes>
+    <AuthProvider>
+      <BrowserRouter>
+        <MainLayout>
+          <Routes>
+            <Route path="/" element={<Navigate to="/questoes" replace />} />
+            <Route
+              path="/questoes"
+              element={<QuestionsPage onBookmarkClick={handleOpenSaveModal} />}
+            />
+            <Route
+              path="/questoes/:id"
+              element={<QuestionDetailPage onBookmarkClick={handleOpenSaveModal} />}
+            />
+            <Route path="/provas" element={<TestsPage />} />
+            <Route
+              path="/provas/:id"
+              element={<TestDetailPage onBookmarkQuestion={handleOpenSaveModal} />}
+            />
+            <Route path="/provas/:id/avaliacao" element={<TestEvaluationPage />} />
+            <Route path="/bancas" element={<OriginsPage />} />
+            <Route
+              path="/bancas/:id"
+              element={
+                <CategoryQuestionsPage
+                  type="origin"
+                  onBookmarkClick={handleOpenSaveModal}
+                />
+              }
+            />
+            <Route path="/areas" element={<AreasPage />} />
+            <Route
+              path="/areas/:id"
+              element={
+                <CategoryQuestionsPage
+                  type="area"
+                  onBookmarkClick={handleOpenSaveModal}
+                />
+              }
+            />
+            <Route path="/pastas" element={<FoldersPage />} />
+            <Route
+              path="/pastas/:id"
+              element={<FolderDetailPage onBookmarkQuestion={handleOpenSaveModal} />}
+            />
+            <Route path="/perfil/:id" element={<UserProfilePage />} />
+            {/* Fallback to questoes */}
+            <Route path="*" element={<Navigate to="/questoes" replace />} />
+          </Routes>
 
-        {/* Global Save To Folder Modal */}
-        <SaveToFolderModal
-          open={saveModalOpen}
-          onClose={() => setSaveModalOpen(false)}
-          question={selectedQuestionForSave}
-        />
-      </MainLayout>
-    </BrowserRouter>
+          {/* Global Save To Folder Modal */}
+          <SaveToFolderModal
+            open={saveModalOpen}
+            onClose={() => setSaveModalOpen(false)}
+            question={selectedQuestionForSave}
+          />
+        </MainLayout>
+      </BrowserRouter>
+    </AuthProvider>
   );
 };
