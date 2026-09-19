@@ -1,15 +1,14 @@
 import React, { useState } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { Box, Container, Typography } from '@mui/material';
-import { Navbar } from './components/Navbar';
-import { QuestionsView } from './components/QuestionsView';
-import { TestListView } from './components/TestListView';
-import { TestEvaluationView } from './components/TestEvaluationView';
-import { OriginListView } from './components/OriginListView';
-import { AreaListView } from './components/AreaListView';
-import { CategoryQuestionsView } from './components/CategoryQuestionsView';
-import { FoldersView } from './components/FoldersView';
-import { SaveToFolderModal } from './components/SaveToFolderModal';
+import { MainLayout } from './layouts/MainLayout';
+import { QuestionsPage } from './pages/QuestionsPage';
+import { TestsPage } from './pages/TestsPage';
+import { TestEvaluationPage } from './pages/TestEvaluationPage';
+import { OriginsPage } from './pages/OriginsPage';
+import { AreasPage } from './pages/AreasPage';
+import { CategoryQuestionsPage } from './pages/CategoryQuestionsPage';
+import { FoldersPage } from './pages/FoldersPage';
+import { SaveToFolderModal } from './components/folders/SaveToFolderModal';
 import { Question } from './types';
 
 export const App: React.FC = () => {
@@ -23,73 +22,50 @@ export const App: React.FC = () => {
 
   return (
     <BrowserRouter>
-      <Box sx={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
-        {/* Horizontal Navbar at top with router links */}
-        <Navbar />
+      <MainLayout>
+        <Routes>
+          <Route path="/" element={<Navigate to="/questoes" replace />} />
+          <Route
+            path="/questoes"
+            element={<QuestionsPage onBookmarkClick={handleOpenSaveModal} />}
+          />
+          <Route path="/provas" element={<TestsPage />} />
+          <Route path="/provas/:id" element={<TestEvaluationPage />} />
+          <Route path="/bancas" element={<OriginsPage />} />
+          <Route
+            path="/bancas/:id"
+            element={
+              <CategoryQuestionsPage
+                type="origin"
+                onBookmarkClick={handleOpenSaveModal}
+              />
+            }
+          />
+          <Route path="/areas" element={<AreasPage />} />
+          <Route
+            path="/areas/:id"
+            element={
+              <CategoryQuestionsPage
+                type="area"
+                onBookmarkClick={handleOpenSaveModal}
+              />
+            }
+          />
+          <Route
+            path="/pastas"
+            element={<FoldersPage onOpenSaveModal={handleOpenSaveModal} />}
+          />
+          {/* Fallback to questoes */}
+          <Route path="*" element={<Navigate to="/questoes" replace />} />
+        </Routes>
 
-        {/* Main Content Area */}
-        <Container maxWidth="lg" sx={{ py: 4, flexGrow: 1 }}>
-          <Routes>
-            <Route path="/" element={<Navigate to="/questoes" replace />} />
-            <Route
-              path="/questoes"
-              element={<QuestionsView onBookmarkClick={handleOpenSaveModal} />}
-            />
-            <Route path="/provas" element={<TestListView />} />
-            <Route path="/provas/:id" element={<TestEvaluationView />} />
-            <Route path="/bancas" element={<OriginListView />} />
-            <Route
-              path="/bancas/:id"
-              element={
-                <CategoryQuestionsView
-                  type="origin"
-                  onBookmarkClick={handleOpenSaveModal}
-                />
-              }
-            />
-            <Route path="/areas" element={<AreaListView />} />
-            <Route
-              path="/areas/:id"
-              element={
-                <CategoryQuestionsView
-                  type="area"
-                  onBookmarkClick={handleOpenSaveModal}
-                />
-              }
-            />
-            <Route
-              path="/pastas"
-              element={<FoldersView onOpenSaveModal={handleOpenSaveModal} />}
-            />
-            {/* Fallback to questoes */}
-            <Route path="*" element={<Navigate to="/questoes" replace />} />
-          </Routes>
-        </Container>
-
-        {/* Modal para salvar em pastas */}
+        {/* Global Save To Folder Modal */}
         <SaveToFolderModal
           open={saveModalOpen}
           onClose={() => setSaveModalOpen(false)}
           question={selectedQuestionForSave}
         />
-
-        {/* Footer */}
-        <Box
-          component="footer"
-          sx={{
-            py: 3,
-            px: 2,
-            mt: 'auto',
-            borderTop: '1px solid',
-            borderColor: 'divider',
-            textAlign: 'center',
-          }}
-        >
-          <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-            Olha Minha Questão &copy; {new Date().getFullYear()} — Plataforma de Estudo e Resolução de Questões
-          </Typography>
-        </Box>
-      </Box>
+      </MainLayout>
     </BrowserRouter>
   );
 };
