@@ -51,12 +51,12 @@ class ExamSimulationTest {
     void testCompleteExamSimulation() {
         // 1. Criar Origem (FUVEST) e Área (Biologia)
         OriginResponseDTO origin = originService.create(OriginRequestDTO.builder()
-                .name("FUVEST")
+                .name("FUVEST_SIMULATION")
                 .description("Fundação Universitária para o Vestibular")
                 .build());
 
         AreaResponseDTO area = areaService.create(AreaRequestDTO.builder()
-                .name("Biologia")
+                .name("Biologia_SIMULATION")
                 .description("Ciências Biológicas e Meio Ambiente")
                 .build());
 
@@ -71,8 +71,8 @@ class ExamSimulationTest {
         entityManager.flush(); // Força INSERTs no PostgreSQL
 
         assertThat(exam.getId()).isNotNull();
-        assertThat(exam.getOriginName()).isEqualTo("FUVEST");
-        assertThat(exam.getAreaName()).isEqualTo("Biologia");
+        assertThat(exam.getOriginName()).isEqualTo("FUVEST_SIMULATION");
+        assertThat(exam.getAreaName()).isEqualTo("Biologia_SIMULATION");
 
         // 3. Criar 4 Questões completas para esta Prova, cada uma com 5 alternativas (A, B, C, D, E)
         List<Long> createdQuestionIds = new ArrayList<>();
