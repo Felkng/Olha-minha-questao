@@ -38,8 +38,8 @@ class TestServiceTest {
     @Test
     @DisplayName("Deve criar uma prova com sucesso e buscar por ID")
     void testCreateAndFindById() {
-        OriginResponseDTO origin = originService.create(OriginRequestDTO.builder().name("ENEM").build());
-        AreaResponseDTO area = areaService.create(AreaRequestDTO.builder().name("Ciências Humanas").build());
+        OriginResponseDTO origin = originService.create(OriginRequestDTO.builder().name("ENEM_TS_TEST").build());
+        AreaResponseDTO area = areaService.create(AreaRequestDTO.builder().name("Ciências Humanas_TS_TEST").build());
         entityManager.flush();
 
         TestRequestDTO request = TestRequestDTO.builder()
@@ -54,8 +54,8 @@ class TestServiceTest {
 
         assertThat(created.getId()).isNotNull();
         assertThat(created.getName()).isEqualTo("ENEM 2024 - Caderno Branco");
-        assertThat(created.getOriginName()).isEqualTo("ENEM");
-        assertThat(created.getAreaName()).isEqualTo("Ciências Humanas");
+        assertThat(created.getOriginName()).isEqualTo("ENEM_TS_TEST");
+        assertThat(created.getAreaName()).isEqualTo("Ciências Humanas_TS_TEST");
 
         TestResponseDTO found = testService.findById(created.getId());
         assertThat(found.getName()).isEqualTo("ENEM 2024 - Caderno Branco");
@@ -78,14 +78,14 @@ class TestServiceTest {
     @Test
     @DisplayName("Deve buscar provas por filtros de ano, origem e área")
     void testFindByFilters() {
-        OriginResponseDTO origin = originService.create(OriginRequestDTO.builder().name("FUVEST").build());
-        AreaResponseDTO area = areaService.create(AreaRequestDTO.builder().name("Exatas").build());
+        OriginResponseDTO origin = originService.create(OriginRequestDTO.builder().name("FUVEST_TS_TEST").build());
+        AreaResponseDTO area = areaService.create(AreaRequestDTO.builder().name("Exatas_TS_TEST").build());
 
         testService.create(TestRequestDTO.builder().name("FUVEST 2023").year(2023).originId(origin.getId()).areaId(area.getId()).build());
         testService.create(TestRequestDTO.builder().name("FUVEST 2024").year(2024).originId(origin.getId()).areaId(area.getId()).build());
         entityManager.flush();
 
-        List<TestResponseDTO> byYear = testService.findAll(null, null, 2024);
+        List<TestResponseDTO> byYear = testService.findAll(origin.getId(), null, 2024);
         assertThat(byYear).isNotEmpty();
         assertThat(byYear).allMatch(t -> t.getYear().equals(2024));
 
@@ -96,7 +96,7 @@ class TestServiceTest {
     @Test
     @DisplayName("Deve atualizar uma prova com sucesso")
     void testUpdate() {
-        OriginResponseDTO origin = originService.create(OriginRequestDTO.builder().name("UNICAMP").build());
+        OriginResponseDTO origin = originService.create(OriginRequestDTO.builder().name("UNICAMP_TS_TEST").build());
         TestResponseDTO created = testService.create(TestRequestDTO.builder()
                 .name("UNICAMP 2023")
                 .year(2023)
@@ -119,7 +119,7 @@ class TestServiceTest {
     @Test
     @DisplayName("Deve deletar uma prova com sucesso")
     void testDelete() {
-        OriginResponseDTO origin = originService.create(OriginRequestDTO.builder().name("ITA").build());
+        OriginResponseDTO origin = originService.create(OriginRequestDTO.builder().name("ITA_TS_TEST").build());
         TestResponseDTO created = testService.create(TestRequestDTO.builder()
                 .name("ITA 2024")
                 .year(2024)
