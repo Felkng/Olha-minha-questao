@@ -2274,7 +2274,7 @@ export const QuestionWhiteboard: React.FC<QuestionWhiteboardProps> = ({ question
               gap: 0.75,
               px: 1.5,
               py: 0.75,
-              borderRadius: '4px',
+              borderRadius: '8px',
               minWidth: 'max-content',
               backgroundColor: isDark ? 'rgba(22, 26, 32, 0.94)' : 'rgba(255, 255, 255, 0.94)',
               backdropFilter: 'blur(8px)',
