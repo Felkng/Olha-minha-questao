@@ -35,6 +35,31 @@ export const SearchBar: React.FC<SearchBarProps> = ({
   tests,
   totalResults,
 }) => {
+  const [searchTerm, setSearchTerm] = React.useState(filters.search);
+
+  // Sync internal search term when external filters.search changes (e.g. Clear Filters)
+  React.useEffect(() => {
+    setSearchTerm(filters.search);
+  }, [filters.search]);
+
+  // Debounce search update to avoid firing requests on every keystroke
+  React.useEffect(() => {
+    const timer = setTimeout(() => {
+      if (searchTerm !== filters.search) {
+        onFilterChange({ ...filters, search: searchTerm });
+      }
+    }, 350);
+
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      onFilterChange({ ...filters, search: searchTerm });
+    }
+  };
+
   const hasActiveFilters =
     filters.search !== '' ||
     filters.type !== 'all' ||
@@ -45,6 +70,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
     Boolean(filters.difficulty);
 
   const handleClear = () => {
+    setSearchTerm('');
     onFilterChange({
       search: '',
       type: 'all',
@@ -74,8 +100,9 @@ export const SearchBar: React.FC<SearchBarProps> = ({
           <TextField
             fullWidth
             placeholder="Pesquise por enunciado, palavras-chave, número da questão ou disciplina..."
-            value={filters.search}
-            onChange={(e) => onFilterChange({ ...filters, search: e.target.value })}
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            onKeyDown={handleKeyDown}
             InputProps={{
               startAdornment: (
                 <InputAdornment position="start">
