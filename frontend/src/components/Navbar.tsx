@@ -8,12 +8,9 @@ import {
   IconButton,
   Tooltip,
   Container,
-  Chip,
 } from '@mui/material';
 import DarkModeOutlinedIcon from '@mui/icons-material/DarkModeOutlined';
 import LightModeOutlinedIcon from '@mui/icons-material/LightModeOutlined';
-import PaletteOutlinedIcon from '@mui/icons-material/PaletteOutlined';
-import AutoAwesomeOutlinedIcon from '@mui/icons-material/AutoAwesomeOutlined';
 import QuizOutlinedIcon from '@mui/icons-material/QuizOutlined';
 import MenuBookOutlinedIcon from '@mui/icons-material/MenuBookOutlined';
 import AccountBalanceOutlinedIcon from '@mui/icons-material/AccountBalanceOutlined';
@@ -24,18 +21,9 @@ import { PALETTE_COLORS } from '../theme/theme';
 interface NavbarProps {
   activeTab: string;
   onTabChange: (tab: string) => void;
-  showSkeleton: boolean;
-  onToggleSkeleton: () => void;
-  onOpenPalette: () => void;
 }
 
-export const Navbar: React.FC<NavbarProps> = ({
-  activeTab,
-  onTabChange,
-  showSkeleton,
-  onToggleSkeleton,
-  onOpenPalette,
-}) => {
+export const Navbar: React.FC<NavbarProps> = ({ activeTab, onTabChange }) => {
   const { mode, toggleColorMode } = useAppTheme();
   const isDark = mode === 'dark';
 
@@ -142,42 +130,8 @@ export const Navbar: React.FC<NavbarProps> = ({
 
           <Box sx={{ flexGrow: { xs: 1, md: 0 } }} />
 
-          {/* Right Action Controls */}
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            {/* Toggle Loading Skeleton Mode */}
-            <Tooltip title={showSkeleton ? 'Ocultar Skeletons' : 'Ver Skeletons de Carregamento'}>
-              <Chip
-                icon={<AutoAwesomeOutlinedIcon fontSize="small" />}
-                label={showSkeleton ? 'Skeleton ON' : 'Skeleton'}
-                onClick={onToggleSkeleton}
-                clickable
-                color={showSkeleton ? 'warning' : 'default'}
-                variant={showSkeleton ? 'filled' : 'outlined'}
-                sx={{
-                  height: 32,
-                  fontWeight: 600,
-                  fontSize: '0.75rem',
-                  borderColor: showSkeleton ? undefined : 'divider',
-                }}
-              />
-            </Tooltip>
-
-            {/* Open Palette Showcase */}
-            <Tooltip title="Guia da Paleta de Cores & Design">
-              <IconButton
-                onClick={onOpenPalette}
-                sx={{
-                  border: '1px solid',
-                  borderColor: 'divider',
-                  borderRadius: 2,
-                  p: 1,
-                }}
-              >
-                <PaletteOutlinedIcon fontSize="small" sx={{ color: PALETTE_COLORS.primary }} />
-              </IconButton>
-            </Tooltip>
-
-            {/* Light / Dark Mode Toggle */}
+          {/* Right Action Controls: Light / Dark Mode Toggle ONLY */}
+          <Box sx={{ display: 'flex', alignItems: 'center' }}>
             <Tooltip title={isDark ? 'Mudar para Modo Claro' : 'Mudar para Modo Escuro'}>
               <IconButton
                 onClick={toggleColorMode}
