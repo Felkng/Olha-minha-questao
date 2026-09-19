@@ -24,15 +24,23 @@ import { useAppTheme } from '../theme/ThemeContext';
 
 interface QuestionCardProps {
   question: Question;
+  onBookmarkClick?: (question: Question) => void;
+  isSavedInAnyFolder?: boolean;
 }
 
-export const QuestionCard: React.FC<QuestionCardProps> = ({ question }) => {
+export const QuestionCard: React.FC<QuestionCardProps> = ({
+  question,
+  onBookmarkClick,
+  isSavedInAnyFolder = false,
+}) => {
   const { mode } = useAppTheme();
   const isDark = mode === 'dark';
 
   const [selectedAlternativeId, setSelectedAlternativeId] = useState<number | null>(null);
   const [isAnswered, setIsAnswered] = useState<boolean>(false);
-  const [isBookmarked, setIsBookmarked] = useState<boolean>(false);
+  const [localBookmarked, setLocalBookmarked] = useState<boolean>(false);
+
+  const isBookmarked = isSavedInAnyFolder || localBookmarked;
 
   // Determina se a alternativa selecionada está correta
   const isCorrectAnswer = Boolean(
@@ -138,8 +146,17 @@ export const QuestionCard: React.FC<QuestionCardProps> = ({ question }) => {
 
         {/* Actions: Bookmark and Share */}
         <Box sx={{ display: 'flex', gap: 0.5 }}>
-          <Tooltip title={isBookmarked ? 'Remover dos favoritos' : 'Salvar questão'}>
-            <IconButton size="small" onClick={() => setIsBookmarked(!isBookmarked)}>
+          <Tooltip title={isBookmarked ? 'Gerenciar pastas salvas' : 'Salvar em uma pasta'}>
+            <IconButton
+              size="small"
+              onClick={() => {
+                if (onBookmarkClick) {
+                  onBookmarkClick(question);
+                } else {
+                  setLocalBookmarked(!localBookmarked);
+                }
+              }}
+            >
               {isBookmarked ? (
                 <BookmarkIcon fontSize="small" sx={{ color: PALETTE_COLORS.primary }} />
               ) : (
