@@ -1,0 +1,111 @@
+import { Area, Origin, Question, Test } from '../types';
+
+export const MOCK_ORIGINS: Origin[] = [
+  { id: 1, name: 'ENEM', description: 'Exame Nacional do Ensino Médio' },
+  { id: 2, name: 'FUVEST', description: 'Vestibular da Universidade de São Paulo' },
+  { id: 3, name: 'VUNESP', description: 'Fundação para o Vestibular da UNESP' },
+  { id: 4, name: 'CEBRASPE', description: 'Centro Brasileiro de Pesquisa em Avaliação e Seleção' },
+  { id: 5, name: 'UNICAMP', description: 'Vestibular da Universidade Estadual de Campinas' },
+];
+
+export const MOCK_AREAS: Area[] = [
+  { id: 1, name: 'Matemática e suas Tecnologias', description: 'Álgebra, Geometria, Estatística' },
+  { id: 2, name: 'Ciências da Natureza (Biologia)', description: 'Ecologia, Genética, Citologia' },
+  { id: 3, name: 'Ciências da Natureza (Física)', description: 'Mecânica, Termodinâmica, Óptica' },
+  { id: 4, name: 'Linguagens e Códigos (Português)', description: 'Interpretação de Texto, Gramática, Literatura' },
+  { id: 5, name: 'Ciências Humanas (História)', description: 'História do Brasil e Geral' },
+];
+
+export const MOCK_TESTS: Test[] = [
+  { id: 1, name: 'ENEM 2024 - Caderno Azul (1º Dia)', year: 2024, originId: 1, originName: 'ENEM', areaId: 4, areaName: 'Linguagens e Códigos (Português)' },
+  { id: 2, name: 'ENEM 2024 - Caderno Amarelo (2º Dia)', year: 2024, originId: 1, originName: 'ENEM', areaId: 1, areaName: 'Matemática e suas Tecnologias' },
+  { id: 3, name: 'FUVEST 2024 - 1ª Fase', year: 2024, originId: 2, originName: 'FUVEST', areaId: 2, areaName: 'Ciências da Natureza (Biologia)' },
+  { id: 4, name: 'VUNESP 2023 - Conhecimentos Gerais', year: 2023, originId: 3, originName: 'VUNESP', areaId: 3, areaName: 'Ciências da Natureza (Física)' },
+];
+
+export const MOCK_QUESTIONS: Question[] = [
+  {
+    id: 1,
+    identifier: '136',
+    enunciado: 'Um arquiteto deseja construir um reservatório cilíndrico com capacidade de 31,4 m³. Sabendo que a altura do reservatório deve ser de 2,5 metros e utilizando π ≈ 3,14, qual deve ser a medida do raio da base desse reservatório, em metros?',
+    year: 2024,
+    originId: 1,
+    originName: 'ENEM',
+    areaId: 1,
+    areaName: 'Matemática e suas Tecnologias',
+    testId: 2,
+    testName: 'ENEM 2024 - Caderno Amarelo (2º Dia)',
+    alternatives: [
+      { id: 101, identifier: 'A', text: '1,0 metro', isCorrect: false },
+      { id: 102, identifier: 'B', text: '2,0 metros', isCorrect: true },
+      { id: 103, identifier: 'C', text: '3,14 metros', isCorrect: false },
+      { id: 104, identifier: 'D', text: '4,0 metros', isCorrect: false },
+      { id: 105, identifier: 'E', text: '5,0 metros', isCorrect: false },
+    ],
+    correctAlternativeId: 102,
+    correctAlternativeIdentifier: 'B',
+  },
+  {
+    id: 2,
+    identifier: '42',
+    enunciado: 'A fotossíntese é um processo essencial para a manutenção da vida na Terra, convertendo energia luminosa em energia química. Durante a fase clara (fotoquímica) da fotossíntese, qual é a principal molécula doadora de elétrons e qual gás é liberado para a atmosfera?',
+    year: 2024,
+    originId: 2,
+    originName: 'FUVEST',
+    areaId: 2,
+    areaName: 'Ciências da Natureza (Biologia)',
+    testId: 3,
+    testName: 'FUVEST 2024 - 1ª Fase',
+    alternatives: [
+      { id: 201, identifier: 'A', text: 'Glicose doa elétrons e gás carbônico (CO₂) é liberado.', isCorrect: false },
+      { id: 202, identifier: 'B', text: 'Água (H₂O) doa elétrons e oxigênio (O₂) é liberado.', isCorrect: true },
+      { id: 203, identifier: 'C', text: 'Gás carbônico (CO₂) doa elétrons e metano (CH₄) é liberado.', isCorrect: false },
+      { id: 204, identifier: 'D', text: 'ATP doa elétrons e ozônio (O₃) é liberado.', isCorrect: false },
+      { id: 205, identifier: 'E', text: 'Clorofila doa elétrons sem liberação de qualquer gás.', isCorrect: false },
+    ],
+    correctAlternativeId: 202,
+    correctAlternativeIdentifier: 'B',
+  },
+  {
+    id: 3,
+    identifier: '18',
+    enunciado: 'No texto modernista de Mário de Andrade, Macunaíma é caracterizado como "o herói de nossa gente", representando a miscigenação e as contradições da formação identitária brasileira. A obra expressa uma ruptura com o romantismo sobretudo por meio de qual recurso estético?',
+    year: 2024,
+    originId: 1,
+    originName: 'ENEM',
+    areaId: 4,
+    areaName: 'Linguagens e Códigos (Português)',
+    testId: 1,
+    testName: 'ENEM 2024 - Caderno Azul (1º Dia)',
+    alternatives: [
+      { id: 301, identifier: 'A', text: 'Idealização heroica do indígena com linguagem formal parnasiana.', isCorrect: false },
+      { id: 302, identifier: 'B', text: 'Rigidez métrica com rimas ricas e temática estritamente religiosa.', isCorrect: false },
+      { id: 303, identifier: 'C', text: 'Incorporação de lendas folclóricas, oralidade coloquial e dessacralização do herói clássico.', isCorrect: true },
+      { id: 304, identifier: 'D', text: 'Foco exclusivo na nobreza europeia transplantada para a colônia.', isCorrect: false },
+      { id: 305, identifier: 'E', text: 'Uso de linguagem neoclássica para retratar paisagens pastoris bucólicas.', isCorrect: false },
+    ],
+    correctAlternativeId: 303,
+    correctAlternativeIdentifier: 'C',
+  },
+  {
+    id: 4,
+    identifier: '07',
+    enunciado: 'Um veículo de massa 1.000 kg desloca-se em linha reta com velocidade escalar constante de 20 m/s. Ao avistar um obstáculo, o motorista pisa nos freios, exercendo uma força de frenagem constante de 4.000 N até a parada total. Qual é a distância percorrida pelo veículo durante a frenagem?',
+    year: 2023,
+    originId: 3,
+    originName: 'VUNESP',
+    areaId: 3,
+    areaName: 'Ciências da Natureza (Física)',
+    testId: 4,
+    testName: 'VUNESP 2023 - Conhecimentos Gerais',
+    alternatives: [
+      { id: 401, identifier: 'A', text: '25 metros', isCorrect: false },
+      { id: 402, identifier: 'B', text: '50 metros', isCorrect: true },
+      { id: 403, identifier: 'C', text: '75 metros', isCorrect: false },
+      { id: 404, identifier: 'D', text: '100 metros', isCorrect: false },
+      { id: 405, identifier: 'E', text: '200 metros', isCorrect: false },
+    ],
+    correctAlternativeId: 402,
+    correctAlternativeIdentifier: 'B',
+  },
+];
