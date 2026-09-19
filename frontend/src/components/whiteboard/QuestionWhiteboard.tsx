@@ -841,13 +841,26 @@ export const QuestionWhiteboard: React.FC<QuestionWhiteboardProps> = ({ question
     }
   };
 
-  // Navegação: Zoom In, Zoom Out, Reset
-  const handleZoom = (delta: number) => {
-    setZoom((prev) => {
-      const next = Math.max(0.3, Math.min(3.0, prev + delta));
-      return Math.round(next * 10) / 10;
+  // Navegação: Zoom In, Zoom Out, Reset (com suporte a zoom focado na posição do cursor)
+  const handleZoom = useCallback((delta: number, focalPoint?: BoardPoint) => {
+    setZoom((prevZoom) => {
+      const nextZoom = Math.max(0.3, Math.min(3.0, prevZoom + delta));
+      const roundedZoom = Math.round(nextZoom * 10) / 10;
+      if (roundedZoom === prevZoom) return prevZoom;
+
+      if (focalPoint) {
+        setViewportOffset((prevOffset) => {
+          const worldX = (focalPoint.x - prevOffset.x) / prevZoom;
+          const worldY = (focalPoint.y - prevOffset.y) / prevZoom;
+          return {
+            x: Math.round(focalPoint.x - worldX * roundedZoom),
+            y: Math.round(focalPoint.y - worldY * roundedZoom),
+          };
+        });
+      }
+      return roundedZoom;
     });
-  };
+  }, []);
 
   const handleResetView = () => {
     setViewportOffset({ x: 0, y: 0 });
@@ -1178,12 +1191,28 @@ export const QuestionWhiteboard: React.FC<QuestionWhiteboardProps> = ({ question
     setStartPoint(null);
   };
 
-  // Suporte a Zoom com a Roda do Mouse
-  const handleWheel = (e: React.WheelEvent<HTMLCanvasElement>) => {
-    e.preventDefault();
-    const zoomFactor = e.deltaY < 0 ? 0.1 : -0.1;
-    handleZoom(zoomFactor);
-  };
+  // Suporte a Zoom com a Roda do Mouse (sem propagar scroll para a página externa)
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+
+      const rect = container.getBoundingClientRect();
+      const screenX = e.clientX - rect.left;
+      const screenY = e.clientY - rect.top;
+
+      const zoomFactor = e.deltaY < 0 ? 0.1 : -0.1;
+      handleZoom(zoomFactor, { x: screenX, y: screenY });
+    };
+
+    container.addEventListener('wheel', onWheel, { passive: false });
+    return () => {
+      container.removeEventListener('wheel', onWheel);
+    };
+  }, [isFullscreen, handleZoom]);
 
   // Lógica da borracha
   const eraseNearPoint = (worldPt: BoardPoint) => {
@@ -1646,7 +1675,8 @@ export const QuestionWhiteboard: React.FC<QuestionWhiteboardProps> = ({ question
         sx={{
           position: 'relative',
           width: '100%',
-          height: 520,
+          height: isFullscreen ? 'calc(100vh - 135px)' : 520,
+          flex: isFullscreen ? 1 : undefined,
           cursor:
             activeTool === 'select'
               ? isDraggingElement
@@ -1666,6 +1696,7 @@ export const QuestionWhiteboard: React.FC<QuestionWhiteboardProps> = ({ question
           overflow: 'hidden',
           userSelect: 'none',
           touchAction: 'none',
+          overscrollBehavior: 'contain',
         }}
       >
         <canvas
@@ -1682,7 +1713,6 @@ export const QuestionWhiteboard: React.FC<QuestionWhiteboardProps> = ({ question
           onTouchStart={handleStart}
           onTouchMove={handleMove}
           onTouchEnd={handleEnd}
-          onWheel={handleWheel}
         />
       </Box>
 
