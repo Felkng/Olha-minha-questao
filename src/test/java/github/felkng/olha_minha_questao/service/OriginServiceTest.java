@@ -29,7 +29,7 @@ class OriginServiceTest {
     @DisplayName("Deve criar uma origem com sucesso e buscar por ID")
     void testCreateAndFindById() {
         OriginRequestDTO request = OriginRequestDTO.builder()
-                .name("ENEM")
+                .name("ENEM_TEST")
                 .description("Exame Nacional do Ensino Médio")
                 .build();
 
@@ -37,51 +37,51 @@ class OriginServiceTest {
         entityManager.flush();
 
         assertThat(created.getId()).isNotNull();
-        assertThat(created.getName()).isEqualTo("ENEM");
+        assertThat(created.getName()).isEqualTo("ENEM_TEST");
         assertThat(created.getDescription()).isEqualTo("Exame Nacional do Ensino Médio");
 
         OriginResponseDTO found = originService.findById(created.getId());
-        assertThat(found.getName()).isEqualTo("ENEM");
+        assertThat(found.getName()).isEqualTo("ENEM_TEST");
     }
 
     @Test
     @DisplayName("Deve lançar exceção ao tentar criar origem com nome duplicado")
     void testCreateDuplicateName_ThrowsException() {
         OriginRequestDTO request1 = OriginRequestDTO.builder()
-                .name("FUVEST")
+                .name("FUVEST_TEST")
                 .description("Vestibular USP")
                 .build();
         originService.create(request1);
         entityManager.flush();
 
         OriginRequestDTO request2 = OriginRequestDTO.builder()
-                .name("fuvest") // teste case-insensitive
+                .name("fuvest_test") // teste case-insensitive
                 .description("Outra descrição")
                 .build();
 
         assertThatThrownBy(() -> originService.create(request2))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("Já existe uma origem cadastrada com o nome: fuvest");
+                .hasMessageContaining("Já existe uma origem cadastrada com o nome: fuvest_test");
     }
 
     @Test
     @DisplayName("Deve atualizar uma origem com sucesso")
     void testUpdate() {
         OriginResponseDTO created = originService.create(OriginRequestDTO.builder()
-                .name("UNICAMP")
+                .name("UNICAMP_TEST")
                 .description("Vestibular Unicamp")
                 .build());
         entityManager.flush();
 
         OriginRequestDTO updateRequest = OriginRequestDTO.builder()
-                .name("UNICAMP - Oficial")
+                .name("UNICAMP_TEST - Oficial")
                 .description("Vestibular Unicamp Atualizado")
                 .build();
 
         OriginResponseDTO updated = originService.update(created.getId(), updateRequest);
         entityManager.flush();
 
-        assertThat(updated.getName()).isEqualTo("UNICAMP - Oficial");
+        assertThat(updated.getName()).isEqualTo("UNICAMP_TEST - Oficial");
         assertThat(updated.getDescription()).isEqualTo("Vestibular Unicamp Atualizado");
     }
 
@@ -89,7 +89,7 @@ class OriginServiceTest {
     @DisplayName("Deve deletar uma origem com sucesso")
     void testDelete() {
         OriginResponseDTO created = originService.create(OriginRequestDTO.builder()
-                .name("ITA")
+                .name("ITA_TEST")
                 .description("Instituto Tecnológico de Aeronáutica")
                 .build());
         entityManager.flush();
