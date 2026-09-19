@@ -139,7 +139,7 @@ export const getQuestions = async (params?: {
     if (params?.year) queryParams.year = params.year;
     if (params?.difficulty) queryParams.difficulty = params.difficulty;
     if (params?.search) queryParams.search = params.search;
-    if (params?.sort) queryParams.sort = params.sort;
+    if (params?.sort && params.sort !== 'recent') queryParams.sort = params.sort;
 
     const response = await apiClient.get('/questions', { params: queryParams });
     const data = response.data;
