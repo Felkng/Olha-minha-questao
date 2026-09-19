@@ -15,6 +15,7 @@ import QuizOutlinedIcon from '@mui/icons-material/QuizOutlined';
 import MenuBookOutlinedIcon from '@mui/icons-material/MenuBookOutlined';
 import AccountBalanceOutlinedIcon from '@mui/icons-material/AccountBalanceOutlined';
 import CategoryOutlinedIcon from '@mui/icons-material/CategoryOutlined';
+import FolderSpecialOutlinedIcon from '@mui/icons-material/FolderSpecialOutlined';
 import { useAppTheme } from '../theme/ThemeContext';
 import { PALETTE_COLORS } from '../theme/theme';
 
@@ -32,6 +33,7 @@ export const Navbar: React.FC<NavbarProps> = ({ activeTab, onTabChange }) => {
     { id: 'provas', label: 'Provas', icon: <MenuBookOutlinedIcon fontSize="small" /> },
     { id: 'bancas', label: 'Bancas', icon: <AccountBalanceOutlinedIcon fontSize="small" /> },
     { id: 'areas', label: 'Áreas', icon: <CategoryOutlinedIcon fontSize="small" /> },
+    { id: 'pastas', label: 'Pastas Salvas', icon: <FolderSpecialOutlinedIcon fontSize="small" /> },
   ];
 
   return (
