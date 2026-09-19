@@ -52,6 +52,10 @@ public class QuestionAttempt {
     @Column(name = "session_id", length = 100)
     private String sessionId;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id")
+    private User user;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
