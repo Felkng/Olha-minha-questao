@@ -50,10 +50,10 @@ class QuestionServiceTest {
     @Test
     @DisplayName("Deve criar uma questão com alternativas em cascata com sucesso")
     void testCreateQuestionWithAlternatives() {
-        OriginResponseDTO origin = originService.create(OriginRequestDTO.builder().name("ENEM").build());
-        AreaResponseDTO area = areaService.create(AreaRequestDTO.builder().name("Física").build());
+        OriginResponseDTO origin = originService.create(OriginRequestDTO.builder().name("ENEM_QS_TEST").build());
+        AreaResponseDTO area = areaService.create(AreaRequestDTO.builder().name("Física_QS_TEST").build());
         TestResponseDTO test = testService.create(TestRequestDTO.builder()
-                .name("ENEM 2024")
+                .name("ENEM 2024_QS_TEST")
                 .year(2024)
                 .originId(origin.getId())
                 .areaId(area.getId())
@@ -80,9 +80,9 @@ class QuestionServiceTest {
 
         assertThat(created.getId()).isNotNull();
         assertThat(created.getEnunciado()).isEqualTo("Um objeto em queda livre desconsiderando a resistência do ar...");
-        assertThat(created.getOrigin().getName()).isEqualTo("ENEM");
-        assertThat(created.getArea().getName()).isEqualTo("Física");
-        assertThat(created.getTest().getName()).isEqualTo("ENEM 2024");
+        assertThat(created.getOrigin().getName()).isEqualTo("ENEM_QS_TEST");
+        assertThat(created.getArea().getName()).isEqualTo("Física_QS_TEST");
+        assertThat(created.getTest().getName()).isEqualTo("ENEM 2024_QS_TEST");
         assertThat(created.getAlternatives()).hasSize(4);
         assertThat(created.getAlternatives()).anyMatch(a -> a.getIdentifier().equals("A") && a.getIsCorrect());
         assertThat(created.getCorrectAlternativeId()).isNotNull();
@@ -111,9 +111,9 @@ class QuestionServiceTest {
     @Test
     @DisplayName("Deve buscar questões com paginação e filtros dinâmicos")
     void testFindQuestionsByFiltersAndPagination() {
-        OriginResponseDTO origin = originService.create(OriginRequestDTO.builder().name("FUVEST").build());
-        AreaResponseDTO areaBio = areaService.create(AreaRequestDTO.builder().name("Biologia").build());
-        AreaResponseDTO areaMat = areaService.create(AreaRequestDTO.builder().name("Matemática").build());
+        OriginResponseDTO origin = originService.create(OriginRequestDTO.builder().name("FUVEST_QS_TEST").build());
+        AreaResponseDTO areaBio = areaService.create(AreaRequestDTO.builder().name("Biologia_QS_TEST").build());
+        AreaResponseDTO areaMat = areaService.create(AreaRequestDTO.builder().name("Matemática_QS_TEST").build());
 
         questionService.create(QuestionRequestDTO.builder()
                 .enunciado("Questão Bio 1").year(2024).originId(origin.getId()).areaId(areaBio.getId()).build());
@@ -126,7 +126,7 @@ class QuestionServiceTest {
         Page<QuestionResponseDTO> bioPage = questionService.findAll(origin.getId(), areaBio.getId(), null, null, PageRequest.of(0, 10));
         assertThat(bioPage.getTotalElements()).isEqualTo(2);
 
-        Page<QuestionResponseDTO> yearPage = questionService.findAll(null, null, null, 2023, PageRequest.of(0, 10));
+        Page<QuestionResponseDTO> yearPage = questionService.findAll(origin.getId(), null, null, 2023, PageRequest.of(0, 10));
         assertThat(yearPage.getTotalElements()).isEqualTo(1);
         assertThat(yearPage.getContent().get(0).getEnunciado()).isEqualTo("Questão Mat 1");
     }
@@ -134,8 +134,8 @@ class QuestionServiceTest {
     @Test
     @DisplayName("Deve atualizar questão e suas alternativas com sucesso")
     void testUpdateQuestionAndAlternatives() {
-        OriginResponseDTO origin = originService.create(OriginRequestDTO.builder().name("UNICAMP").build());
-        AreaResponseDTO area = areaService.create(AreaRequestDTO.builder().name("Química").build());
+        OriginResponseDTO origin = originService.create(OriginRequestDTO.builder().name("UNICAMP_QS_TEST").build());
+        AreaResponseDTO area = areaService.create(AreaRequestDTO.builder().name("Química_QS_TEST").build());
 
         QuestionResponseDTO created = questionService.create(QuestionRequestDTO.builder()
                 .enunciado("Enunciado inicial")
@@ -169,8 +169,8 @@ class QuestionServiceTest {
     @Test
     @DisplayName("Deve deletar questão e remover alternativas em cascata")
     void testDeleteQuestion_CascadeDeletesAlternatives() {
-        OriginResponseDTO origin = originService.create(OriginRequestDTO.builder().name("ITA").build());
-        AreaResponseDTO area = areaService.create(AreaRequestDTO.builder().name("Computação").build());
+        OriginResponseDTO origin = originService.create(OriginRequestDTO.builder().name("ITA_QS_TEST").build());
+        AreaResponseDTO area = areaService.create(AreaRequestDTO.builder().name("Computação_QS_TEST").build());
 
         QuestionResponseDTO created = questionService.create(QuestionRequestDTO.builder()
                 .enunciado("Questão para deleção")
