@@ -25,6 +25,7 @@ import java.util.List;
 public class TestController {
 
     private final TestService testService;
+    private final github.felkng.olha_minha_questao.service.StatisticsService statisticsService;
 
     @GetMapping
     public ResponseEntity<List<TestResponseDTO>> findAll(
@@ -32,6 +33,23 @@ public class TestController {
             @RequestParam(required = false) Long areaId,
             @RequestParam(required = false) Integer year) {
         return ResponseEntity.ok(testService.findAll(originId, areaId, year));
+    }
+
+    @GetMapping("/cards")
+    public ResponseEntity<List<github.felkng.olha_minha_questao.dto.test.TestCardDTO>> findTestCards() {
+        return ResponseEntity.ok(testService.findTestCards());
+    }
+
+    @GetMapping("/{id}/evaluation")
+    public ResponseEntity<github.felkng.olha_minha_questao.dto.test.TestEvaluationDTO> getTestEvaluation(@PathVariable Long id) {
+        return ResponseEntity.ok(testService.getTestEvaluation(id));
+    }
+
+    @PostMapping("/{id}/submit")
+    public ResponseEntity<github.felkng.olha_minha_questao.dto.test.TestSubmissionResponseDTO> submitTest(
+            @PathVariable Long id,
+            @RequestBody github.felkng.olha_minha_questao.dto.test.TestSubmissionRequestDTO dto) {
+        return ResponseEntity.ok(statisticsService.submitTestAttempt(id, dto));
     }
 
     @GetMapping("/{id}")
