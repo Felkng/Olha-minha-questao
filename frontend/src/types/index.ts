@@ -1,3 +1,5 @@
+export type DifficultyLevel = 'FACIL' | 'MEDIA' | 'DIFICIL' | 'SEM_DADOS';
+
 export interface Alternative {
   id?: number;
   identifier: string;
@@ -44,6 +46,9 @@ export interface Question {
   alternatives: Alternative[];
   correctAlternativeId?: number;
   correctAlternativeIdentifier?: string;
+  difficultyLevel?: DifficultyLevel;
+  accuracyPercentage?: number;
+  totalAttempts?: number;
 }
 
 export interface FilterState {
@@ -53,6 +58,8 @@ export interface FilterState {
   areaId: number | '';
   year: number | '';
   testId: number | '';
+  difficulty?: string;
+  sort?: string;
 }
 
 export interface Folder {
@@ -75,3 +82,85 @@ export interface SavedQuestion {
   createdAt: string;
 }
 
+export interface TestCard {
+  id: number;
+  name: string;
+  year: number;
+  originId?: number;
+  originName?: string;
+  areaId?: number;
+  areaName?: string;
+  questionCount: number;
+  difficultyLevel: DifficultyLevel;
+  averageScore: number;
+  totalAttempts: number;
+}
+
+export interface OriginCard {
+  id: number;
+  name: string;
+  description?: string;
+  questionCount: number;
+  testCount: number;
+}
+
+export interface AreaCard {
+  id: number;
+  name: string;
+  description?: string;
+  questionCount: number;
+  testCount: number;
+}
+
+export interface TestEvaluation {
+  id: number;
+  name: string;
+  year: number;
+  originId?: number;
+  originName?: string;
+  areaId?: number;
+  areaName?: string;
+  questionCount: number;
+  questions: Question[];
+}
+
+export interface QuestionAttemptRequest {
+  selectedAlternativeId?: number;
+  isFirstAttempt?: boolean;
+  timeSpentSeconds?: number;
+  sessionId?: string;
+}
+
+export interface QuestionAttemptResponse {
+  isCorrect: boolean;
+  correctAlternativeId?: number;
+  accuracyPercentage: number;
+  difficultyLevel: DifficultyLevel;
+  totalAttempts: number;
+}
+
+export interface TestSubmissionRequest {
+  timeSpentSeconds: number;
+  sessionId?: string;
+  answers: {
+    questionId: number;
+    selectedAlternativeId?: number;
+    timeSpentSeconds?: number;
+  }[];
+}
+
+export interface TestSubmissionResponse {
+  testId: number;
+  totalQuestions: number;
+  correctAnswers: number;
+  scorePercentage: number;
+  timeSpentSeconds: number;
+  difficultyLevel: DifficultyLevel;
+  detailedResults: {
+    questionId: number;
+    selectedAlternativeId?: number;
+    correctAlternativeId?: number;
+    isCorrect: boolean;
+    difficultyLevel: DifficultyLevel;
+  }[];
+}
