@@ -10,4 +10,5 @@ import java.util.Optional;
 public interface OriginRepository extends JpaRepository<Origin, Long> {
     Optional<Origin> findByNameIgnoreCase(String name);
     boolean existsByNameIgnoreCase(String name);
+    java.util.List<Origin> findAllByOrderByNameAsc();
 }
