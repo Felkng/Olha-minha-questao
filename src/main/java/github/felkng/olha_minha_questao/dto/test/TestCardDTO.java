@@ -1,6 +1,7 @@
 package github.felkng.olha_minha_questao.dto.test;
 
 import github.felkng.olha_minha_questao.domain.entity.DifficultyLevel;
+import github.felkng.olha_minha_questao.dto.user.UserSummaryDTO;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -22,4 +23,5 @@ public class TestCardDTO {
     private DifficultyLevel difficultyLevel;
     private Double averageScore;
     private Long totalAttempts;
+    private UserSummaryDTO createdByUser;
 }
