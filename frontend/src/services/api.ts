@@ -17,12 +17,56 @@ import {
   TestEvaluation,
   TestSubmissionRequest,
   TestSubmissionResponse,
+  AuthResponse,
+  UserProfile,
+  UserSummary,
 } from '../types';
 
 const apiClient = axios.create({
   baseURL: '/api/v1',
   timeout: 5000,
 });
+
+apiClient.interceptors.request.use((config) => {
+  const userStr = localStorage.getItem('user');
+  if (userStr) {
+    try {
+      const user = JSON.parse(userStr);
+      if (user?.id) {
+        config.headers['X-User-Id'] = user.id;
+      }
+    } catch (e) {
+      // ignore error
+    }
+  }
+  return config;
+});
+
+// Auth & User API
+export const loginUser = async (data: { email: string; password: string }): Promise<AuthResponse> => {
+  const response = await apiClient.post<AuthResponse>('/auth/login', data);
+  return response.data;
+};
+
+export const registerUser = async (data: { name: string; email: string; password: string }): Promise<AuthResponse> => {
+  const response = await apiClient.post<AuthResponse>('/auth/register', data);
+  return response.data;
+};
+
+export const getUserProfile = async (userId: number): Promise<UserProfile> => {
+  const response = await apiClient.get<UserProfile>(`/users/${userId}/profile`);
+  return response.data;
+};
+
+export const promoteUserToAdmin = async (userId: number): Promise<UserSummary> => {
+  const response = await apiClient.patch<UserSummary>(`/users/${userId}/promote-admin`);
+  return response.data;
+};
+
+export const getAttemptedQuestionIds = async (userId: number): Promise<number[]> => {
+  const response = await apiClient.get<number[]>(`/questions/attempted-ids`, { params: { userId } });
+  return Array.isArray(response.data) ? response.data : [];
+};
 
 // Normaliza campos aninhados retornados pela API Spring Data
 const normalizeQuestion = (q: any): Question => ({
