@@ -2274,13 +2274,13 @@ export const QuestionWhiteboard: React.FC<QuestionWhiteboardProps> = ({ question
               gap: 0.75,
               px: 1.5,
               py: 0.75,
-              borderRadius: 2,
-              backgroundColor: isDark ? 'rgba(22, 26, 32, 0.92)' : 'rgba(255, 255, 255, 0.92)',
+              borderRadius: '4px',
+              minWidth: 'max-content',
+              backgroundColor: isDark ? 'rgba(22, 26, 32, 0.94)' : 'rgba(255, 255, 255, 0.94)',
               backdropFilter: 'blur(8px)',
               border: '1px solid',
               borderColor: isDark ? 'rgba(90, 166, 226, 0.35)' : 'rgba(90, 166, 226, 0.4)',
-              boxShadow: '0 4px 20px rgba(0,0,0,0.25)',
-              // Não captura eventos de mouse na área transparente além dos botões
+              boxShadow: '0 2px 12px rgba(0,0,0,0.2)',
               pointerEvents: 'auto',
             }}
             // Impede que cliques na barra propaguem para o canvas e desfaçam a seleção
