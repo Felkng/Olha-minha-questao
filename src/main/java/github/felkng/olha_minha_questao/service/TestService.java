@@ -35,6 +35,7 @@ public class TestService {
     private final OriginRepository originRepository;
     private final AreaRepository areaRepository;
     private final QuestionRepository questionRepository;
+    private final github.felkng.olha_minha_questao.domain.repository.UserRepository userRepository;
     private final TestMapper testMapper;
     private final QuestionMapper questionMapper;
 
@@ -112,6 +113,11 @@ public class TestService {
 
     @Transactional
     public TestResponseDTO create(TestRequestDTO dto) {
+        return create(dto, null);
+    }
+
+    @Transactional
+    public TestResponseDTO create(TestRequestDTO dto, Long userId) {
         Origin origin = originRepository.findById(dto.getOriginId())
                 .orElseThrow(() -> new ResourceNotFoundException("Origem não encontrada com o id: " + dto.getOriginId()));
 
@@ -121,9 +127,15 @@ public class TestService {
                     .orElseThrow(() -> new ResourceNotFoundException("Área não encontrada com o id: " + dto.getAreaId()));
         }
 
+        github.felkng.olha_minha_questao.domain.entity.User user = null;
+        if (userId != null) {
+            user = userRepository.findById(userId).orElse(null);
+        }
+
         Test test = testMapper.toEntity(dto);
         test.setOrigin(origin);
         test.setArea(area);
+        test.setCreatedByUser(user);
 
         Test saved = testRepository.save(test);
 
