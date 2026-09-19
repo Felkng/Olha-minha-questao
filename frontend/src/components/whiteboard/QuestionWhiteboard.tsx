@@ -18,6 +18,8 @@ import {
   ToggleButton,
   ToggleButtonGroup,
 } from '@mui/material';
+import NearMeIcon from '@mui/icons-material/NearMe';
+import PanToolIcon from '@mui/icons-material/PanTool';
 import BrushIcon from '@mui/icons-material/Brush';
 import CropSquareIcon from '@mui/icons-material/CropSquare';
 import SquareIcon from '@mui/icons-material/Square';
@@ -34,6 +36,12 @@ import GridOnIcon from '@mui/icons-material/GridOn';
 import GridOffIcon from '@mui/icons-material/GridOff';
 import CloudDoneOutlinedIcon from '@mui/icons-material/CloudDoneOutlined';
 import CloudUploadOutlinedIcon from '@mui/icons-material/CloudUploadOutlined';
+import RotateRightIcon from '@mui/icons-material/RotateRight';
+import FlipIcon from '@mui/icons-material/Flip';
+import ContentCopyIcon from '@mui/icons-material/ContentCopy';
+import ZoomInIcon from '@mui/icons-material/ZoomIn';
+import ZoomOutIcon from '@mui/icons-material/ZoomOut';
+import CenterFocusStrongIcon from '@mui/icons-material/CenterFocusStrong';
 import {
   BoardElement,
   BoardPoint,
@@ -66,51 +74,156 @@ const STROKE_WIDTHS = [
   { label: 'Extra', value: 10 },
 ];
 
-// Serializa array de elementos para XML
+const generateId = () => 'el_' + Math.random().toString(36).substring(2, 10);
+
+// Calcula centro e dimensões de qualquer elemento para rotação e inversão
+export const getElementBounds = (el: BoardElement): { cx: number; cy: number; width: number; height: number; minX: number; minY: number; maxX: number; maxY: number } => {
+  switch (el.type) {
+    case 'brush': {
+      if (el.points.length === 0) return { cx: 0, cy: 0, width: 0, height: 0, minX: 0, minY: 0, maxX: 0, maxY: 0 };
+      let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+      for (const p of el.points) {
+        if (p.x < minX) minX = p.x;
+        if (p.x > maxX) maxX = p.x;
+        if (p.y < minY) minY = p.y;
+        if (p.y > maxY) maxY = p.y;
+      }
+      return {
+        cx: (minX + maxX) / 2,
+        cy: (minY + maxY) / 2,
+        width: Math.max(10, maxX - minX),
+        height: Math.max(10, maxY - minY),
+        minX, minY, maxX, maxY,
+      };
+    }
+    case 'rectangle': {
+      return {
+        cx: el.x + el.w / 2,
+        cy: el.y + el.h / 2,
+        width: Math.abs(el.w),
+        height: Math.abs(el.h),
+        minX: el.x,
+        minY: el.y,
+        maxX: el.x + el.w,
+        maxY: el.y + el.h,
+      };
+    }
+    case 'square': {
+      return {
+        cx: el.x + el.size / 2,
+        cy: el.y + el.size / 2,
+        width: Math.abs(el.size),
+        height: Math.abs(el.size),
+        minX: el.x,
+        minY: el.y,
+        maxX: el.x + el.size,
+        maxY: el.y + el.size,
+      };
+    }
+    case 'triangle': {
+      const minX = Math.min(el.x1, el.x2, el.x3);
+      const maxX = Math.max(el.x1, el.x2, el.x3);
+      const minY = Math.min(el.y1, el.y2, el.y3);
+      const maxY = Math.max(el.y1, el.y2, el.y3);
+      return {
+        cx: (el.x1 + el.x2 + el.x3) / 3,
+        cy: (el.y1 + el.y2 + el.y3) / 3,
+        width: Math.max(10, maxX - minX),
+        height: Math.max(10, maxY - minY),
+        minX, minY, maxX, maxY,
+      };
+    }
+    case 'circle': {
+      return {
+        cx: el.cx,
+        cy: el.cy,
+        width: el.radius * 2,
+        height: el.radius * 2,
+        minX: el.cx - el.radius,
+        minY: el.cy - el.radius,
+        maxX: el.cx + el.radius,
+        maxY: el.cy + el.radius,
+      };
+    }
+    case 'star': {
+      return {
+        cx: el.cx,
+        cy: el.cy,
+        width: el.outerRadius * 2,
+        height: el.outerRadius * 2,
+        minX: el.cx - el.outerRadius,
+        minY: el.cy - el.outerRadius,
+        maxX: el.cx + el.outerRadius,
+        maxY: el.cy + el.outerRadius,
+      };
+    }
+    case 'text': {
+      const textWidth = Math.max(20, el.text.length * (el.fontSize * 0.6));
+      const textHeight = el.fontSize * 1.2;
+      return {
+        cx: el.x + textWidth / 2,
+        cy: el.y - textHeight / 2,
+        width: textWidth,
+        height: textHeight,
+        minX: el.x,
+        minY: el.y - textHeight,
+        maxX: el.x + textWidth,
+        maxY: el.y,
+      };
+    }
+  }
+};
+
+// Serializa array de elementos para XML com suporte a id, rotação e inversão
 export const boardToXml = (elements: BoardElement[]): string => {
   const parts: string[] = ['<?xml version="1.0" encoding="UTF-8"?>', '<board version="1.0">'];
 
   for (const el of elements) {
+    const rot = el.rotation || 0;
+    const fx = Boolean(el.flipX);
+    const fy = Boolean(el.flipY);
+    const id = el.id || generateId();
+
     switch (el.type) {
       case 'brush': {
         const pts = el.points.map((p) => `${Math.round(p.x)},${Math.round(p.y)}`).join(';');
-        parts.push(`  <brush color="${el.color}" width="${el.width}" points="${pts}" />`);
+        parts.push(`  <brush id="${id}" color="${el.color}" width="${el.width}" rotation="${rot}" flipX="${fx}" flipY="${fy}" points="${pts}" />`);
         break;
       }
       case 'rectangle': {
         parts.push(
-          `  <rectangle color="${el.color}" width="${el.width}" x="${Math.round(el.x)}" y="${Math.round(el.y)}" w="${Math.round(el.w)}" h="${Math.round(el.h)}" />`
+          `  <rectangle id="${id}" color="${el.color}" width="${el.width}" x="${Math.round(el.x)}" y="${Math.round(el.y)}" w="${Math.round(el.w)}" h="${Math.round(el.h)}" rotation="${rot}" flipX="${fx}" flipY="${fy}" />`
         );
         break;
       }
       case 'square': {
         parts.push(
-          `  <square color="${el.color}" width="${el.width}" x="${Math.round(el.x)}" y="${Math.round(el.y)}" size="${Math.round(el.size)}" />`
+          `  <square id="${id}" color="${el.color}" width="${el.width}" x="${Math.round(el.x)}" y="${Math.round(el.y)}" size="${Math.round(el.size)}" rotation="${rot}" flipX="${fx}" flipY="${fy}" />`
         );
         break;
       }
       case 'triangle': {
         parts.push(
-          `  <triangle color="${el.color}" width="${el.width}" x1="${Math.round(el.x1)}" y1="${Math.round(el.y1)}" x2="${Math.round(el.x2)}" y2="${Math.round(el.y2)}" x3="${Math.round(el.x3)}" y3="${Math.round(el.y3)}" />`
+          `  <triangle id="${id}" color="${el.color}" width="${el.width}" x1="${Math.round(el.x1)}" y1="${Math.round(el.y1)}" x2="${Math.round(el.x2)}" y2="${Math.round(el.y2)}" x3="${Math.round(el.x3)}" y3="${Math.round(el.y3)}" rotation="${rot}" flipX="${fx}" flipY="${fy}" />`
         );
         break;
       }
       case 'circle': {
         parts.push(
-          `  <circle color="${el.color}" width="${el.width}" cx="${Math.round(el.cx)}" cy="${Math.round(el.cy)}" r="${Math.round(el.radius)}" />`
+          `  <circle id="${id}" color="${el.color}" width="${el.width}" cx="${Math.round(el.cx)}" cy="${Math.round(el.cy)}" r="${Math.round(el.radius)}" rotation="${rot}" flipX="${fx}" flipY="${fy}" />`
         );
         break;
       }
       case 'star': {
         parts.push(
-          `  <star color="${el.color}" width="${el.width}" cx="${Math.round(el.cx)}" cy="${Math.round(el.cy)}" outerRadius="${Math.round(el.outerRadius)}" innerRadius="${Math.round(el.innerRadius)}" spikes="${el.spikes}" />`
+          `  <star id="${id}" color="${el.color}" width="${el.width}" cx="${Math.round(el.cx)}" cy="${Math.round(el.cy)}" outerRadius="${Math.round(el.outerRadius)}" innerRadius="${Math.round(el.innerRadius)}" spikes="${el.spikes}" rotation="${rot}" flipX="${fx}" flipY="${fy}" />`
         );
         break;
       }
       case 'text': {
         const sanitized = el.text.replace(/]]>/g, ']]&gt;');
         parts.push(
-          `  <text color="${el.color}" fontSize="${el.fontSize}" x="${Math.round(el.x)}" y="${Math.round(el.y)}"><![CDATA[${sanitized}]]></text>`
+          `  <text id="${id}" color="${el.color}" fontSize="${el.fontSize}" x="${Math.round(el.x)}" y="${Math.round(el.y)}" rotation="${rot}" flipX="${fx}" flipY="${fy}"><![CDATA[${sanitized}]]></text>`
         );
         break;
       }
@@ -121,7 +234,7 @@ export const boardToXml = (elements: BoardElement[]): string => {
   return parts.join('\n');
 };
 
-// Desserializa XML para array de elementos
+// Desserializa XML para array de elementos com suporte a id, rotação e inversão
 export const xmlToBoard = (xml: string): BoardElement[] => {
   if (!xml || !xml.trim()) return [];
 
@@ -135,8 +248,12 @@ export const xmlToBoard = (xml: string): BoardElement[] => {
 
     for (const child of Array.from(board.children)) {
       const tag = child.tagName.toLowerCase();
+      const id = child.getAttribute('id') || generateId();
       const color = child.getAttribute('color') || '#FFE600';
       const width = parseFloat(child.getAttribute('width') || '3');
+      const rotation = parseFloat(child.getAttribute('rotation') || '0');
+      const flipX = child.getAttribute('flipX') === 'true';
+      const flipY = child.getAttribute('flipY') === 'true';
 
       switch (tag) {
         case 'brush': {
@@ -150,7 +267,7 @@ export const xmlToBoard = (xml: string): BoardElement[] => {
             .filter((p): p is BoardPoint => p !== null);
 
           if (points.length > 0) {
-            elements.push({ type: 'brush', color, width, points });
+            elements.push({ id, type: 'brush', color, width, points, rotation, flipX, flipY });
           }
           break;
         }
@@ -159,14 +276,14 @@ export const xmlToBoard = (xml: string): BoardElement[] => {
           const y = parseFloat(child.getAttribute('y') || '0');
           const w = parseFloat(child.getAttribute('w') || '0');
           const h = parseFloat(child.getAttribute('h') || '0');
-          elements.push({ type: 'rectangle', color, width, x, y, w, h });
+          elements.push({ id, type: 'rectangle', color, width, x, y, w, h, rotation, flipX, flipY });
           break;
         }
         case 'square': {
           const x = parseFloat(child.getAttribute('x') || '0');
           const y = parseFloat(child.getAttribute('y') || '0');
           const size = parseFloat(child.getAttribute('size') || '0');
-          elements.push({ type: 'square', color, width, x, y, size });
+          elements.push({ id, type: 'square', color, width, x, y, size, rotation, flipX, flipY });
           break;
         }
         case 'triangle': {
@@ -176,14 +293,14 @@ export const xmlToBoard = (xml: string): BoardElement[] => {
           const y2 = parseFloat(child.getAttribute('y2') || '0');
           const x3 = parseFloat(child.getAttribute('x3') || '0');
           const y3 = parseFloat(child.getAttribute('y3') || '0');
-          elements.push({ type: 'triangle', color, width, x1, y1, x2, y2, x3, y3 });
+          elements.push({ id, type: 'triangle', color, width, x1, y1, x2, y2, x3, y3, rotation, flipX, flipY });
           break;
         }
         case 'circle': {
           const cx = parseFloat(child.getAttribute('cx') || '0');
           const cy = parseFloat(child.getAttribute('cy') || '0');
           const radius = parseFloat(child.getAttribute('r') || '0');
-          elements.push({ type: 'circle', color, width, cx, cy, radius });
+          elements.push({ id, type: 'circle', color, width, cx, cy, radius, rotation, flipX, flipY });
           break;
         }
         case 'star': {
@@ -192,7 +309,7 @@ export const xmlToBoard = (xml: string): BoardElement[] => {
           const outerRadius = parseFloat(child.getAttribute('outerRadius') || '40');
           const innerRadius = parseFloat(child.getAttribute('innerRadius') || '20');
           const spikes = parseInt(child.getAttribute('spikes') || '5', 10);
-          elements.push({ type: 'star', color, width, cx, cy, outerRadius, innerRadius, spikes });
+          elements.push({ id, type: 'star', color, width, cx, cy, outerRadius, innerRadius, spikes, rotation, flipX, flipY });
           break;
         }
         case 'text': {
@@ -200,7 +317,7 @@ export const xmlToBoard = (xml: string): BoardElement[] => {
           const y = parseFloat(child.getAttribute('y') || '0');
           const fontSize = parseFloat(child.getAttribute('fontSize') || '16');
           const text = child.textContent || '';
-          elements.push({ type: 'text', color, fontSize, x, y, text });
+          elements.push({ id, type: 'text', color, fontSize, x, y, text, rotation, flipX, flipY });
           break;
         }
       }
@@ -222,12 +339,24 @@ export const QuestionWhiteboard: React.FC<QuestionWhiteboardProps> = ({ question
   const containerRef = useRef<HTMLDivElement | null>(null);
 
   // Tools & Styling State
-  const [activeTool, setActiveTool] = useState<BoardTool>('brush');
+  const [activeTool, setActiveTool] = useState<BoardTool>('select');
   const [selectedColor, setSelectedColor] = useState<string>(
     isDark ? PALETTE_COLORS.primary : PALETTE_COLORS.secondary
   );
   const [strokeWidth, setStrokeWidth] = useState<number>(4);
   const [showGrid, setShowGrid] = useState<boolean>(true);
+
+  // Viewport / Navigation State (Pan & Zoom)
+  const [viewportOffset, setViewportOffset] = useState<BoardPoint>({ x: 0, y: 0 });
+  const [zoom, setZoom] = useState<number>(1.0);
+  const [isPanning, setIsPanning] = useState<boolean>(false);
+  const [panStart, setPanStart] = useState<BoardPoint>({ x: 0, y: 0 });
+
+  // Selection & Transform State
+  const [selectedElementId, setSelectedElementId] = useState<string | null>(null);
+  const [isDraggingElement, setIsDraggingElement] = useState<boolean>(false);
+  const [isRotatingElement, setIsRotatingElement] = useState<boolean>(false);
+  const [dragStartPoint, setDragStartPoint] = useState<BoardPoint | null>(null);
 
   // Drawing state
   const [elements, setElements] = useState<BoardElement[]>([]);
@@ -250,7 +379,7 @@ export const QuestionWhiteboard: React.FC<QuestionWhiteboardProps> = ({ question
   // Canvas Dimensions
   const [canvasDimensions, setCanvasDimensions] = useState<{ width: number; height: number }>({
     width: 900,
-    height: 500,
+    height: 520,
   });
 
   // Atualiza cor padrão se o tema mudar e a cor atual for de baixo contraste
@@ -314,7 +443,7 @@ export const QuestionWhiteboard: React.FC<QuestionWhiteboardProps> = ({ question
       if (containerRef.current) {
         const rect = containerRef.current.getBoundingClientRect();
         const width = Math.max(300, Math.floor(rect.width));
-        setCanvasDimensions({ width, height: 500 });
+        setCanvasDimensions({ width, height: 520 });
       }
     };
 
@@ -322,6 +451,17 @@ export const QuestionWhiteboard: React.FC<QuestionWhiteboardProps> = ({ question
     window.addEventListener('resize', updateSize);
     return () => window.removeEventListener('resize', updateSize);
   }, []);
+
+  // Conversões de Coordenadas: Tela <-> Mundo
+  const screenToWorld = useCallback(
+    (screenX: number, screenY: number): BoardPoint => {
+      return {
+        x: (screenX - viewportOffset.x) / zoom,
+        y: (screenY - viewportOffset.y) / zoom,
+      };
+    },
+    [viewportOffset, zoom]
+  );
 
   // Função para desenhar uma estrela
   const drawStar = (
@@ -353,7 +493,7 @@ export const QuestionWhiteboard: React.FC<QuestionWhiteboardProps> = ({ question
     ctx.stroke();
   };
 
-  // Renderiza todos os elementos no canvas
+  // Renderiza todos os elementos no canvas com clipping rigoroso e transformações
   const renderCanvas = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -367,33 +507,58 @@ export const QuestionWhiteboard: React.FC<QuestionWhiteboardProps> = ({ question
     canvas.height = height * dpr;
     ctx.scale(dpr, dpr);
 
-    // 1. Limpa fundo
+    // 1. Limpa e recorta estritamente a área visível do canvas
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(0, 0, width, height);
+    ctx.clip(); // CLIPPING RIGOROSO DE CENA
+
     const bgColor = isDark ? '#161a20' : '#FFFFFF';
     ctx.fillStyle = bgColor;
     ctx.fillRect(0, 0, width, height);
 
-    // 2. Desenha grade se ativada
+    // 2. Desenha grade infinita ajustada ao deslocamento e zoom
     if (showGrid) {
       ctx.strokeStyle = isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)';
       ctx.lineWidth = 1;
-      const gridSize = 25;
+      const gridSize = 25 * zoom;
+      const startX = (viewportOffset.x % gridSize);
+      const startY = (viewportOffset.y % gridSize);
 
       ctx.beginPath();
-      for (let x = gridSize; x < width; x += gridSize) {
+      for (let x = startX; x < width; x += gridSize) {
         ctx.moveTo(x, 0);
         ctx.lineTo(x, height);
       }
-      for (let y = gridSize; y < height; y += gridSize) {
+      for (let y = startY; y < height; y += gridSize) {
         ctx.moveTo(0, y);
         ctx.lineTo(width, y);
       }
       ctx.stroke();
     }
 
-    // 3. Renderiza elementos
+    // 3. Aplica transformação da câmera / viewport
+    ctx.save();
+    ctx.translate(viewportOffset.x, viewportOffset.y);
+    ctx.scale(zoom, zoom);
+
+    // Renderiza elementos
     const allElements = currentPreviewElement ? [...elements, currentPreviewElement] : elements;
 
     for (const el of allElements) {
+      ctx.save();
+      const bounds = getElementBounds(el);
+
+      // Aplica transformações do elemento (rotação e espelhamento no centro do objeto)
+      ctx.translate(bounds.cx, bounds.cy);
+      if (el.rotation) {
+        ctx.rotate((el.rotation * Math.PI) / 180);
+      }
+      if (el.flipX || el.flipY) {
+        ctx.scale(el.flipX ? -1 : 1, el.flipY ? -1 : 1);
+      }
+      ctx.translate(-bounds.cx, -bounds.cy);
+
       ctx.strokeStyle = el.color;
       ctx.fillStyle = el.color;
       if ('width' in el) {
@@ -446,8 +611,58 @@ export const QuestionWhiteboard: React.FC<QuestionWhiteboardProps> = ({ question
           break;
         }
       }
+
+      ctx.restore();
     }
-  }, [canvasDimensions, elements, currentPreviewElement, isDark, showGrid]);
+
+    // 4. Desenha caixa de seleção e manipulador de rotação no elemento selecionado
+    if (selectedElementId) {
+      const selectedEl = elements.find((e) => e.id === selectedElementId);
+      if (selectedEl) {
+        const bounds = getElementBounds(selectedEl);
+        const padding = 8 / zoom;
+
+        ctx.save();
+        ctx.translate(bounds.cx, bounds.cy);
+        if (selectedEl.rotation) {
+          ctx.rotate((selectedEl.rotation * Math.PI) / 180);
+        }
+        ctx.translate(-bounds.cx, -bounds.cy);
+
+        // Bounding box tracejada
+        ctx.strokeStyle = PALETTE_COLORS.secondary;
+        ctx.lineWidth = 1.5 / zoom;
+        ctx.setLineDash([4 / zoom, 4 / zoom]);
+        ctx.strokeRect(
+          bounds.minX - padding,
+          bounds.minY - padding,
+          bounds.width + padding * 2,
+          bounds.height + padding * 2
+        );
+
+        // Manipulador de rotação (haste e círculo no topo)
+        const rotHandleY = bounds.minY - padding - 22 / zoom;
+        ctx.setLineDash([]);
+        ctx.beginPath();
+        ctx.moveTo(bounds.cx, bounds.minY - padding);
+        ctx.lineTo(bounds.cx, rotHandleY);
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.arc(bounds.cx, rotHandleY, 6 / zoom, 0, Math.PI * 2);
+        ctx.fillStyle = PALETTE_COLORS.primary;
+        ctx.fill();
+        ctx.strokeStyle = '#1a1e24';
+        ctx.lineWidth = 1.5 / zoom;
+        ctx.stroke();
+
+        ctx.restore();
+      }
+    }
+
+    ctx.restore(); // Restaura transform da câmera
+    ctx.restore(); // Restaura clipping
+  }, [canvasDimensions, elements, currentPreviewElement, isDark, showGrid, viewportOffset, zoom, selectedElementId]);
 
   useEffect(() => {
     renderCanvas();
@@ -462,7 +677,6 @@ export const QuestionWhiteboard: React.FC<QuestionWhiteboardProps> = ({ question
       if (user) {
         await saveQuestionBoard(questionId, xml);
       }
-      // Sempre salva também em localStorage como cache
       localStorage.setItem(`omq_board_q_${questionId}`, xml);
       setLastSavedTime(new Date());
       setHasUnsavedChanges(false);
@@ -489,6 +703,18 @@ export const QuestionWhiteboard: React.FC<QuestionWhiteboardProps> = ({ question
     setUndoStack((prev) => [...prev, elements]);
     setRedoStack([]);
     setElements((prev) => [...prev, newEl]);
+    setSelectedElementId(newEl.id);
+    setHasUnsavedChanges(true);
+  };
+
+  // Atualiza elemento selecionado
+  const updateSelectedElement = (updater: (prev: BoardElement) => BoardElement) => {
+    if (!selectedElementId) return;
+    setUndoStack((prev) => [...prev, elements]);
+    setRedoStack([]);
+    setElements((prev) =>
+      prev.map((el) => (el.id === selectedElementId ? updater(el) : el))
+    );
     setHasUnsavedChanges(true);
   };
 
@@ -499,6 +725,7 @@ export const QuestionWhiteboard: React.FC<QuestionWhiteboardProps> = ({ question
     setRedoStack((prev) => [...prev, elements]);
     setUndoStack((prev) => prev.slice(0, prev.length - 1));
     setElements(previous);
+    setSelectedElementId(null);
     setHasUnsavedChanges(true);
   };
 
@@ -508,6 +735,7 @@ export const QuestionWhiteboard: React.FC<QuestionWhiteboardProps> = ({ question
     setUndoStack((prev) => [...prev, elements]);
     setRedoStack((prev) => prev.slice(0, prev.length - 1));
     setElements(next);
+    setSelectedElementId(null);
     setHasUnsavedChanges(true);
   };
 
@@ -516,11 +744,112 @@ export const QuestionWhiteboard: React.FC<QuestionWhiteboardProps> = ({ question
     setUndoStack((prev) => [...prev, elements]);
     setRedoStack([]);
     setElements([]);
+    setSelectedElementId(null);
     setHasUnsavedChanges(true);
   };
 
-  // Mouse & Touch coordinates helpers
-  const getCanvasPoint = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>): BoardPoint => {
+  // Funções de Transformação no Elemento Selecionado
+  const handleRotateSelected = (deltaDegrees: number) => {
+    updateSelectedElement((el) => ({
+      ...el,
+      rotation: ((el.rotation || 0) + deltaDegrees + 360) % 360,
+    }));
+  };
+
+  const handleFlipSelected = (axis: 'x' | 'y') => {
+    updateSelectedElement((el) => ({
+      ...el,
+      flipX: axis === 'x' ? !el.flipX : el.flipX,
+      flipY: axis === 'y' ? !el.flipY : el.flipY,
+    }));
+  };
+
+  const handleDeleteSelected = () => {
+    if (!selectedElementId) return;
+    setUndoStack((prev) => [...prev, elements]);
+    setRedoStack([]);
+    setElements((prev) => prev.filter((el) => el.id !== selectedElementId));
+    setSelectedElementId(null);
+    setHasUnsavedChanges(true);
+  };
+
+  const handleDuplicateSelected = () => {
+    if (!selectedElementId) return;
+    const target = elements.find((el) => el.id === selectedElementId);
+    if (!target) return;
+
+    const offset = 25;
+    let duplicated: BoardElement;
+
+    switch (target.type) {
+      case 'brush':
+        duplicated = {
+          ...target,
+          id: generateId(),
+          points: target.points.map((p) => ({ x: p.x + offset, y: p.y + offset })),
+        };
+        break;
+      case 'rectangle':
+        duplicated = { ...target, id: generateId(), x: target.x + offset, y: target.y + offset };
+        break;
+      case 'square':
+        duplicated = { ...target, id: generateId(), x: target.x + offset, y: target.y + offset };
+        break;
+      case 'triangle':
+        duplicated = {
+          ...target,
+          id: generateId(),
+          x1: target.x1 + offset,
+          y1: target.y1 + offset,
+          x2: target.x2 + offset,
+          y2: target.y2 + offset,
+          x3: target.x3 + offset,
+          y3: target.y3 + offset,
+        };
+        break;
+      case 'circle':
+      case 'star':
+        duplicated = { ...target, id: generateId(), cx: target.cx + offset, cy: target.cy + offset };
+        break;
+      case 'text':
+        duplicated = { ...target, id: generateId(), x: target.x + offset, y: target.y + offset };
+        break;
+    }
+
+    addElement(duplicated);
+  };
+
+  // Alterar Cor do elemento selecionado ou da ferramenta ativa
+  const handleColorChange = (newColor: string) => {
+    setSelectedColor(newColor);
+    if (selectedElementId) {
+      updateSelectedElement((el) => ({ ...el, color: newColor }));
+    }
+  };
+
+  // Alterar Espessura do traço do elemento selecionado ou da ferramenta ativa
+  const handleStrokeWidthChange = (newWidth: number) => {
+    setStrokeWidth(newWidth);
+    if (selectedElementId) {
+      updateSelectedElement((el) => ('width' in el ? { ...el, width: newWidth } : el));
+    }
+  };
+
+  // Navegação: Zoom In, Zoom Out, Reset
+  const handleZoom = (delta: number) => {
+    setZoom((prev) => {
+      const next = Math.max(0.3, Math.min(3.0, prev + delta));
+      return Math.round(next * 10) / 10;
+    });
+  };
+
+  const handleResetView = () => {
+    setViewportOffset({ x: 0, y: 0 });
+    setZoom(1.0);
+  };
+
+  // Helper de coordenadas relativas ao Canvas na tela
+  const getScreenPoint = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>): BoardPoint => {
     const canvas = canvasRef.current;
     if (!canvas) return { x: 0, y: 0 };
     const rect = canvas.getBoundingClientRect();
@@ -544,56 +873,208 @@ export const QuestionWhiteboard: React.FC<QuestionWhiteboardProps> = ({ question
     };
   };
 
-  // Handlers para início de desenho
-  const handleStart = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
-    const pt = getCanvasPoint(e);
+  // Detecção de colisão / Hit Test para seleção de objetos
+  const findElementAtPoint = (worldPt: BoardPoint): BoardElement | null => {
+    // Procura de trás para frente (elementos superiores primeiro)
+    for (let i = elements.length - 1; i >= 0; i--) {
+      const el = elements[i];
+      const bounds = getElementBounds(el);
+      const hitPadding = 12;
 
+      // Se rotacionado, faz teste rotacionando o ponto em torno do centro do objeto
+      let testPt = worldPt;
+      if (el.rotation) {
+        const rad = (-el.rotation * Math.PI) / 180;
+        const dx = worldPt.x - bounds.cx;
+        const dy = worldPt.y - bounds.cy;
+        testPt = {
+          x: bounds.cx + dx * Math.cos(rad) - dy * Math.sin(rad),
+          y: bounds.cy + dx * Math.sin(rad) + dy * Math.cos(rad),
+        };
+      }
+
+      if (
+        testPt.x >= bounds.minX - hitPadding &&
+        testPt.x <= bounds.maxX + hitPadding &&
+        testPt.y >= bounds.minY - hitPadding &&
+        testPt.y <= bounds.maxY + hitPadding
+      ) {
+        return el;
+      }
+    }
+    return null;
+  };
+
+  // Testa se o clique foi no manipulador de rotação do elemento selecionado
+  const isClickOnRotationHandle = (worldPt: BoardPoint, el: BoardElement): boolean => {
+    const bounds = getElementBounds(el);
+    const rotHandleDist = 22 / zoom;
+
+    let testPt = worldPt;
+    if (el.rotation) {
+      const rad = (-el.rotation * Math.PI) / 180;
+      const dx = worldPt.x - bounds.cx;
+      const dy = worldPt.y - bounds.cy;
+      testPt = {
+        x: bounds.cx + dx * Math.cos(rad) - dy * Math.sin(rad),
+        y: bounds.cy + dx * Math.sin(rad) + dy * Math.cos(rad),
+      };
+    }
+
+    const handlePt = { x: bounds.cx, y: bounds.minY - 8 / zoom - rotHandleDist };
+    return Math.hypot(testPt.x - handlePt.x, testPt.y - handlePt.y) <= 12 / zoom;
+  };
+
+  // Handlers de Interação do Canvas
+  const handleStart = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
+    const screenPt = getScreenPoint(e);
+    const worldPt = screenToWorld(screenPt.x, screenPt.y);
+
+    // Ferramenta de Navegação (Pan) ou clique com botão do meio
+    if (activeTool === 'pan' || ('button' in e && e.button === 1)) {
+      setIsPanning(true);
+      setPanStart(screenPt);
+      return;
+    }
+
+    // Ferramenta de Seleção / Cursor Comum
+    if (activeTool === 'select') {
+      if (selectedElementId) {
+        const selectedEl = elements.find((el) => el.id === selectedElementId);
+        if (selectedEl && isClickOnRotationHandle(worldPt, selectedEl)) {
+          setIsRotatingElement(true);
+          setDragStartPoint(worldPt);
+          return;
+        }
+      }
+
+      const hit = findElementAtPoint(worldPt);
+      if (hit) {
+        setSelectedElementId(hit.id);
+        setIsDraggingElement(true);
+        setDragStartPoint(worldPt);
+      } else {
+        setSelectedElementId(null);
+      }
+      return;
+    }
+
+    // Ferramenta de Texto
     if (activeTool === 'text') {
-      setTextPosition(pt);
+      setTextPosition(worldPt);
       setTextInput('');
       setTextDialogOpen(true);
       return;
     }
 
+    // Ferramentas de Desenho
     setIsDrawing(true);
-    setStartPoint(pt);
+    setStartPoint(worldPt);
 
     if (activeTool === 'brush') {
       setCurrentPreviewElement({
+        id: generateId(),
         type: 'brush',
         color: selectedColor,
         width: strokeWidth,
-        points: [pt],
+        points: [worldPt],
       });
     } else if (activeTool === 'eraser') {
-      // Borracha: remove elementos próximos ao ponto
-      eraseNearPoint(pt);
+      eraseNearPoint(worldPt);
     }
   };
 
-  // Handlers para movimento do mouse/touch
   const handleMove = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
+    const screenPt = getScreenPoint(e);
+    const worldPt = screenToWorld(screenPt.x, screenPt.y);
+
+    // Navegação (Pan)
+    if (isPanning) {
+      const dx = screenPt.x - panStart.x;
+      const dy = screenPt.y - panStart.y;
+      setViewportOffset((prev) => ({ x: prev.x + dx, y: prev.y + dy }));
+      setPanStart(screenPt);
+      return;
+    }
+
+    // Rotação do elemento selecionado
+    if (isRotatingElement && selectedElementId) {
+      const el = elements.find((item) => item.id === selectedElementId);
+      if (el) {
+        const bounds = getElementBounds(el);
+        const angleRad = Math.atan2(worldPt.y - bounds.cy, worldPt.x - bounds.cx);
+        // O manipulador fica a -90 graus (topo)
+        const degrees = ((angleRad * 180) / Math.PI + 90 + 360) % 360;
+        setElements((prev) =>
+          prev.map((item) => (item.id === selectedElementId ? { ...item, rotation: Math.round(degrees) } : item))
+        );
+        setHasUnsavedChanges(true);
+      }
+      return;
+    }
+
+    // Movimentação / Drag do elemento selecionado
+    if (isDraggingElement && selectedElementId && dragStartPoint) {
+      const dx = worldPt.x - dragStartPoint.x;
+      const dy = worldPt.y - dragStartPoint.y;
+
+      setElements((prev) =>
+        prev.map((item) => {
+          if (item.id !== selectedElementId) return item;
+          switch (item.type) {
+            case 'brush':
+              return {
+                ...item,
+                points: item.points.map((p) => ({ x: p.x + dx, y: p.y + dy })),
+              };
+            case 'rectangle':
+            case 'square':
+              return { ...item, x: item.x + dx, y: item.y + dy };
+            case 'triangle':
+              return {
+                ...item,
+                x1: item.x1 + dx,
+                y1: item.y1 + dy,
+                x2: item.x2 + dx,
+                y2: item.y2 + dy,
+                x3: item.x3 + dx,
+                y3: item.y3 + dy,
+              };
+            case 'circle':
+            case 'star':
+              return { ...item, cx: item.cx + dx, cy: item.cy + dy };
+            case 'text':
+              return { ...item, x: item.x + dx, y: item.y + dy };
+          }
+        })
+      );
+      setDragStartPoint(worldPt);
+      setHasUnsavedChanges(true);
+      return;
+    }
+
+    // Ferramentas de Desenho
     if (!isDrawing || !startPoint) return;
-    const currentPt = getCanvasPoint(e);
 
     if (activeTool === 'brush') {
       setCurrentPreviewElement((prev) => {
         if (prev && prev.type === 'brush') {
           return {
             ...prev,
-            points: [...prev.points, currentPt],
+            points: [...prev.points, worldPt],
           };
         }
         return prev;
       });
     } else if (activeTool === 'eraser') {
-      eraseNearPoint(currentPt);
+      eraseNearPoint(worldPt);
     } else if (activeTool === 'rectangle') {
-      const x = Math.min(startPoint.x, currentPt.x);
-      const y = Math.min(startPoint.y, currentPt.y);
-      const w = Math.abs(currentPt.x - startPoint.x);
-      const h = Math.abs(currentPt.y - startPoint.y);
+      const x = Math.min(startPoint.x, worldPt.x);
+      const y = Math.min(startPoint.y, worldPt.y);
+      const w = Math.abs(worldPt.x - startPoint.x);
+      const h = Math.abs(worldPt.y - startPoint.y);
       setCurrentPreviewElement({
+        id: generateId(),
         type: 'rectangle',
         color: selectedColor,
         width: strokeWidth,
@@ -603,12 +1084,13 @@ export const QuestionWhiteboard: React.FC<QuestionWhiteboardProps> = ({ question
         h,
       });
     } else if (activeTool === 'square') {
-      const dx = currentPt.x - startPoint.x;
-      const dy = currentPt.y - startPoint.y;
+      const dx = worldPt.x - startPoint.x;
+      const dy = worldPt.y - startPoint.y;
       const size = Math.max(Math.abs(dx), Math.abs(dy));
       const x = dx >= 0 ? startPoint.x : startPoint.x - size;
       const y = dy >= 0 ? startPoint.y : startPoint.y - size;
       setCurrentPreviewElement({
+        id: generateId(),
         type: 'square',
         color: selectedColor,
         width: strokeWidth,
@@ -617,8 +1099,9 @@ export const QuestionWhiteboard: React.FC<QuestionWhiteboardProps> = ({ question
         size,
       });
     } else if (activeTool === 'circle') {
-      const radius = Math.hypot(currentPt.x - startPoint.x, currentPt.y - startPoint.y);
+      const radius = Math.hypot(worldPt.x - startPoint.x, worldPt.y - startPoint.y);
       setCurrentPreviewElement({
+        id: generateId(),
         type: 'circle',
         color: selectedColor,
         width: strokeWidth,
@@ -628,12 +1111,13 @@ export const QuestionWhiteboard: React.FC<QuestionWhiteboardProps> = ({ question
       });
     } else if (activeTool === 'triangle') {
       const x1 = startPoint.x;
-      const y1 = currentPt.y;
-      const x2 = (startPoint.x + currentPt.x) / 2;
+      const y1 = worldPt.y;
+      const x2 = (startPoint.x + worldPt.x) / 2;
       const y2 = startPoint.y;
-      const x3 = currentPt.x;
-      const y3 = currentPt.y;
+      const x3 = worldPt.x;
+      const y3 = worldPt.y;
       setCurrentPreviewElement({
+        id: generateId(),
         type: 'triangle',
         color: selectedColor,
         width: strokeWidth,
@@ -645,8 +1129,9 @@ export const QuestionWhiteboard: React.FC<QuestionWhiteboardProps> = ({ question
         y3,
       });
     } else if (activeTool === 'star') {
-      const outerRadius = Math.hypot(currentPt.x - startPoint.x, currentPt.y - startPoint.y);
+      const outerRadius = Math.hypot(worldPt.x - startPoint.x, worldPt.y - startPoint.y);
       setCurrentPreviewElement({
+        id: generateId(),
         type: 'star',
         color: selectedColor,
         width: strokeWidth,
@@ -659,8 +1144,24 @@ export const QuestionWhiteboard: React.FC<QuestionWhiteboardProps> = ({ question
     }
   };
 
-  // Handlers para finalização do desenho
   const handleEnd = () => {
+    if (isPanning) {
+      setIsPanning(false);
+      return;
+    }
+
+    if (isRotatingElement) {
+      setIsRotatingElement(false);
+      setDragStartPoint(null);
+      return;
+    }
+
+    if (isDraggingElement) {
+      setIsDraggingElement(false);
+      setDragStartPoint(null);
+      return;
+    }
+
     if (!isDrawing) return;
     setIsDrawing(false);
 
@@ -671,30 +1172,20 @@ export const QuestionWhiteboard: React.FC<QuestionWhiteboardProps> = ({ question
     setStartPoint(null);
   };
 
-  // Lógica da borracha: remove o elemento mais próximo do clique/rastro
-  const eraseNearPoint = (pt: BoardPoint) => {
+  // Suporte a Zoom com a Roda do Mouse
+  const handleWheel = (e: React.WheelEvent<HTMLCanvasElement>) => {
+    e.preventDefault();
+    const zoomFactor = e.deltaY < 0 ? 0.1 : -0.1;
+    handleZoom(zoomFactor);
+  };
+
+  // Lógica da borracha
+  const eraseNearPoint = (worldPt: BoardPoint) => {
     setElements((prev) => {
-      const threshold = 18;
+      const threshold = 18 / zoom;
       const filtered = prev.filter((el) => {
-        if (el.type === 'brush') {
-          return !el.points.some((p) => Math.hypot(p.x - pt.x, p.y - pt.y) < threshold);
-        }
-        if (el.type === 'rectangle') {
-          return !(pt.x >= el.x && pt.x <= el.x + el.w && pt.y >= el.y && pt.y <= el.y + el.h);
-        }
-        if (el.type === 'square') {
-          return !(pt.x >= el.x && pt.x <= el.x + el.size && pt.y >= el.y && pt.y <= el.y + el.size);
-        }
-        if (el.type === 'circle') {
-          return Math.hypot(el.cx - pt.x, el.cy - pt.y) > el.radius + threshold;
-        }
-        if (el.type === 'star') {
-          return Math.hypot(el.cx - pt.x, el.cy - pt.y) > el.outerRadius + threshold;
-        }
-        if (el.type === 'text') {
-          return Math.hypot(el.x - pt.x, el.y - pt.y) > 25;
-        }
-        return true;
+        const bounds = getElementBounds(el);
+        return Math.hypot(bounds.cx - worldPt.x, bounds.cy - worldPt.y) > bounds.width / 2 + threshold;
       });
 
       if (filtered.length !== prev.length) {
@@ -708,6 +1199,7 @@ export const QuestionWhiteboard: React.FC<QuestionWhiteboardProps> = ({ question
   const handleConfirmText = () => {
     if (textInput.trim() && textPosition) {
       addElement({
+        id: generateId(),
         type: 'text',
         color: selectedColor,
         fontSize: Math.max(14, strokeWidth * 4),
@@ -720,6 +1212,8 @@ export const QuestionWhiteboard: React.FC<QuestionWhiteboardProps> = ({ question
     setTextInput('');
     setTextPosition(null);
   };
+
+  const selectedElement = elements.find((e) => e.id === selectedElementId);
 
   return (
     <Paper
@@ -762,6 +1256,28 @@ export const QuestionWhiteboard: React.FC<QuestionWhiteboardProps> = ({ question
         </Stack>
 
         <Stack direction="row" spacing={1.5} alignItems="center">
+          {/* Zoom controls */}
+          <Stack direction="row" spacing={0.5} alignItems="center" sx={{ mr: 1 }}>
+            <Tooltip title="Diminuir Zoom">
+              <IconButton size="small" onClick={() => handleZoom(-0.1)}>
+                <ZoomOutIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+            <Typography variant="caption" sx={{ minWidth: 40, textAlign: 'center', fontWeight: 700 }}>
+              {Math.round(zoom * 100)}%
+            </Typography>
+            <Tooltip title="Aumentar Zoom">
+              <IconButton size="small" onClick={() => handleZoom(0.1)}>
+                <ZoomInIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+            <Tooltip title="Centralizar / Resetar Visão">
+              <IconButton size="small" onClick={handleResetView}>
+                <CenterFocusStrongIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+          </Stack>
+
           {isSaving ? (
             <Chip
               size="small"
@@ -813,7 +1329,7 @@ export const QuestionWhiteboard: React.FC<QuestionWhiteboardProps> = ({ question
         </Stack>
       </Box>
 
-      {/* Whiteboard Toolbar */}
+      {/* Whiteboard Primary Toolbar */}
       <Box
         sx={{
           p: 1.5,
@@ -832,10 +1348,27 @@ export const QuestionWhiteboard: React.FC<QuestionWhiteboardProps> = ({ question
           value={activeTool}
           exclusive
           onChange={(_e, newTool) => {
-            if (newTool) setActiveTool(newTool);
+            if (newTool) {
+              setActiveTool(newTool);
+              if (newTool !== 'select') {
+                setSelectedElementId(null);
+              }
+            }
           }}
           aria-label="ferramenta de desenho"
         >
+          <ToggleButton value="select" aria-label="cursor comum e seleção">
+            <Tooltip title="Cursor Comum (Selecionar, Mover, Girar, Inverter)">
+              <NearMeIcon fontSize="small" />
+            </Tooltip>
+          </ToggleButton>
+
+          <ToggleButton value="pan" aria-label="navegação e arrasto da lousa">
+            <Tooltip title="Navegação / Mover Lousa (Arrastar tela)">
+              <PanToolIcon fontSize="small" />
+            </Tooltip>
+          </ToggleButton>
+
           <ToggleButton value="brush" aria-label="pincel livre">
             <Tooltip title="Pincel Livre">
               <BrushIcon fontSize="small" />
@@ -897,7 +1430,7 @@ export const QuestionWhiteboard: React.FC<QuestionWhiteboardProps> = ({ question
               key={sw.value}
               size="small"
               variant={strokeWidth === sw.value ? 'contained' : 'outlined'}
-              onClick={() => setStrokeWidth(sw.value)}
+              onClick={() => handleStrokeWidthChange(sw.value)}
               sx={{
                 minWidth: 32,
                 px: 1,
@@ -925,7 +1458,7 @@ export const QuestionWhiteboard: React.FC<QuestionWhiteboardProps> = ({ question
             return (
               <Tooltip key={p.color} title={p.label}>
                 <Box
-                  onClick={() => setSelectedColor(p.color)}
+                  onClick={() => handleColorChange(p.color)}
                   sx={{
                     width: 22,
                     height: 22,
@@ -984,15 +1517,105 @@ export const QuestionWhiteboard: React.FC<QuestionWhiteboardProps> = ({ question
         </Stack>
       </Box>
 
-      {/* Canvas Area */}
+      {/* Selected Element Quick Transformation Bar */}
+      {selectedElement && (
+        <Box
+          sx={{
+            py: 1,
+            px: 2,
+            display: 'flex',
+            alignItems: 'center',
+            flexWrap: 'wrap',
+            gap: 1.5,
+            backgroundColor: isDark ? 'rgba(90, 166, 226, 0.12)' : 'rgba(90, 166, 226, 0.08)',
+            borderBottom: '1px solid',
+            borderColor: 'divider',
+          }}
+        >
+          <Typography variant="caption" sx={{ fontWeight: 700, color: PALETTE_COLORS.secondary, textTransform: 'uppercase' }}>
+            Objeto Selecionado ({selectedElement.type}):
+          </Typography>
+
+          <Tooltip title="Rotacionar 90° no sentido horário">
+            <Button
+              size="small"
+              variant="outlined"
+              startIcon={<RotateRightIcon fontSize="small" />}
+              onClick={() => handleRotateSelected(90)}
+              sx={{ textTransform: 'none', py: 0.3, fontSize: '0.75rem' }}
+            >
+              Girar +90°
+            </Button>
+          </Tooltip>
+
+          <Tooltip title="Inverter Horizontalmente">
+            <Button
+              size="small"
+              variant="outlined"
+              startIcon={<FlipIcon fontSize="small" />}
+              onClick={() => handleFlipSelected('x')}
+              sx={{ textTransform: 'none', py: 0.3, fontSize: '0.75rem' }}
+            >
+              Inverter Horiz.
+            </Button>
+          </Tooltip>
+
+          <Tooltip title="Inverter Verticalmente">
+            <Button
+              size="small"
+              variant="outlined"
+              startIcon={<FlipIcon fontSize="small" sx={{ transform: 'rotate(90deg)' }} />}
+              onClick={() => handleFlipSelected('y')}
+              sx={{ textTransform: 'none', py: 0.3, fontSize: '0.75rem' }}
+            >
+              Inverter Vert.
+            </Button>
+          </Tooltip>
+
+          <Tooltip title="Duplicar Objeto">
+            <Button
+              size="small"
+              variant="outlined"
+              startIcon={<ContentCopyIcon fontSize="small" />}
+              onClick={handleDuplicateSelected}
+              sx={{ textTransform: 'none', py: 0.3, fontSize: '0.75rem' }}
+            >
+              Duplicar
+            </Button>
+          </Tooltip>
+
+          <Tooltip title="Excluir Objeto Selecionado">
+            <Button
+              size="small"
+              variant="outlined"
+              color="error"
+              startIcon={<DeleteOutlineIcon fontSize="small" />}
+              onClick={handleDeleteSelected}
+              sx={{ textTransform: 'none', py: 0.3, fontSize: '0.75rem' }}
+            >
+              Excluir
+            </Button>
+          </Tooltip>
+        </Box>
+      )}
+
+      {/* Canvas Area with Clipping */}
       <Box
         ref={containerRef}
         sx={{
           position: 'relative',
           width: '100%',
-          height: 500,
+          height: 520,
           cursor:
-            activeTool === 'brush'
+            activeTool === 'select'
+              ? isDraggingElement
+                ? 'grabbing'
+                : 'default'
+              : activeTool === 'pan'
+              ? isPanning
+                ? 'grabbing'
+                : 'grab'
+              : activeTool === 'brush'
               ? 'crosshair'
               : activeTool === 'text'
               ? 'text'
@@ -1018,6 +1641,7 @@ export const QuestionWhiteboard: React.FC<QuestionWhiteboardProps> = ({ question
           onTouchStart={handleStart}
           onTouchMove={handleMove}
           onTouchEnd={handleEnd}
+          onWheel={handleWheel}
         />
       </Box>
 
