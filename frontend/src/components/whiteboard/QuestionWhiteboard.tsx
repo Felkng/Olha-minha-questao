@@ -1183,11 +1183,11 @@ export const QuestionWhiteboard: React.FC<QuestionWhiteboardProps> = ({ question
   // Atalhos de teclado
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Se está editando texto inline, só permite Esc (para cancelar) ou Enter sem Shift (para confirmar)
+      // Se está editando texto inline, Esc e Enter confirmam; Shift+Enter é nova linha
       if (inlineTextState) {
         if (e.key === 'Escape') {
           e.preventDefault();
-          setInlineTextState(null);
+          commitInlineText();
         }
         // Enter confirma (Shift+Enter é nova linha)
         if (e.key === 'Enter' && !e.shiftKey) {
@@ -2365,7 +2365,7 @@ export const QuestionWhiteboard: React.FC<QuestionWhiteboardProps> = ({ question
             onKeyDown={(ev) => {
               if (ev.key === 'Escape') {
                 ev.preventDefault();
-                setInlineTextState(null);
+                commitInlineText();
               } else if (ev.key === 'Enter' && !ev.shiftKey) {
                 ev.preventDefault();
                 commitInlineText();
