@@ -26,6 +26,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class QuestionController {
 
     private final QuestionService questionService;
+    private final github.felkng.olha_minha_questao.service.StatisticsService statisticsService;
 
     @GetMapping
     public ResponseEntity<Page<QuestionResponseDTO>> findAll(
@@ -33,8 +34,18 @@ public class QuestionController {
             @RequestParam(required = false) Long areaId,
             @RequestParam(required = false) Long testId,
             @RequestParam(required = false) Integer year,
+            @RequestParam(required = false) String difficulty,
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false) String sort,
             @PageableDefault(size = 20) Pageable pageable) {
-        return ResponseEntity.ok(questionService.findAll(originId, areaId, testId, year, pageable));
+        return ResponseEntity.ok(questionService.findAll(originId, areaId, testId, year, difficulty, search, sort, pageable));
+    }
+
+    @PostMapping("/{id}/attempts")
+    public ResponseEntity<github.felkng.olha_minha_questao.dto.question.QuestionAttemptResponseDTO> registerAttempt(
+            @PathVariable Long id,
+            @RequestBody github.felkng.olha_minha_questao.dto.question.QuestionAttemptRequestDTO dto) {
+        return ResponseEntity.ok(statisticsService.registerQuestionAttempt(id, dto));
     }
 
     @GetMapping("/{id}")
