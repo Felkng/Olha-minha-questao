@@ -42,6 +42,8 @@ import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import ZoomInIcon from '@mui/icons-material/ZoomIn';
 import ZoomOutIcon from '@mui/icons-material/ZoomOut';
 import CenterFocusStrongIcon from '@mui/icons-material/CenterFocusStrong';
+import FullscreenIcon from '@mui/icons-material/Fullscreen';
+import FullscreenExitIcon from '@mui/icons-material/FullscreenExit';
 import {
   BoardElement,
   BoardPoint,
@@ -376,6 +378,9 @@ export const QuestionWhiteboard: React.FC<QuestionWhiteboardProps> = ({ question
   const [lastSavedTime, setLastSavedTime] = useState<Date | null>(null);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState<boolean>(false);
 
+  // Fullscreen State
+  const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
+
   // Canvas Dimensions
   const [canvasDimensions, setCanvasDimensions] = useState<{ width: number; height: number }>({
     width: 900,
@@ -437,20 +442,21 @@ export const QuestionWhiteboard: React.FC<QuestionWhiteboardProps> = ({ question
     };
   }, [questionId, user?.id]);
 
-  // Ajusta dimensões do Canvas com base no container
+  // Ajusta dimensões do Canvas com base no container e modo tela cheia
   useEffect(() => {
     const updateSize = () => {
       if (containerRef.current) {
         const rect = containerRef.current.getBoundingClientRect();
         const width = Math.max(300, Math.floor(rect.width));
-        setCanvasDimensions({ width, height: 520 });
+        const height = isFullscreen ? Math.max(400, Math.floor(window.innerHeight - 135)) : 520;
+        setCanvasDimensions({ width, height });
       }
     };
 
     updateSize();
     window.addEventListener('resize', updateSize);
     return () => window.removeEventListener('resize', updateSize);
-  }, []);
+  }, [isFullscreen]);
 
   // Conversões de Coordenadas: Tela <-> Mundo
   const screenToWorld = useCallback(
@@ -1215,16 +1221,14 @@ export const QuestionWhiteboard: React.FC<QuestionWhiteboardProps> = ({ question
 
   const selectedElement = elements.find((e) => e.id === selectedElementId);
 
-  return (
-    <Paper
-      elevation={3}
+  const whiteboardBody = (
+    <Box
       sx={{
-        borderRadius: 3,
-        border: '1px solid',
-        borderColor: 'divider',
+        display: 'flex',
+        flexDirection: 'column',
+        height: isFullscreen ? '100vh' : 'auto',
         overflow: 'hidden',
         backgroundColor: 'background.paper',
-        mb: 4,
       }}
     >
       {/* Whiteboard Header / Status Bar */}
@@ -1245,7 +1249,7 @@ export const QuestionWhiteboard: React.FC<QuestionWhiteboardProps> = ({ question
         <Stack direction="row" spacing={1} alignItems="center">
           <Typography variant="subtitle2" sx={{ fontWeight: 700, display: 'flex', alignItems: 'center', gap: 0.8 }}>
             <BrushIcon fontSize="small" sx={{ color: PALETTE_COLORS.primary }} />
-            Lousa de Raciocínio
+            Lousa de Raciocínio {isFullscreen && '(Tela Cheia)'}
           </Typography>
           <Chip
             size="small"
@@ -1326,6 +1330,43 @@ export const QuestionWhiteboard: React.FC<QuestionWhiteboardProps> = ({ question
           >
             Salvar
           </Button>
+
+          {isFullscreen ? (
+            <Tooltip title="Sair do modo Tela Cheia (Esc)">
+              <Button
+                size="small"
+                variant="outlined"
+                color="inherit"
+                startIcon={<FullscreenExitIcon />}
+                onClick={() => setIsFullscreen(false)}
+                sx={{
+                  fontWeight: 700,
+                  fontSize: '0.75rem',
+                  py: 0.5,
+                  textTransform: 'none',
+                }}
+              >
+                Sair
+              </Button>
+            </Tooltip>
+          ) : (
+            <Tooltip title="Expandir lousa em Tela Cheia">
+              <Button
+                size="small"
+                variant="outlined"
+                startIcon={<FullscreenIcon />}
+                onClick={() => setIsFullscreen(true)}
+                sx={{
+                  fontWeight: 700,
+                  fontSize: '0.75rem',
+                  py: 0.5,
+                  textTransform: 'none',
+                }}
+              >
+                Tela Cheia
+              </Button>
+            </Tooltip>
+          )}
         </Stack>
       </Box>
 
@@ -1680,6 +1721,73 @@ export const QuestionWhiteboard: React.FC<QuestionWhiteboardProps> = ({ question
           </Button>
         </DialogActions>
       </Dialog>
+    </Box>
+  );
+
+  if (isFullscreen) {
+    return (
+      <>
+        <Paper
+          elevation={2}
+          sx={{
+            p: 3,
+            textAlign: 'center',
+            borderRadius: 3,
+            border: '1px dashed',
+            borderColor: PALETTE_COLORS.primary,
+            backgroundColor: isDark ? 'rgba(255, 230, 0, 0.03)' : 'rgba(255, 230, 0, 0.05)',
+            mb: 4,
+          }}
+        >
+          <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 0.5 }}>
+            A Lousa de Raciocínio está aberta em Tela Cheia
+          </Typography>
+          <Typography variant="body2" sx={{ color: 'text.secondary', mb: 2 }}>
+            Pressione Esc ou clique no botão abaixo para retornar à visualização padrão na página.
+          </Typography>
+          <Button
+            variant="outlined"
+            startIcon={<FullscreenExitIcon />}
+            onClick={() => setIsFullscreen(false)}
+            sx={{ fontWeight: 700, textTransform: 'none' }}
+          >
+            Sair da Tela Cheia
+          </Button>
+        </Paper>
+
+        <Dialog
+          fullScreen
+          open={isFullscreen}
+          onClose={() => setIsFullscreen(false)}
+          PaperProps={{
+            sx: {
+              backgroundColor: isDark ? '#161a20' : '#FFFFFF',
+              overflow: 'hidden',
+              display: 'flex',
+              flexDirection: 'column',
+            },
+          }}
+        >
+          {whiteboardBody}
+        </Dialog>
+      </>
+    );
+  }
+
+  return (
+    <Paper
+      elevation={3}
+      sx={{
+        borderRadius: 3,
+        border: '1px solid',
+        borderColor: 'divider',
+        overflow: 'hidden',
+        backgroundColor: 'background.paper',
+        mb: 4,
+      }}
+    >
+      {whiteboardBody}
     </Paper>
   );
 };
+
