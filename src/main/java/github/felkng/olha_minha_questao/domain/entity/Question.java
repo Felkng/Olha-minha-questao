@@ -73,6 +73,9 @@ public class Question {
     @Builder.Default
     private List<QuestionImage> images = new ArrayList<>();
 
+    @OneToOne(mappedBy = "question", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    private QuestionStatistic statistic;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
