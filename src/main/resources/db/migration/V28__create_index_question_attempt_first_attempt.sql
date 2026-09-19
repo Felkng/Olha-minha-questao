@@ -1,0 +1,1 @@
+CREATE INDEX idx_question_attempt_first_attempt ON question_attempt(question_id, is_first_attempt);
