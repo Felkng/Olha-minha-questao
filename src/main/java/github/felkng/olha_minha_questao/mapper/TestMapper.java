@@ -7,12 +7,13 @@ import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 import org.mapstruct.MappingTarget;
 
-@Mapper(componentModel = "spring")
+@Mapper(componentModel = "spring", uses = {UserMapper.class})
 public interface TestMapper {
 
     @Mapping(target = "id", ignore = true)
     @Mapping(target = "origin", ignore = true)
     @Mapping(target = "area", ignore = true)
+    @Mapping(target = "createdByUser", ignore = true)
     @Mapping(target = "statistic", ignore = true)
     @Mapping(target = "createdAt", ignore = true)
     @Mapping(target = "updatedAt", ignore = true)
@@ -27,6 +28,7 @@ public interface TestMapper {
     @Mapping(target = "id", ignore = true)
     @Mapping(target = "origin", ignore = true)
     @Mapping(target = "area", ignore = true)
+    @Mapping(target = "createdByUser", ignore = true)
     @Mapping(target = "statistic", ignore = true)
     @Mapping(target = "createdAt", ignore = true)
     @Mapping(target = "updatedAt", ignore = true)
