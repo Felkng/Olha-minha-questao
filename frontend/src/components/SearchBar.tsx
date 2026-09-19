@@ -41,7 +41,8 @@ export const SearchBar: React.FC<SearchBarProps> = ({
     filters.originId !== '' ||
     filters.areaId !== '' ||
     filters.year !== '' ||
-    filters.testId !== '';
+    filters.testId !== '' ||
+    Boolean(filters.difficulty);
 
   const handleClear = () => {
     onFilterChange({
@@ -51,6 +52,8 @@ export const SearchBar: React.FC<SearchBarProps> = ({
       areaId: '',
       year: '',
       testId: '',
+      difficulty: '',
+      sort: 'recent',
     });
   };
 
@@ -91,11 +94,32 @@ export const SearchBar: React.FC<SearchBarProps> = ({
             gridTemplateColumns: {
               xs: '1fr',
               sm: 'repeat(2, 1fr)',
-              md: 'repeat(5, 1fr)',
+              md: 'repeat(6, 1fr)',
             },
             gap: 1.5,
           }}
         >
+          {/* Dificuldade */}
+          <FormControl size="small" fullWidth>
+            <InputLabel id="difficulty-select-label">Dificuldade</InputLabel>
+            <Select
+              labelId="difficulty-select-label"
+              label="Dificuldade"
+              value={filters.difficulty || ''}
+              onChange={(e) =>
+                onFilterChange({
+                  ...filters,
+                  difficulty: e.target.value,
+                })
+              }
+            >
+              <MenuItem value="">Todas</MenuItem>
+              <MenuItem value="FACIL">Fácil (≥ 80%)</MenuItem>
+              <MenuItem value="MEDIA">Média (50% - 79%)</MenuItem>
+              <MenuItem value="DIFICIL">Difícil (&lt; 50%)</MenuItem>
+            </Select>
+          </FormControl>
+
           {/* Tipo */}
           <FormControl size="small" fullWidth>
             <InputLabel id="type-select-label">Tipo</InputLabel>
@@ -141,10 +165,10 @@ export const SearchBar: React.FC<SearchBarProps> = ({
 
           {/* Área do Conhecimento */}
           <FormControl size="small" fullWidth>
-            <InputLabel id="area-select-label">Área do Conhecimento</InputLabel>
+            <InputLabel id="area-select-label">Área</InputLabel>
             <Select
               labelId="area-select-label"
-              label="Área do Conhecimento"
+              label="Área"
               value={filters.areaId}
               onChange={(e) =>
                 onFilterChange({
@@ -164,10 +188,10 @@ export const SearchBar: React.FC<SearchBarProps> = ({
 
           {/* Ano */}
           <FormControl size="small" fullWidth>
-            <InputLabel id="year-select-label">Ano de Aplicação</InputLabel>
+            <InputLabel id="year-select-label">Ano</InputLabel>
             <Select
               labelId="year-select-label"
-              label="Ano de Aplicação"
+              label="Ano"
               value={filters.year}
               onChange={(e) =>
                 onFilterChange({
@@ -187,10 +211,10 @@ export const SearchBar: React.FC<SearchBarProps> = ({
 
           {/* Prova Específica */}
           <FormControl size="small" fullWidth>
-            <InputLabel id="test-select-label">Prova / Caderno</InputLabel>
+            <InputLabel id="test-select-label">Prova</InputLabel>
             <Select
               labelId="test-select-label"
-              label="Prova / Caderno"
+              label="Prova"
               value={filters.testId}
               onChange={(e) =>
                 onFilterChange({
@@ -234,6 +258,14 @@ export const SearchBar: React.FC<SearchBarProps> = ({
                 label={`Busca: "${filters.search}"`}
                 onDelete={() => onFilterChange({ ...filters, search: '' })}
                 sx={{ borderColor: PALETTE_COLORS.primary }}
+                variant="outlined"
+              />
+            )}
+            {filters.difficulty && (
+              <Chip
+                size="small"
+                label={`Dificuldade: ${filters.difficulty === 'FACIL' ? 'Fácil' : filters.difficulty === 'MEDIA' ? 'Média' : 'Difícil'}`}
+                onDelete={() => onFilterChange({ ...filters, difficulty: '' })}
                 variant="outlined"
               />
             )}
