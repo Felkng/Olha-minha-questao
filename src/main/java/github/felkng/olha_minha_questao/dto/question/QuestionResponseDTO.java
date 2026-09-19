@@ -31,6 +31,9 @@ public class QuestionResponseDTO {
     private List<AlternativeResponseDTO> alternatives = new ArrayList<>();
     private Long correctAlternativeId;
     private String correctAlternativeIdentifier;
+    private github.felkng.olha_minha_questao.domain.entity.DifficultyLevel difficultyLevel;
+    private Double accuracyPercentage;
+    private Long totalAttempts;
     private Instant createdAt;
     private Instant updatedAt;
 }
