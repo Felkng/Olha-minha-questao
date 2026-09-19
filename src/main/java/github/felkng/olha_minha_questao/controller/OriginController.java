@@ -24,10 +24,23 @@ import java.util.List;
 public class OriginController {
 
     private final OriginService originService;
+    private final github.felkng.olha_minha_questao.service.QuestionService questionService;
 
     @GetMapping
     public ResponseEntity<List<OriginResponseDTO>> findAll() {
         return ResponseEntity.ok(originService.findAll());
+    }
+
+    @GetMapping("/cards")
+    public ResponseEntity<List<github.felkng.olha_minha_questao.dto.origin.OriginCardDTO>> findOriginCards() {
+        return ResponseEntity.ok(originService.findOriginCards());
+    }
+
+    @GetMapping("/{id}/questions")
+    public ResponseEntity<org.springframework.data.domain.Page<github.felkng.olha_minha_questao.dto.question.QuestionResponseDTO>> findOriginQuestions(
+            @PathVariable Long id,
+            @org.springframework.data.web.PageableDefault(size = 20) org.springframework.data.domain.Pageable pageable) {
+        return ResponseEntity.ok(questionService.findByOriginOrdered(id, pageable));
     }
 
     @GetMapping("/{id}")
