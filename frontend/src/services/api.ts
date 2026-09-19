@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { Area, Origin, Question, Test } from '../types';
+import { Area, Folder, Origin, Question, SavedQuestion, Test } from '../types';
 import { MOCK_AREAS, MOCK_ORIGINS, MOCK_QUESTIONS, MOCK_TESTS } from './mockData';
 
 const apiClient = axios.create({
@@ -80,5 +80,81 @@ export const getTests = async (): Promise<Test[]> => {
   } catch (err) {
     console.warn('API /tests error, using mock fallback:', err);
     return MOCK_TESTS;
+  }
+};
+
+// ==========================================
+// Folders & Saved Questions API
+// ==========================================
+
+export const getFolders = async (): Promise<Folder[]> => {
+  try {
+    const response = await apiClient.get<Folder[]>('/folders');
+    return Array.isArray(response.data) ? response.data : [];
+  } catch (err) {
+    console.warn('API /folders error:', err);
+    return [];
+  }
+};
+
+export const createFolder = async (folder: {
+  name: string;
+  description?: string;
+  color?: string;
+}): Promise<Folder> => {
+  const response = await apiClient.post<Folder>('/folders', folder);
+  return response.data;
+};
+
+export const updateFolder = async (
+  id: number,
+  folder: { name: string; description?: string; color?: string }
+): Promise<Folder> => {
+  const response = await apiClient.put<Folder>(`/folders/${id}`, folder);
+  return response.data;
+};
+
+export const deleteFolder = async (id: number): Promise<void> => {
+  await apiClient.delete(`/folders/${id}`);
+};
+
+export const getQuestionsInFolder = async (folderId: number): Promise<Question[]> => {
+  try {
+    const response = await apiClient.get<Question[]>(`/folders/${folderId}/questions`);
+    const rawList: any[] = Array.isArray(response.data) ? response.data : [];
+    return rawList.map(normalizeQuestion);
+  } catch (err) {
+    console.warn(`API /folders/${folderId}/questions error:`, err);
+    return [];
+  }
+};
+
+export const addQuestionToFolder = async (
+  folderId: number,
+  questionId: number,
+  notes?: string
+): Promise<SavedQuestion> => {
+  const response = await apiClient.post<SavedQuestion>(
+    `/folders/${folderId}/questions/${questionId}`,
+    null,
+    { params: { notes } }
+  );
+  return response.data;
+};
+
+export const removeQuestionFromFolder = async (
+  folderId: number,
+  questionId: number
+): Promise<void> => {
+  await apiClient.delete(`/folders/${folderId}/questions/${questionId}`);
+};
+
+export const getFolderIdsForQuestion = async (questionId: number): Promise<number[]> => {
+  try {
+    const response = await apiClient.get<number[]>(`/folders/by-question/${questionId}`);
+    return Array.isArray(response.data) ? response.data : [];
+  } catch (err) {
+    console.warn(`API /folders/by-question/${questionId} error:`, err);
+    return [];
   }
 };
