@@ -58,8 +58,10 @@ public class TestController {
     }
 
     @PostMapping
-    public ResponseEntity<TestResponseDTO> create(@Valid @RequestBody TestRequestDTO dto) {
-        TestResponseDTO created = testService.create(dto);
+    public ResponseEntity<TestResponseDTO> create(
+            @Valid @RequestBody TestRequestDTO dto,
+            @org.springframework.web.bind.annotation.RequestHeader(name = "X-User-Id", required = false) Long userId) {
+        TestResponseDTO created = testService.create(dto, userId);
         return ResponseEntity.status(HttpStatus.CREATED).body(created);
     }
 
