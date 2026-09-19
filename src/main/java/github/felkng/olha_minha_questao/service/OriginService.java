@@ -17,7 +17,22 @@ import java.util.List;
 public class OriginService {
 
     private final OriginRepository originRepository;
+    private final github.felkng.olha_minha_questao.domain.repository.QuestionRepository questionRepository;
+    private final github.felkng.olha_minha_questao.domain.repository.TestRepository testRepository;
     private final OriginMapper originMapper;
+
+    @Transactional(readOnly = true)
+    public java.util.List<github.felkng.olha_minha_questao.dto.origin.OriginCardDTO> findOriginCards() {
+        return originRepository.findAllByOrderByNameAsc().stream()
+                .map(origin -> github.felkng.olha_minha_questao.dto.origin.OriginCardDTO.builder()
+                        .id(origin.getId())
+                        .name(origin.getName())
+                        .description(origin.getDescription())
+                        .questionCount(questionRepository.countByOriginId(origin.getId()))
+                        .testCount(testRepository.countByOriginId(origin.getId()))
+                        .build())
+                .toList();
+    }
 
     @Transactional(readOnly = true)
     public List<OriginResponseDTO> findAll() {
