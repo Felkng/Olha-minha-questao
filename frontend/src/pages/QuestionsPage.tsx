@@ -99,7 +99,42 @@ export const QuestionsPage: React.FC<QuestionsPageProps> = ({
 
   // Fetch questions whenever filters or page changes
   useEffect(() => {
-    loadQuestionsData(page);
+    let isCurrent = true;
+    const fetchQuestions = async () => {
+      setIsLoading(true);
+      try {
+        const pageRes = await getQuestions({
+          originId: filters.originId,
+          areaId: filters.areaId,
+          testId: filters.testId,
+          year: filters.year,
+          difficulty: filters.difficulty,
+          search: filters.search,
+          sort: filters.sort,
+          page: page - 1, // API is 0-indexed
+          size: 5, // 5 questões por vez
+        });
+        if (isCurrent) {
+          setQuestions(pageRes.content);
+          setTotalPages(pageRes.totalPages || 1);
+          setTotalElements(pageRes.totalElements || 0);
+        }
+      } catch (err) {
+        if (isCurrent) {
+          console.error('Erro ao carregar questões:', err);
+        }
+      } finally {
+        if (isCurrent) {
+          setIsLoading(false);
+        }
+      }
+    };
+
+    fetchQuestions();
+
+    return () => {
+      isCurrent = false;
+    };
   }, [
     page,
     filters.originId,
