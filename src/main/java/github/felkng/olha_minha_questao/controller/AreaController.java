@@ -24,10 +24,23 @@ import java.util.List;
 public class AreaController {
 
     private final AreaService areaService;
+    private final github.felkng.olha_minha_questao.service.QuestionService questionService;
 
     @GetMapping
     public ResponseEntity<List<AreaResponseDTO>> findAll() {
         return ResponseEntity.ok(areaService.findAll());
+    }
+
+    @GetMapping("/cards")
+    public ResponseEntity<List<github.felkng.olha_minha_questao.dto.area.AreaCardDTO>> findAreaCards() {
+        return ResponseEntity.ok(areaService.findAreaCards());
+    }
+
+    @GetMapping("/{id}/questions")
+    public ResponseEntity<org.springframework.data.domain.Page<github.felkng.olha_minha_questao.dto.question.QuestionResponseDTO>> findAreaQuestions(
+            @PathVariable Long id,
+            @org.springframework.data.web.PageableDefault(size = 20) org.springframework.data.domain.Pageable pageable) {
+        return ResponseEntity.ok(questionService.findByAreaOrdered(id, pageable));
     }
 
     @GetMapping("/{id}")
