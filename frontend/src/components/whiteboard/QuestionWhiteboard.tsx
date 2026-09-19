@@ -76,6 +76,10 @@ const STROKE_WIDTHS = [
   { label: 'Extra', value: 10 },
 ];
 
+// Cursor personalizado para rotação livre (ícone de setas circulares com contorno branco e preenchimento escuro)
+const ROTATE_CURSOR =
+  "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Cpath d='M12 4V1L8 5l4 4V6c3.31 0 6 2.69 6 6 0 1.01-.25 1.97-.7 2.8l1.46 1.46A7.93 7.93 0 0 0 20 12c0-4.42-3.58-8-8-8zm0 14c-3.31 0-6-2.69-6-6 0-1.01.25-1.97.7-2.8L5.24 7.74A7.93 7.93 0 0 0 4 12c0 4.42 3.58 8 8 8v3l4-4-4-4v3z' fill='%23000000' stroke='%23ffffff' stroke-width='1.5' stroke-linejoin='round'/%3E%3C/svg%3E\") 12 12, crosshair";
+
 const generateId = () => 'el_' + Math.random().toString(36).substring(2, 10);
 
 // Calcula centro e dimensões de qualquer elemento para rotação e inversão
@@ -359,6 +363,8 @@ export const QuestionWhiteboard: React.FC<QuestionWhiteboardProps> = ({ question
   const [isDraggingElement, setIsDraggingElement] = useState<boolean>(false);
   const [isRotatingElement, setIsRotatingElement] = useState<boolean>(false);
   const [dragStartPoint, setDragStartPoint] = useState<BoardPoint | null>(null);
+  const [isHoveringRotationHandle, setIsHoveringRotationHandle] = useState<boolean>(false);
+  const [isHoveringSelectedElement, setIsHoveringSelectedElement] = useState<boolean>(false);
 
   // Drawing state
   const [elements, setElements] = useState<BoardElement[]>([]);
@@ -867,6 +873,179 @@ export const QuestionWhiteboard: React.FC<QuestionWhiteboardProps> = ({ question
     setZoom(1.0);
   };
 
+  // Movimento fino com as setas do teclado (nudge)
+  const moveSelectedBy = useCallback((dx: number, dy: number) => {
+    if (!selectedElementId) return;
+    setElements((prev) =>
+      prev.map((item) => {
+        if (item.id !== selectedElementId) return item;
+        switch (item.type) {
+          case 'brush':
+            return {
+              ...item,
+              points: item.points.map((p) => ({ x: p.x + dx, y: p.y + dy })),
+            };
+          case 'rectangle':
+          case 'square':
+            return { ...item, x: item.x + dx, y: item.y + dy };
+          case 'triangle':
+            return {
+              ...item,
+              x1: item.x1 + dx,
+              y1: item.y1 + dy,
+              x2: item.x2 + dx,
+              y2: item.y2 + dy,
+              x3: item.x3 + dx,
+              y3: item.y3 + dy,
+            };
+          case 'circle':
+          case 'star':
+            return { ...item, cx: item.cx + dx, cy: item.cy + dy };
+          case 'text':
+            return { ...item, x: item.x + dx, y: item.y + dy };
+        }
+      })
+    );
+    setHasUnsavedChanges(true);
+  }, [selectedElementId]);
+
+  // Atalhos de teclado para ferramentas, figuras, edição e exclusão
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ignora se estiver digitando em campo de texto ou modal de texto aberto
+      if (textDialogOpen) return;
+      const target = e.target as HTMLElement | null;
+      if (
+        target &&
+        (target.tagName === 'INPUT' ||
+          target.tagName === 'TEXTAREA' ||
+          target.isContentEditable ||
+          target.closest('.MuiInputBase-root'))
+      ) {
+        return;
+      }
+
+      // Atalhos de Exclusão: Delete ou Backspace
+      if (e.key === 'Delete' || e.key === 'Backspace') {
+        if (selectedElementId) {
+          e.preventDefault();
+          handleDeleteSelected();
+        }
+        return;
+      }
+
+      // Atalhos com Ctrl / Cmd
+      if (e.ctrlKey || e.metaKey) {
+        if (e.key.toLowerCase() === 'z') {
+          e.preventDefault();
+          if (e.shiftKey) {
+            handleRedo();
+          } else {
+            handleUndo();
+          }
+          return;
+        }
+        if (e.key.toLowerCase() === 'y') {
+          e.preventDefault();
+          handleRedo();
+          return;
+        }
+        if (e.key.toLowerCase() === 'd') {
+          e.preventDefault();
+          handleDuplicateSelected();
+          return;
+        }
+      }
+
+      // Desmarcar seleção com Escape
+      if (e.key === 'Escape') {
+        if (selectedElementId) {
+          e.preventDefault();
+          setSelectedElementId(null);
+          return;
+        }
+      }
+
+      // Deslocamento fino com setas do teclado (Nudge)
+      if (selectedElementId && (e.key === 'ArrowUp' || e.key === 'ArrowDown' || e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
+        e.preventDefault();
+        const step = e.shiftKey ? 10 : 2;
+        const dx = e.key === 'ArrowLeft' ? -step : e.key === 'ArrowRight' ? step : 0;
+        const dy = e.key === 'ArrowUp' ? -step : e.key === 'ArrowDown' ? step : 0;
+        moveSelectedBy(dx, dy);
+        return;
+      }
+
+      // Se tecla modificadora estiver ativa, não aciona atalhos simples de ferramentas
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+
+      // Atalhos de Ferramentas e Figuras
+      const key = e.key.toLowerCase();
+      switch (key) {
+        case 'v':
+        case '1':
+          setActiveTool('select');
+          break;
+        case 'h':
+        case '2':
+          setActiveTool('pan');
+          setSelectedElementId(null);
+          break;
+        case 'b':
+        case '3':
+          setActiveTool('brush');
+          setSelectedElementId(null);
+          break;
+        case 'e':
+        case '4':
+          setActiveTool('eraser');
+          setSelectedElementId(null);
+          break;
+        case 't':
+        case '5':
+          setActiveTool('text');
+          setSelectedElementId(null);
+          break;
+        case 'r':
+        case '6':
+          setActiveTool('rectangle');
+          setSelectedElementId(null);
+          break;
+        case 's':
+        case '7':
+          setActiveTool('square');
+          setSelectedElementId(null);
+          break;
+        case 'c':
+        case '8':
+          setActiveTool('circle');
+          setSelectedElementId(null);
+          break;
+        case 'g':
+        case '9':
+          setActiveTool('triangle');
+          setSelectedElementId(null);
+          break;
+        case 'x':
+        case '0':
+          setActiveTool('star');
+          setSelectedElementId(null);
+          break;
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [
+    selectedElementId,
+    textDialogOpen,
+    handleDeleteSelected,
+    handleUndo,
+    handleRedo,
+    handleDuplicateSelected,
+    moveSelectedBy,
+  ]);
+
   // Helper de coordenadas relativas ao Canvas na tela
   const getScreenPoint = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>): BoardPoint => {
     const canvas = canvasRef.current;
@@ -1007,6 +1186,26 @@ export const QuestionWhiteboard: React.FC<QuestionWhiteboardProps> = ({ question
     const screenPt = getScreenPoint(e);
     const worldPt = screenToWorld(screenPt.x, screenPt.y);
 
+    // Detecção de Hover no Manipulador de Rotação e Objeto Selecionado
+    if (activeTool === 'select' && selectedElementId && !isDraggingElement && !isRotatingElement && !isDrawing && !isPanning) {
+      const selectedEl = elements.find((item) => item.id === selectedElementId);
+      if (selectedEl && isClickOnRotationHandle(worldPt, selectedEl)) {
+        setIsHoveringRotationHandle(true);
+        setIsHoveringSelectedElement(false);
+      } else {
+        setIsHoveringRotationHandle(false);
+        const hit = findElementAtPoint(worldPt);
+        setIsHoveringSelectedElement(hit?.id === selectedElementId);
+      }
+    } else {
+      if (isHoveringRotationHandle && !isRotatingElement) {
+        setIsHoveringRotationHandle(false);
+      }
+      if (isHoveringSelectedElement && !isDraggingElement) {
+        setIsHoveringSelectedElement(false);
+      }
+    }
+
     // Navegação (Pan)
     if (isPanning) {
       const dx = screenPt.x - panStart.x;
@@ -1103,11 +1302,9 @@ export const QuestionWhiteboard: React.FC<QuestionWhiteboardProps> = ({ question
         h,
       });
     } else if (activeTool === 'square') {
-      const dx = worldPt.x - startPoint.x;
-      const dy = worldPt.y - startPoint.y;
-      const size = Math.max(Math.abs(dx), Math.abs(dy));
-      const x = dx >= 0 ? startPoint.x : startPoint.x - size;
-      const y = dy >= 0 ? startPoint.y : startPoint.y - size;
+      const size = Math.max(Math.abs(worldPt.x - startPoint.x), Math.abs(worldPt.y - startPoint.y));
+      const x = worldPt.x < startPoint.x ? startPoint.x - size : startPoint.x;
+      const y = worldPt.y < startPoint.y ? startPoint.y - size : startPoint.y;
       setCurrentPreviewElement({
         id: generateId(),
         type: 'square',
@@ -1172,12 +1369,14 @@ export const QuestionWhiteboard: React.FC<QuestionWhiteboardProps> = ({ question
     if (isRotatingElement) {
       setIsRotatingElement(false);
       setDragStartPoint(null);
+      setIsHoveringRotationHandle(false);
       return;
     }
 
     if (isDraggingElement) {
       setIsDraggingElement(false);
       setDragStartPoint(null);
+      setIsHoveringSelectedElement(false);
       return;
     }
 
@@ -1189,6 +1388,12 @@ export const QuestionWhiteboard: React.FC<QuestionWhiteboardProps> = ({ question
       setCurrentPreviewElement(null);
     }
     setStartPoint(null);
+  };
+
+  const handleMouseLeave = () => {
+    handleEnd();
+    setIsHoveringRotationHandle(false);
+    setIsHoveringSelectedElement(false);
   };
 
   // Suporte a Zoom com a Roda do Mouse (sem propagar scroll para a página externa)
@@ -1428,61 +1633,61 @@ export const QuestionWhiteboard: React.FC<QuestionWhiteboardProps> = ({ question
           aria-label="ferramenta de desenho"
         >
           <ToggleButton value="select" aria-label="cursor comum e seleção">
-            <Tooltip title="Cursor Comum (Selecionar, Mover, Girar, Inverter)">
+            <Tooltip title="Cursor Comum e Seleção (V ou 1)">
               <NearMeIcon fontSize="small" />
             </Tooltip>
           </ToggleButton>
 
           <ToggleButton value="pan" aria-label="navegação e arrasto da lousa">
-            <Tooltip title="Navegação / Mover Lousa (Arrastar tela)">
+            <Tooltip title="Navegação / Mover Lousa (H ou 2)">
               <PanToolIcon fontSize="small" />
             </Tooltip>
           </ToggleButton>
 
           <ToggleButton value="brush" aria-label="pincel livre">
-            <Tooltip title="Pincel Livre">
+            <Tooltip title="Pincel Livre (B ou 3)">
               <BrushIcon fontSize="small" />
             </Tooltip>
           </ToggleButton>
 
           <ToggleButton value="rectangle" aria-label="retângulo">
-            <Tooltip title="Retângulo">
+            <Tooltip title="Retângulo (R ou 6)">
               <CropSquareIcon fontSize="small" />
             </Tooltip>
           </ToggleButton>
 
           <ToggleButton value="square" aria-label="quadrado">
-            <Tooltip title="Quadrado">
+            <Tooltip title="Quadrado (S ou 7)">
               <SquareIcon fontSize="small" />
             </Tooltip>
           </ToggleButton>
 
           <ToggleButton value="triangle" aria-label="triângulo">
-            <Tooltip title="Triângulo">
+            <Tooltip title="Triângulo (G ou 9)">
               <ChangeHistoryIcon fontSize="small" />
             </Tooltip>
           </ToggleButton>
 
           <ToggleButton value="star" aria-label="estrela">
-            <Tooltip title="Estrela (5 pontas)">
+            <Tooltip title="Estrela de 5 pontas (X ou 0)">
               <StarBorderIcon fontSize="small" />
             </Tooltip>
           </ToggleButton>
 
           <ToggleButton value="circle" aria-label="bola / círculo">
-            <Tooltip title="Bola / Círculo">
+            <Tooltip title="Bola / Círculo (C ou 8)">
               <RadioButtonUncheckedIcon fontSize="small" />
             </Tooltip>
           </ToggleButton>
 
           <ToggleButton value="text" aria-label="texto">
-            <Tooltip title="Adicionar Texto (clique no quadro)">
+            <Tooltip title="Adicionar Texto (T ou 5)">
               <TextFieldsIcon fontSize="small" />
             </Tooltip>
           </ToggleButton>
 
           <ToggleButton value="eraser" aria-label="borracha">
-            <Tooltip title="Borracha">
+            <Tooltip title="Borracha (E ou 4)">
               <CleaningServicesIcon fontSize="small" />
             </Tooltip>
           </ToggleButton>
@@ -1561,7 +1766,7 @@ export const QuestionWhiteboard: React.FC<QuestionWhiteboardProps> = ({ question
             </IconButton>
           </Tooltip>
 
-          <Tooltip title="Desfazer (Undo)">
+          <Tooltip title="Desfazer (Ctrl+Z)">
             <span>
               <IconButton size="small" onClick={handleUndo} disabled={undoStack.length === 0}>
                 <UndoIcon fontSize="small" />
@@ -1569,7 +1774,7 @@ export const QuestionWhiteboard: React.FC<QuestionWhiteboardProps> = ({ question
             </span>
           </Tooltip>
 
-          <Tooltip title="Refazer (Redo)">
+          <Tooltip title="Refazer (Ctrl+Y ou Ctrl+Shift+Z)">
             <span>
               <IconButton size="small" onClick={handleRedo} disabled={redoStack.length === 0}>
                 <RedoIcon fontSize="small" />
@@ -1642,7 +1847,7 @@ export const QuestionWhiteboard: React.FC<QuestionWhiteboardProps> = ({ question
             </Button>
           </Tooltip>
 
-          <Tooltip title="Duplicar Objeto">
+          <Tooltip title="Duplicar Objeto (Ctrl+D)">
             <Button
               size="small"
               variant="outlined"
@@ -1654,7 +1859,7 @@ export const QuestionWhiteboard: React.FC<QuestionWhiteboardProps> = ({ question
             </Button>
           </Tooltip>
 
-          <Tooltip title="Excluir Objeto Selecionado">
+          <Tooltip title="Excluir Objeto Selecionado (Delete ou Backspace)">
             <Button
               size="small"
               variant="outlined"
@@ -1678,9 +1883,13 @@ export const QuestionWhiteboard: React.FC<QuestionWhiteboardProps> = ({ question
           height: isFullscreen ? 'calc(100vh - 135px)' : 520,
           flex: isFullscreen ? 1 : undefined,
           cursor:
-            activeTool === 'select'
+            isHoveringRotationHandle || isRotatingElement
+              ? ROTATE_CURSOR
+              : activeTool === 'select'
               ? isDraggingElement
                 ? 'grabbing'
+                : isHoveringSelectedElement
+                ? 'move'
                 : 'default'
               : activeTool === 'pan'
               ? isPanning
@@ -1709,7 +1918,7 @@ export const QuestionWhiteboard: React.FC<QuestionWhiteboardProps> = ({ question
           onMouseDown={handleStart}
           onMouseMove={handleMove}
           onMouseUp={handleEnd}
-          onMouseLeave={handleEnd}
+          onMouseLeave={handleMouseLeave}
           onTouchStart={handleStart}
           onTouchMove={handleMove}
           onTouchEnd={handleEnd}
