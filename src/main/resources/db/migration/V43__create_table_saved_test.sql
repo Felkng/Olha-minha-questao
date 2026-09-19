@@ -1,0 +1,8 @@
+CREATE TABLE IF NOT EXISTS saved_test (
+    id BIGSERIAL PRIMARY KEY,
+    folder_id BIGINT NOT NULL REFERENCES folder(id) ON DELETE CASCADE,
+    test_id BIGINT NOT NULL REFERENCES test(id) ON DELETE CASCADE,
+    notes TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    CONSTRAINT uk_saved_test_folder_test UNIQUE (folder_id, test_id)
+);
