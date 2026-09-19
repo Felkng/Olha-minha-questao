@@ -41,8 +41,10 @@ public class FolderController {
     }
 
     @PostMapping
-    public ResponseEntity<FolderResponseDTO> create(@Valid @RequestBody FolderRequestDTO dto) {
-        FolderResponseDTO created = folderService.create(dto);
+    public ResponseEntity<FolderResponseDTO> create(
+            @Valid @RequestBody FolderRequestDTO dto,
+            @org.springframework.web.bind.annotation.RequestHeader(name = "X-User-Id", required = false) Long userId) {
+        FolderResponseDTO created = folderService.create(dto, userId);
         return ResponseEntity.status(HttpStatus.CREATED).body(created);
     }
 
