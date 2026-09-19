@@ -7,10 +7,11 @@ import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 import org.mapstruct.MappingTarget;
 
-@Mapper(componentModel = "spring")
+@Mapper(componentModel = "spring", uses = {UserMapper.class})
 public interface FolderMapper {
 
     @Mapping(target = "id", ignore = true)
+    @Mapping(target = "createdByUser", ignore = true)
     @Mapping(target = "createdAt", ignore = true)
     @Mapping(target = "updatedAt", ignore = true)
     @Mapping(target = "savedQuestions", ignore = true)
@@ -22,6 +23,7 @@ public interface FolderMapper {
     FolderResponseDTO toDTO(Folder entity);
 
     @Mapping(target = "id", ignore = true)
+    @Mapping(target = "createdByUser", ignore = true)
     @Mapping(target = "createdAt", ignore = true)
     @Mapping(target = "updatedAt", ignore = true)
     @Mapping(target = "savedQuestions", ignore = true)
