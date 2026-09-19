@@ -61,7 +61,9 @@ public class QuestionController {
 
     @GetMapping("/attempted-ids")
     public ResponseEntity<List<Long>> getAttemptedQuestionIds(
-            @RequestHeader(value = "X-User-Id", required = false) Long userId) {
+            @RequestHeader(value = "X-User-Id", required = false) Long userIdHeader,
+            @RequestParam(value = "userId", required = false) Long userIdParam) {
+        Long userId = userIdHeader != null ? userIdHeader : userIdParam;
         if (userId == null) {
             return ResponseEntity.ok(List.of());
         }
