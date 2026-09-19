@@ -7,15 +7,39 @@ const apiClient = axios.create({
   timeout: 5000,
 });
 
-export const getQuestions = async (): Promise<Question[]> => {
+// Normaliza campos aninhados retornados pela API Spring Data
+const normalizeQuestion = (q: any): Question => ({
+  ...q,
+  originId: q.originId ?? q.origin?.id,
+  originName: q.originName ?? q.origin?.name,
+  areaId: q.areaId ?? q.area?.id,
+  areaName: q.areaName ?? q.area?.name,
+  testId: q.testId ?? q.test?.id,
+  testName: q.testName ?? q.test?.name,
+});
+
+export const getQuestions = async (params?: {
+  originId?: number | '';
+  areaId?: number | '';
+  testId?: number | '';
+  year?: number | '';
+}): Promise<Question[]> => {
   try {
-    const response = await apiClient.get<Question[]>('/questions');
-    if (response.data && response.data.length > 0) {
-      return response.data;
+    const queryParams: Record<string, any> = { size: 100 };
+    if (params?.originId) queryParams.originId = params.originId;
+    if (params?.areaId) queryParams.areaId = params.areaId;
+    if (params?.testId) queryParams.testId = params.testId;
+    if (params?.year) queryParams.year = params.year;
+
+    const response = await apiClient.get('/questions', { params: queryParams });
+    const rawList: any[] = response.data?.content || (Array.isArray(response.data) ? response.data : []);
+
+    if (rawList.length > 0) {
+      return rawList.map(normalizeQuestion);
     }
-    return MOCK_QUESTIONS;
+    return [];
   } catch (err) {
-    console.warn('API /questions unavailable or empty, using mock data:', err);
+    console.warn('API /questions error, using mock fallback:', err);
     return MOCK_QUESTIONS;
   }
 };
@@ -23,11 +47,12 @@ export const getQuestions = async (): Promise<Question[]> => {
 export const getOrigins = async (): Promise<Origin[]> => {
   try {
     const response = await apiClient.get<Origin[]>('/origins');
-    if (response.data && response.data.length > 0) {
+    if (Array.isArray(response.data) && response.data.length > 0) {
       return response.data;
     }
     return MOCK_ORIGINS;
   } catch (err) {
+    console.warn('API /origins error, using mock fallback:', err);
     return MOCK_ORIGINS;
   }
 };
@@ -35,11 +60,12 @@ export const getOrigins = async (): Promise<Origin[]> => {
 export const getAreas = async (): Promise<Area[]> => {
   try {
     const response = await apiClient.get<Area[]>('/areas');
-    if (response.data && response.data.length > 0) {
+    if (Array.isArray(response.data) && response.data.length > 0) {
       return response.data;
     }
     return MOCK_AREAS;
   } catch (err) {
+    console.warn('API /areas error, using mock fallback:', err);
     return MOCK_AREAS;
   }
 };
@@ -47,11 +73,12 @@ export const getAreas = async (): Promise<Area[]> => {
 export const getTests = async (): Promise<Test[]> => {
   try {
     const response = await apiClient.get<Test[]>('/tests');
-    if (response.data && response.data.length > 0) {
+    if (Array.isArray(response.data) && response.data.length > 0) {
       return response.data;
     }
     return MOCK_TESTS;
   } catch (err) {
+    console.warn('API /tests error, using mock fallback:', err);
     return MOCK_TESTS;
   }
 };
