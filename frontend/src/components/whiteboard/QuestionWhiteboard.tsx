@@ -450,18 +450,49 @@ export const QuestionWhiteboard: React.FC<QuestionWhiteboardProps> = ({ question
 
   // Ajusta dimensões do Canvas com base no container e modo tela cheia
   useEffect(() => {
-    const updateSize = () => {
-      if (containerRef.current) {
-        const rect = containerRef.current.getBoundingClientRect();
-        const width = Math.max(300, Math.floor(rect.width));
-        const height = isFullscreen ? Math.max(400, Math.floor(window.innerHeight - 135)) : 520;
-        setCanvasDimensions({ width, height });
+    const container = containerRef.current;
+    if (!container) return;
+
+    const measureSize = () => {
+      const rect = container.getBoundingClientRect();
+      const width = Math.max(
+        300,
+        Math.floor(rect.width || container.clientWidth || (isFullscreen ? window.innerWidth : 900))
+      );
+      const height = isFullscreen
+        ? Math.max(300, Math.floor(rect.height || container.clientHeight || (window.innerHeight - 135)))
+        : 520;
+
+      if (width > 0 && height > 0) {
+        setCanvasDimensions((prev) => {
+          if (prev.width === width && prev.height === height) return prev;
+          return { width, height };
+        });
       }
     };
 
-    updateSize();
-    window.addEventListener('resize', updateSize);
-    return () => window.removeEventListener('resize', updateSize);
+    measureSize();
+
+    // ResizeObserver monitora mudanças reais de dimensão no container
+    const resizeObserver = new ResizeObserver(() => {
+      measureSize();
+    });
+    resizeObserver.observe(container);
+
+    // Múltiplos disparos para cobrir o ciclo de renderização e montagem do Dialog no Portal
+    const rafId = requestAnimationFrame(measureSize);
+    const t1 = setTimeout(measureSize, 50);
+    const t2 = setTimeout(measureSize, 200);
+
+    window.addEventListener('resize', measureSize);
+
+    return () => {
+      resizeObserver.disconnect();
+      cancelAnimationFrame(rafId);
+      clearTimeout(t1);
+      clearTimeout(t2);
+      window.removeEventListener('resize', measureSize);
+    };
   }, [isFullscreen]);
 
   // Conversões de Coordenadas: Tela <-> Mundo
@@ -1880,8 +1911,9 @@ export const QuestionWhiteboard: React.FC<QuestionWhiteboardProps> = ({ question
         sx={{
           position: 'relative',
           width: '100%',
-          height: isFullscreen ? 'calc(100vh - 135px)' : 520,
-          flex: isFullscreen ? 1 : undefined,
+          height: isFullscreen ? '100%' : 520,
+          flex: isFullscreen ? '1 1 0px' : undefined,
+          minHeight: isFullscreen ? 300 : 520,
           cursor:
             isHoveringRotationHandle || isRotatingElement
               ? ROTATE_CURSOR
@@ -1998,12 +2030,15 @@ export const QuestionWhiteboard: React.FC<QuestionWhiteboardProps> = ({ question
           fullScreen
           open={isFullscreen}
           onClose={() => setIsFullscreen(false)}
+          transitionDuration={0}
           PaperProps={{
             sx: {
               backgroundColor: isDark ? '#161a20' : '#FFFFFF',
               overflow: 'hidden',
               display: 'flex',
               flexDirection: 'column',
+              width: '100vw',
+              height: '100vh',
             },
           }}
         >
