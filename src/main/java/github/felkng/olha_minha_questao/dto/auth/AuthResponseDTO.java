@@ -16,4 +16,14 @@ public class AuthResponseDTO {
     private String name;
     private String email;
     private UserRole role;
+
+    public github.felkng.olha_minha_questao.dto.user.UserSummaryDTO getUser() {
+        if (id == null) return null;
+        return github.felkng.olha_minha_questao.dto.user.UserSummaryDTO.builder()
+                .id(id)
+                .name(name)
+                .email(email)
+                .role(role)
+                .build();
+    }
 }
