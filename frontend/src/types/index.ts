@@ -38,6 +38,38 @@ export interface Subject {
   areaName?: string;
 }
 
+export type UserRole = 'GENERAL' | 'ADMIN';
+
+export interface UserSummary {
+  id: number;
+  name: string;
+  email: string;
+  role: UserRole;
+}
+
+export interface AuthResponse {
+  user: UserSummary;
+  token?: string;
+}
+
+export interface DailyActivity {
+  date: string;
+  count: number;
+}
+
+export interface UserProfile {
+  id: number;
+  name: string;
+  email: string;
+  role: UserRole;
+  createdAt: string;
+  totalResolved: number;
+  easyAccuracy: number;
+  mediumAccuracy: number;
+  hardAccuracy: number;
+  dailyActivities: DailyActivity[];
+}
+
 export interface Test {
   id: number;
   name: string;
@@ -46,6 +78,7 @@ export interface Test {
   originName?: string;
   areaId?: number;
   areaName?: string;
+  createdByUser?: UserSummary;
 }
 
 export interface Question {
@@ -71,6 +104,7 @@ export interface Question {
   difficultyLevel?: DifficultyLevel;
   accuracyPercentage?: number;
   totalAttempts?: number;
+  createdByUser?: UserSummary;
 }
 
 export interface FilterState {
@@ -95,6 +129,7 @@ export interface Folder {
   testCount?: number;
   createdAt?: string;
   updatedAt?: string;
+  createdByUser?: UserSummary;
 }
 
 export interface SavedQuestion {
