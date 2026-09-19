@@ -1011,11 +1011,16 @@ export const QuestionWhiteboard: React.FC<QuestionWhiteboardProps> = ({ question
         }
       }
 
-      // Desmarcar seleção com Escape
+      // Desmarcar seleção com Escape ou sair da tela cheia
       if (e.key === 'Escape') {
         if (selectedElementId) {
           e.preventDefault();
           setSelectedElementId(null);
+          return;
+        }
+        if (isFullscreen) {
+          e.preventDefault();
+          setIsFullscreen(false);
           return;
         }
       }
@@ -1094,6 +1099,7 @@ export const QuestionWhiteboard: React.FC<QuestionWhiteboardProps> = ({ question
     selectedElementId,
     textDialogOpen,
     shortcutsDialogOpen,
+    isFullscreen,
     handleDeleteSelected,
     handleUndo,
     handleRedo,
@@ -1456,16 +1462,30 @@ export const QuestionWhiteboard: React.FC<QuestionWhiteboardProps> = ({ question
     setIsHoveringSelectedElement(false);
   };
 
+  // Bloqueia scroll da página durante o modo tela cheia
+  useEffect(() => {
+    if (isFullscreen) {
+      const originalOverflow = document.body.style.overflow;
+      document.body.style.overflow = 'hidden';
+      return () => {
+        document.body.style.overflow = originalOverflow;
+      };
+    }
+  }, [isFullscreen]);
+
   // Suporte a Zoom com a Roda do Mouse (sem propagar scroll para a página externa)
   useEffect(() => {
+    const canvas = canvasRef.current;
     const container = containerRef.current;
-    if (!container) return;
+    if (!canvas && !container) return;
 
     const onWheel = (e: WheelEvent) => {
       e.preventDefault();
       e.stopPropagation();
 
-      const rect = container.getBoundingClientRect();
+      const target = canvas || container;
+      if (!target) return;
+      const rect = target.getBoundingClientRect();
       const screenX = e.clientX - rect.left;
       const screenY = e.clientY - rect.top;
 
@@ -1473,9 +1493,12 @@ export const QuestionWhiteboard: React.FC<QuestionWhiteboardProps> = ({ question
       handleZoom(zoomFactor, { x: screenX, y: screenY });
     };
 
-    container.addEventListener('wheel', onWheel, { passive: false });
+    if (canvas) canvas.addEventListener('wheel', onWheel, { passive: false });
+    if (container) container.addEventListener('wheel', onWheel, { passive: false });
+
     return () => {
-      container.removeEventListener('wheel', onWheel);
+      if (canvas) canvas.removeEventListener('wheel', onWheel);
+      if (container) container.removeEventListener('wheel', onWheel);
     };
   }, [isFullscreen, handleZoom]);
 
@@ -1520,7 +1543,9 @@ export const QuestionWhiteboard: React.FC<QuestionWhiteboardProps> = ({ question
       sx={{
         display: 'flex',
         flexDirection: 'column',
-        height: isFullscreen ? '100vh' : 'auto',
+        height: '100%',
+        width: '100%',
+        flex: 1,
         overflow: 'hidden',
         backgroundColor: 'background.paper',
       }}
@@ -1545,11 +1570,6 @@ export const QuestionWhiteboard: React.FC<QuestionWhiteboardProps> = ({ question
             <BrushIcon fontSize="small" sx={{ color: PALETTE_COLORS.primary }} />
             Lousa de Raciocínio {isFullscreen && '(Tela Cheia)'}
           </Typography>
-          <Chip
-            size="small"
-            variant="outlined"
-            sx={{ fontSize: '0.7rem', height: 20 }}
-          />
           <Tooltip title="Ver lista completa de atalhos de teclado (?)">
             <Button
               size="small"
@@ -1961,7 +1981,7 @@ export const QuestionWhiteboard: React.FC<QuestionWhiteboardProps> = ({ question
           width: '100%',
           height: isFullscreen ? '100%' : 520,
           flex: isFullscreen ? '1 1 0px' : undefined,
-          minHeight: isFullscreen ? 300 : 520,
+          minHeight: isFullscreen ? 0 : 520,
           cursor:
             isHoveringRotationHandle || isRotatingElement
               ? ROTATE_CURSOR
@@ -2206,13 +2226,13 @@ export const QuestionWhiteboard: React.FC<QuestionWhiteboardProps> = ({ question
     </Box>
   );
 
-  if (isFullscreen) {
-    return (
-      <>
+  return (
+    <>
+      {isFullscreen && (
         <Paper
-          elevation={2}
+          elevation={1}
           sx={{
-            p: 3,
+            p: 4,
             textAlign: 'center',
             borderRadius: 3,
             border: '1px dashed',
@@ -2225,7 +2245,7 @@ export const QuestionWhiteboard: React.FC<QuestionWhiteboardProps> = ({ question
             A Lousa de Raciocínio está aberta em Tela Cheia
           </Typography>
           <Typography variant="body2" sx={{ color: 'text.secondary', mb: 2 }}>
-            Pressione Esc ou clique no botão abaixo para retornar à visualização padrão na página.
+            Pressione Esc ou clique no botão 'Sair' no canto superior direito para retornar.
           </Typography>
           <Button
             variant="outlined"
@@ -2236,43 +2256,40 @@ export const QuestionWhiteboard: React.FC<QuestionWhiteboardProps> = ({ question
             Sair da Tela Cheia
           </Button>
         </Paper>
+      )}
 
-        <Dialog
-          fullScreen
-          open={isFullscreen}
-          onClose={() => setIsFullscreen(false)}
-          transitionDuration={0}
-          PaperProps={{
-            sx: {
-              backgroundColor: isDark ? '#161a20' : '#FFFFFF',
-              overflow: 'hidden',
-              display: 'flex',
-              flexDirection: 'column',
-              width: '100vw',
-              height: '100vh',
-            },
-          }}
-        >
-          {whiteboardBody}
-        </Dialog>
-      </>
-    );
-  }
-
-  return (
-    <Paper
-      elevation={3}
-      sx={{
-        borderRadius: 3,
-        border: '1px solid',
-        borderColor: 'divider',
-        overflow: 'hidden',
-        backgroundColor: 'background.paper',
-        mb: 4,
-      }}
-    >
-      {whiteboardBody}
-    </Paper>
+      <Paper
+        elevation={isFullscreen ? 24 : 3}
+        sx={{
+          display: 'flex',
+          flexDirection: 'column',
+          overflow: 'hidden',
+          backgroundColor: 'background.paper',
+          ...(isFullscreen
+            ? {
+                position: 'fixed',
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                width: '100vw',
+                height: '100vh',
+                zIndex: 1400,
+                borderRadius: 0,
+                border: 'none',
+                m: 0,
+              }
+            : {
+                borderRadius: 3,
+                border: '1px solid',
+                borderColor: 'divider',
+                mb: 4,
+              }),
+        }}
+      >
+        {whiteboardBody}
+      </Paper>
+    </>
   );
 };
 
