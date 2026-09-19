@@ -12,6 +12,7 @@ import {
   Chip,
   Stack,
   Typography,
+  Autocomplete,
 } from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
 import ClearIcon from '@mui/icons-material/Clear';
@@ -168,96 +169,80 @@ export const SearchBar: React.FC<SearchBarProps> = ({
           </FormControl>
 
           {/* Banca / Origem */}
-          <FormControl size="small" fullWidth>
-            <InputLabel id="origin-select-label">Banca / Origem</InputLabel>
-            <Select
-              labelId="origin-select-label"
-              label="Banca / Origem"
-              value={filters.originId}
-              onChange={(e) =>
-                onFilterChange({
-                  ...filters,
-                  originId: e.target.value as number | '',
-                })
-              }
-            >
-              <MenuItem value="">Todas as Bancas</MenuItem>
-              {origins.map((orig) => (
-                <MenuItem key={orig.id} value={orig.id}>
-                  {orig.name}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
+          <Autocomplete
+            size="small"
+            fullWidth
+            options={origins}
+            getOptionLabel={(option) => (typeof option === 'string' ? option : option.name)}
+            value={origins.find((orig) => orig.id === filters.originId) || null}
+            onChange={(_e, newValue) => {
+              onFilterChange({
+                ...filters,
+                originId: newValue ? newValue.id : '',
+              });
+            }}
+            isOptionEqualToValue={(option, value) => option.id === value.id}
+            renderInput={(params) => (
+              <TextField {...params} label="Banca / Origem" placeholder="Todas as bancas" />
+            )}
+          />
 
           {/* Área do Conhecimento */}
-          <FormControl size="small" fullWidth>
-            <InputLabel id="area-select-label">Área</InputLabel>
-            <Select
-              labelId="area-select-label"
-              label="Área"
-              value={filters.areaId}
-              onChange={(e) =>
-                onFilterChange({
-                  ...filters,
-                  areaId: e.target.value as number | '',
-                })
-              }
-            >
-              <MenuItem value="">Todas as Áreas</MenuItem>
-              {areas.map((area) => (
-                <MenuItem key={area.id} value={area.id}>
-                  {area.name}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
+          <Autocomplete
+            size="small"
+            fullWidth
+            options={areas}
+            getOptionLabel={(option) => (typeof option === 'string' ? option : option.name)}
+            value={areas.find((area) => area.id === filters.areaId) || null}
+            onChange={(_e, newValue) => {
+              onFilterChange({
+                ...filters,
+                areaId: newValue ? newValue.id : '',
+              });
+            }}
+            isOptionEqualToValue={(option, value) => option.id === value.id}
+            renderInput={(params) => (
+              <TextField {...params} label="Área" placeholder="Todas as áreas" />
+            )}
+          />
 
           {/* Ano */}
-          <FormControl size="small" fullWidth>
-            <InputLabel id="year-select-label">Ano</InputLabel>
-            <Select
-              labelId="year-select-label"
-              label="Ano"
-              value={filters.year}
-              onChange={(e) =>
-                onFilterChange({
-                  ...filters,
-                  year: e.target.value as number | '',
-                })
-              }
-            >
-              <MenuItem value="">Todos os Anos</MenuItem>
-              {[2024, 2023, 2022, 2021, 2020].map((yr) => (
-                <MenuItem key={yr} value={yr}>
-                  {yr}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
+          <Autocomplete
+            size="small"
+            fullWidth
+            options={[2026, 2025, 2024, 2023, 2022, 2021, 2020, 2019, 2018]}
+            getOptionLabel={(option) => String(option)}
+            value={filters.year !== '' ? Number(filters.year) : null}
+            onChange={(_e, newValue) => {
+              onFilterChange({
+                ...filters,
+                year: newValue !== null ? newValue : '',
+              });
+            }}
+            isOptionEqualToValue={(option, value) => option === value}
+            renderInput={(params) => (
+              <TextField {...params} label="Ano" placeholder="Todos os anos" />
+            )}
+          />
 
           {/* Prova Específica */}
-          <FormControl size="small" fullWidth>
-            <InputLabel id="test-select-label">Prova</InputLabel>
-            <Select
-              labelId="test-select-label"
-              label="Prova"
-              value={filters.testId}
-              onChange={(e) =>
-                onFilterChange({
-                  ...filters,
-                  testId: e.target.value as number | '',
-                })
-              }
-            >
-              <MenuItem value="">Todas as Provas</MenuItem>
-              {tests.map((t) => (
-                <MenuItem key={t.id} value={t.id}>
-                  {t.name}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
+          <Autocomplete
+            size="small"
+            fullWidth
+            options={tests}
+            getOptionLabel={(option) => (typeof option === 'string' ? option : option.name)}
+            value={tests.find((t) => t.id === filters.testId) || null}
+            onChange={(_e, newValue) => {
+              onFilterChange({
+                ...filters,
+                testId: newValue ? newValue.id : '',
+              });
+            }}
+            isOptionEqualToValue={(option, value) => option.id === value.id}
+            renderInput={(params) => (
+              <TextField {...params} label="Prova" placeholder="Todas as provas" />
+            )}
+          />
         </Box>
 
         {/* Active Filter Chips & Results Count */}
