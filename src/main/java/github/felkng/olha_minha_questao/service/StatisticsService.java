@@ -7,12 +7,14 @@ import github.felkng.olha_minha_questao.domain.entity.QuestionStatistic;
 import github.felkng.olha_minha_questao.domain.entity.Test;
 import github.felkng.olha_minha_questao.domain.entity.TestAttempt;
 import github.felkng.olha_minha_questao.domain.entity.TestStatistic;
+import github.felkng.olha_minha_questao.domain.entity.User;
 import github.felkng.olha_minha_questao.domain.repository.QuestionAttemptRepository;
 import github.felkng.olha_minha_questao.domain.repository.QuestionRepository;
 import github.felkng.olha_minha_questao.domain.repository.QuestionStatisticRepository;
 import github.felkng.olha_minha_questao.domain.repository.TestAttemptRepository;
 import github.felkng.olha_minha_questao.domain.repository.TestRepository;
 import github.felkng.olha_minha_questao.domain.repository.TestStatisticRepository;
+import github.felkng.olha_minha_questao.domain.repository.UserRepository;
 import github.felkng.olha_minha_questao.dto.question.QuestionAttemptRequestDTO;
 import github.felkng.olha_minha_questao.dto.question.QuestionAttemptResponseDTO;
 import github.felkng.olha_minha_questao.dto.test.TestSubmissionRequestDTO;
@@ -35,11 +37,17 @@ public class StatisticsService {
     private final TestRepository testRepository;
     private final TestAttemptRepository testAttemptRepository;
     private final TestStatisticRepository testStatisticRepository;
+    private final UserRepository userRepository;
 
     @Transactional
     public QuestionAttemptResponseDTO registerQuestionAttempt(Long questionId, QuestionAttemptRequestDTO dto) {
         Question question = questionRepository.findById(questionId)
                 .orElseThrow(() -> new ResourceNotFoundException("Questão não encontrada com o id: " + questionId));
+
+        User user = null;
+        if (dto.getUserId() != null) {
+            user = userRepository.findById(dto.getUserId()).orElse(null);
+        }
 
         boolean isCorrect = false;
         if (dto.getSelectedAlternativeId() != null && question.getCorrectAlternative() != null) {
@@ -49,6 +57,11 @@ public class StatisticsService {
         boolean isFirstAttempt = true;
         if (dto.getIsFirstAttempt() != null) {
             isFirstAttempt = dto.getIsFirstAttempt();
+        } else if (user != null) {
+            boolean alreadyAttemptedByUser = questionAttemptRepository.existsByQuestionIdAndUserId(questionId, user.getId());
+            if (alreadyAttemptedByUser) {
+                isFirstAttempt = false;
+            }
         } else if (dto.getSessionId() != null && !dto.getSessionId().isBlank()) {
             boolean alreadyAttemptedInSession = questionAttemptRepository.existsByQuestionIdAndSessionId(questionId, dto.getSessionId());
             if (alreadyAttemptedInSession) {
@@ -58,6 +71,7 @@ public class StatisticsService {
 
         QuestionAttempt attempt = QuestionAttempt.builder()
                 .question(question)
+                .user(user)
                 .selectedAlternative(dto.getSelectedAlternativeId() != null ?
                         question.getAlternatives().stream()
                                 .filter(a -> a.getId().equals(dto.getSelectedAlternativeId()))
