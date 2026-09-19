@@ -17,7 +17,22 @@ import java.util.List;
 public class AreaService {
 
     private final AreaRepository areaRepository;
+    private final github.felkng.olha_minha_questao.domain.repository.QuestionRepository questionRepository;
+    private final github.felkng.olha_minha_questao.domain.repository.TestRepository testRepository;
     private final AreaMapper areaMapper;
+
+    @Transactional(readOnly = true)
+    public java.util.List<github.felkng.olha_minha_questao.dto.area.AreaCardDTO> findAreaCards() {
+        return areaRepository.findAllByOrderByNameAsc().stream()
+                .map(area -> github.felkng.olha_minha_questao.dto.area.AreaCardDTO.builder()
+                        .id(area.getId())
+                        .name(area.getName())
+                        .description(area.getDescription())
+                        .questionCount(questionRepository.countByAreaId(area.getId()))
+                        .testCount(testRepository.countByAreaId(area.getId()))
+                        .build())
+                .toList();
+    }
 
     @Transactional(readOnly = true)
     public List<AreaResponseDTO> findAll() {
