@@ -10,4 +10,5 @@ import java.util.Optional;
 public interface AreaRepository extends JpaRepository<Area, Long> {
     Optional<Area> findByNameIgnoreCase(String name);
     boolean existsByNameIgnoreCase(String name);
+    java.util.List<Area> findAllByOrderByNameAsc();
 }
