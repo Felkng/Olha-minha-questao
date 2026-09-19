@@ -48,6 +48,10 @@ public class Folder {
     @Builder.Default
     private FolderType folderType = FolderType.QUESTION;
 
+    @jakarta.persistence.ManyToOne(fetch = jakarta.persistence.FetchType.LAZY)
+    @jakarta.persistence.JoinColumn(name = "created_by_user_id")
+    private User createdByUser;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
