@@ -12,6 +12,7 @@ import {
   MenuItem,
   ListItemIcon,
   ListItemText,
+  Stack,
 } from '@mui/material';
 import DarkModeOutlinedIcon from '@mui/icons-material/DarkModeOutlined';
 import LightModeOutlinedIcon from '@mui/icons-material/LightModeOutlined';
@@ -23,6 +24,8 @@ import FolderSpecialOutlinedIcon from '@mui/icons-material/FolderSpecialOutlined
 import AddIcon from '@mui/icons-material/Add';
 import MenuBookIcon from '@mui/icons-material/MenuBook';
 import ClassIcon from '@mui/icons-material/Class';
+import PersonIcon from '@mui/icons-material/Person';
+import LogoutIcon from '@mui/icons-material/Logout';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAppTheme } from '../../theme/ThemeContext';
 import { PALETTE_COLORS } from '../../theme/theme';
@@ -31,15 +34,27 @@ import { CreateTestModal } from '../crud/CreateTestModal';
 import { CreateOriginModal } from '../crud/CreateOriginModal';
 import { CreateAreaModal } from '../crud/CreateAreaModal';
 import { CreateSubjectModal } from '../crud/CreateSubjectModal';
+import { useAuth } from '../../context/AuthContext';
+import { LoginModal } from '../auth/LoginModal';
+import { RegisterModal } from '../auth/RegisterModal';
+import { Avatar, Chip } from '@mui/material';
 
 export const Navbar: React.FC = () => {
   const { mode, toggleColorMode } = useAppTheme();
   const isDark = mode === 'dark';
   const location = useLocation();
   const navigate = useNavigate();
+  const { user, logout } = useAuth();
 
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const openMenu = Boolean(anchorEl);
+
+  const [userMenuAnchor, setUserMenuAnchor] = useState<null | HTMLElement>(null);
+  const openUserMenu = Boolean(userMenuAnchor);
+
+  // Auth Modals
+  const [openLogin, setOpenLogin] = useState(false);
+  const [openRegister, setOpenRegister] = useState(false);
 
   // Modais de Criação
   const [openCreateQuestion, setOpenCreateQuestion] = useState(false);
@@ -68,12 +83,26 @@ export const Navbar: React.FC = () => {
   const activeTab = getActiveTab();
 
   const handleOpenMenu = (event: React.MouseEvent<HTMLElement>) => {
+    if (!user) {
+      setOpenLogin(true);
+      return;
+    }
     setAnchorEl(event.currentTarget);
   };
 
   const handleCloseMenu = () => {
     setAnchorEl(null);
   };
+
+  const handleOpenUserMenu = (event: React.MouseEvent<HTMLElement>) => {
+    setUserMenuAnchor(event.currentTarget);
+  };
+
+  const handleCloseUserMenu = () => {
+    setUserMenuAnchor(null);
+  };
+
+  const isAdmin = user?.role === 'ADMIN';
 
   return (
     <AppBar position="sticky" color="inherit">
@@ -171,7 +200,7 @@ export const Navbar: React.FC = () => {
 
           <Box sx={{ flexGrow: { xs: 1, md: 0 } }} />
 
-          {/* Action Controls: Menu + Criar & Mode Toggle */}
+          {/* Action Controls: Menu + Criar, Auth Controls & Mode Toggle */}
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
             <Button
               variant="contained"
@@ -208,6 +237,7 @@ export const Navbar: React.FC = () => {
                 </ListItemIcon>
                 <ListItemText primary="Nova Questão" />
               </MenuItem>
+
               <MenuItem
                 onClick={() => {
                   handleCloseMenu();
@@ -219,40 +249,155 @@ export const Navbar: React.FC = () => {
                 </ListItemIcon>
                 <ListItemText primary="Nova Prova" />
               </MenuItem>
+
+              {isAdmin && (
+                <MenuItem
+                  onClick={() => {
+                    handleCloseMenu();
+                    setOpenCreateOrigin(true);
+                  }}
+                >
+                  <ListItemIcon>
+                    <AccountBalanceOutlinedIcon fontSize="small" />
+                  </ListItemIcon>
+                  <ListItemText primary="Nova Banca" />
+                </MenuItem>
+              )}
+
+              {isAdmin && (
+                <MenuItem
+                  onClick={() => {
+                    handleCloseMenu();
+                    setOpenCreateArea(true);
+                  }}
+                >
+                  <ListItemIcon>
+                    <CategoryOutlinedIcon fontSize="small" />
+                  </ListItemIcon>
+                  <ListItemText primary="Nova Área" />
+                </MenuItem>
+              )}
+
+              {isAdmin && (
+                <MenuItem
+                  onClick={() => {
+                    handleCloseMenu();
+                    setOpenCreateSubject(true);
+                  }}
+                >
+                  <ListItemIcon>
+                    <ClassIcon fontSize="small" />
+                  </ListItemIcon>
+                  <ListItemText primary="Nova Matéria" />
+                </MenuItem>
+              )}
+
               <MenuItem
                 onClick={() => {
                   handleCloseMenu();
-                  setOpenCreateOrigin(true);
+                  navigate('/pastas');
                 }}
               >
                 <ListItemIcon>
-                  <AccountBalanceOutlinedIcon fontSize="small" />
+                  <FolderSpecialOutlinedIcon fontSize="small" />
                 </ListItemIcon>
-                <ListItemText primary="Nova Banca" />
-              </MenuItem>
-              <MenuItem
-                onClick={() => {
-                  handleCloseMenu();
-                  setOpenCreateArea(true);
-                }}
-              >
-                <ListItemIcon>
-                  <CategoryOutlinedIcon fontSize="small" />
-                </ListItemIcon>
-                <ListItemText primary="Nova Área" />
-              </MenuItem>
-              <MenuItem
-                onClick={() => {
-                  handleCloseMenu();
-                  setOpenCreateSubject(true);
-                }}
-              >
-                <ListItemIcon>
-                  <ClassIcon fontSize="small" />
-                </ListItemIcon>
-                <ListItemText primary="Nova Matéria" />
+                <ListItemText primary="Nova Pasta" />
               </MenuItem>
             </Menu>
+
+            {/* Auth Buttons / Profile Menu */}
+            {user ? (
+              <>
+                <Button
+                  onClick={handleOpenUserMenu}
+                  sx={{
+                    textTransform: 'none',
+                    borderRadius: 2,
+                    py: 0.5,
+                    px: 1.5,
+                    border: '1px solid',
+                    borderColor: 'divider',
+                  }}
+                  startIcon={
+                    <Avatar
+                      sx={{
+                        width: 28,
+                        height: 28,
+                        fontSize: '0.85rem',
+                        bgcolor: 'secondary.main',
+                      }}
+                    >
+                      {user.name.charAt(0).toUpperCase()}
+                    </Avatar>
+                  }
+                >
+                  <Box sx={{ textAlign: 'left', display: { xs: 'none', sm: 'block' } }}>
+                    <Typography variant="body2" fontWeight="bold" lineHeight={1.2}>
+                      {user.name}
+                    </Typography>
+                    <Chip
+                      label={user.role}
+                      size="small"
+                      color={user.role === 'ADMIN' ? 'error' : 'secondary'}
+                      sx={{ height: 16, fontSize: '0.65rem', fontWeight: 'bold' }}
+                    />
+                  </Box>
+                </Button>
+
+                <Menu
+                  anchorEl={userMenuAnchor}
+                  open={openUserMenu}
+                  onClose={handleCloseUserMenu}
+                  PaperProps={{
+                    elevation: 4,
+                    sx: { borderRadius: 2, mt: 1, minWidth: 160 },
+                  }}
+                >
+                  <MenuItem
+                    onClick={() => {
+                      handleCloseUserMenu();
+                      navigate(`/perfil/${user.id}`);
+                    }}
+                  >
+                    <ListItemIcon>
+                      <PersonIcon fontSize="small" />
+                    </ListItemIcon>
+                    <ListItemText primary="Meu Perfil" />
+                  </MenuItem>
+                  <MenuItem
+                    onClick={() => {
+                      handleCloseUserMenu();
+                      logout();
+                    }}
+                  >
+                    <ListItemIcon>
+                      <LogoutIcon fontSize="small" />
+                    </ListItemIcon>
+                    <ListItemText primary="Sair" />
+                  </MenuItem>
+                </Menu>
+              </>
+            ) : (
+              <Stack direction="row" spacing={1}>
+                <Button
+                  variant="outlined"
+                  size="small"
+                  onClick={() => setOpenLogin(true)}
+                  sx={{ fontWeight: 600, borderRadius: 2 }}
+                >
+                  Entrar
+                </Button>
+                <Button
+                  variant="contained"
+                  color="secondary"
+                  size="small"
+                  onClick={() => setOpenRegister(true)}
+                  sx={{ fontWeight: 600, borderRadius: 2 }}
+                >
+                  Cadastrar
+                </Button>
+              </Stack>
+            )}
 
             <Tooltip title={isDark ? 'Mudar para Modo Claro' : 'Mudar para Modo Escuro'}>
               <IconButton
@@ -274,6 +419,18 @@ export const Navbar: React.FC = () => {
           </Box>
         </Toolbar>
       </Container>
+
+      {/* Auth Modals */}
+      <LoginModal
+        open={openLogin}
+        onClose={() => setOpenLogin(false)}
+        onSwitchToRegister={() => setOpenRegister(true)}
+      />
+      <RegisterModal
+        open={openRegister}
+        onClose={() => setOpenRegister(false)}
+        onSwitchToLogin={() => setOpenLogin(true)}
+      />
 
       {/* Modais de Criação */}
       <CreateQuestionModal
