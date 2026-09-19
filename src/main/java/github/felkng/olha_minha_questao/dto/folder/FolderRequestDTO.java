@@ -1,5 +1,6 @@
 package github.felkng.olha_minha_questao.dto.folder;
 
+import github.felkng.olha_minha_questao.domain.entity.FolderType;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
@@ -23,4 +24,7 @@ public class FolderRequestDTO {
 
     @Builder.Default
     private String color = "#d9b763";
+
+    @Builder.Default
+    private FolderType folderType = FolderType.QUESTION;
 }

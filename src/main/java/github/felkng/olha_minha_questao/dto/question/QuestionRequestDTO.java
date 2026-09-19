@@ -38,6 +38,8 @@ public class QuestionRequestDTO {
     @NotNull(message = "O ID da área é obrigatório")
     private Long areaId;
 
+    private Long subjectId;
+
     private Long testId;
 
     private Long correctAlternativeId;

@@ -3,6 +3,7 @@ package github.felkng.olha_minha_questao.dto.question;
 import github.felkng.olha_minha_questao.dto.alternative.AlternativeResponseDTO;
 import github.felkng.olha_minha_questao.dto.area.AreaResponseDTO;
 import github.felkng.olha_minha_questao.dto.origin.OriginResponseDTO;
+import github.felkng.olha_minha_questao.dto.subject.SubjectResponseDTO;
 import github.felkng.olha_minha_questao.dto.test.TestResponseDTO;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -26,6 +27,7 @@ public class QuestionResponseDTO {
     private Integer year;
     private OriginResponseDTO origin;
     private AreaResponseDTO area;
+    private SubjectResponseDTO subject;
     private TestResponseDTO test;
     @Builder.Default
     private List<AlternativeResponseDTO> alternatives = new ArrayList<>();

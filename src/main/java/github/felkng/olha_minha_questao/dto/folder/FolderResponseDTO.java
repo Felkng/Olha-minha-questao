@@ -1,5 +1,6 @@
 package github.felkng.olha_minha_questao.dto.folder;
 
+import github.felkng.olha_minha_questao.domain.entity.FolderType;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -18,7 +19,9 @@ public class FolderResponseDTO {
     private String name;
     private String description;
     private String color;
+    private FolderType folderType;
     private long questionCount;
+    private long testCount;
     private Instant createdAt;
     private Instant updatedAt;
 }
