@@ -1,0 +1,1 @@
+ALTER TABLE question ADD COLUMN IF NOT EXISTS created_by_user_id BIGINT REFERENCES app_user(id) ON DELETE SET NULL;
