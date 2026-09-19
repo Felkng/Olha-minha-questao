@@ -7,7 +7,7 @@ import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 import org.mapstruct.MappingTarget;
 
-@Mapper(componentModel = "spring", uses = {OriginMapper.class, AreaMapper.class, SubjectMapper.class, TestMapper.class, AlternativeMapper.class})
+@Mapper(componentModel = "spring", uses = {OriginMapper.class, AreaMapper.class, SubjectMapper.class, TestMapper.class, AlternativeMapper.class, UserMapper.class})
 public interface QuestionMapper {
 
     @Mapping(target = "id", ignore = true)
@@ -15,6 +15,7 @@ public interface QuestionMapper {
     @Mapping(target = "area", ignore = true)
     @Mapping(target = "subject", ignore = true)
     @Mapping(target = "test", ignore = true)
+    @Mapping(target = "createdByUser", ignore = true)
     @Mapping(target = "images", ignore = true)
     @Mapping(target = "correctAlternative", ignore = true)
     @Mapping(target = "statistic", ignore = true)
@@ -34,6 +35,7 @@ public interface QuestionMapper {
     @Mapping(target = "area", ignore = true)
     @Mapping(target = "subject", ignore = true)
     @Mapping(target = "test", ignore = true)
+    @Mapping(target = "createdByUser", ignore = true)
     @Mapping(target = "images", ignore = true)
     @Mapping(target = "correctAlternative", ignore = true)
     @Mapping(target = "statistic", ignore = true)
