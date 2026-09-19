@@ -1,6 +1,6 @@
 MVN = ./mvnw
 
-.PHONY: build up down logs status \
+.PHONY: build up down logs status seed \
         clean compile test package package-all run \
         mvn-clean mvn-compile mvn-test mvn-package mvn-package-all mvn-run \
         frontend-install frontend-dev frontend-build
@@ -29,6 +29,11 @@ logs:
 # Exibe o status dos containers
 status:
 	docker compose ps
+
+# Popula o banco de dados com dados iniciais (seed)
+seed:
+	docker compose exec -T db psql -U postgres -d olha_minha_questao < src/main/resources/db/seed.sql
+
 
 # ==========================================
 # Maven Commands
