@@ -1,0 +1,1 @@
+CREATE INDEX idx_question_statistic_accuracy ON question_statistic(first_attempt_accuracy);
