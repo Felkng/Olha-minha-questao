@@ -48,6 +48,10 @@ public class Test {
     @JoinColumn(name = "area_id")
     private Area area;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "created_by_user_id")
+    private User createdByUser;
+
     @OneToOne(mappedBy = "test", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private TestStatistic statistic;
 
