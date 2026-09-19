@@ -12,15 +12,12 @@ import { Navbar } from './components/Navbar';
 import { SearchBar } from './components/SearchBar';
 import { QuestionCard } from './components/QuestionCard';
 import { QuestionSkeleton } from './components/QuestionSkeleton';
-import { PaletteShowcase } from './components/PaletteShowcase';
 import { Area, FilterState, Origin, Question, Test } from './types';
 import { getAreas, getOrigins, getQuestions, getTests } from './services/api';
 import { PALETTE_COLORS } from './theme/theme';
 
 export const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<string>('questoes');
-  const [showSkeleton, setShowSkeleton] = useState<boolean>(false);
-  const [paletteOpen, setPaletteOpen] = useState<boolean>(false);
 
   const [questions, setQuestions] = useState<Question[]>([]);
   const [origins, setOrigins] = useState<Origin[]>([]);
@@ -37,8 +34,9 @@ export const App: React.FC = () => {
     testId: '',
   });
 
+  // Carrega opções de filtros e questões iniciais do backend
   useEffect(() => {
-    const fetchData = async () => {
+    const fetchInitialData = async () => {
       setIsLoading(true);
       try {
         const [qList, oList, aList, tList] = await Promise.all([
@@ -52,48 +50,67 @@ export const App: React.FC = () => {
         setAreas(aList);
         setTests(tList);
       } catch (err) {
-        console.error('Erro ao carregar dados:', err);
+        console.error('Erro ao carregar dados do backend:', err);
       } finally {
         setIsLoading(false);
       }
     };
 
-    fetchData();
+    fetchInitialData();
   }, []);
 
-  // Filtragem dinâmica
+  // Recarrega questões da API quando filtros específicos de servidor mudam
+  const handleFilterChange = async (newFilters: FilterState) => {
+    setFilters(newFilters);
+
+    // Se mudou banca, área, ano ou prova, consulta a API com os parâmetros
+    const needsServerFetch =
+      newFilters.originId !== filters.originId ||
+      newFilters.areaId !== filters.areaId ||
+      newFilters.testId !== filters.testId ||
+      newFilters.year !== filters.year;
+
+    if (needsServerFetch) {
+      setIsLoading(true);
+      try {
+        const qList = await getQuestions({
+          originId: newFilters.originId,
+          areaId: newFilters.areaId,
+          testId: newFilters.testId,
+          year: newFilters.year,
+        });
+        setQuestions(qList);
+      } catch (err) {
+        console.error('Erro ao filtrar questões:', err);
+      } finally {
+        setIsLoading(false);
+      }
+    }
+  };
+
+  // Filtragem dinâmica no cliente (busca textual e categoria)
   const filteredQuestions = useMemo(() => {
     return questions.filter((q) => {
-      // Busca textual no enunciado ou identificador
+      // Filtro de tipo (questões com ou sem prova)
+      if (filters.type === 'questions' && q.testId) {
+        // Mostra apenas questões avulsas se selecionado 'questions'
+        // ou todas dependendo do contexto
+      }
+      if (filters.type === 'tests' && !q.testId) {
+        return false;
+      }
+
+      // Busca textual no enunciado, identificador, banca ou área
       if (filters.search) {
         const searchLower = filters.search.toLowerCase();
         const matchesEnunciado = q.enunciado.toLowerCase().includes(searchLower);
         const matchesIdentifier = q.identifier.toLowerCase().includes(searchLower);
         const matchesOrigin = q.originName?.toLowerCase().includes(searchLower);
         const matchesArea = q.areaName?.toLowerCase().includes(searchLower);
-        if (!matchesEnunciado && !matchesIdentifier && !matchesOrigin && !matchesArea) {
+        const matchesTest = q.testName?.toLowerCase().includes(searchLower);
+        if (!matchesEnunciado && !matchesIdentifier && !matchesOrigin && !matchesArea && !matchesTest) {
           return false;
         }
-      }
-
-      // Filtro de Banca / Origem
-      if (filters.originId !== '' && q.originId !== filters.originId) {
-        return false;
-      }
-
-      // Filtro de Área
-      if (filters.areaId !== '' && q.areaId !== filters.areaId) {
-        return false;
-      }
-
-      // Filtro de Ano
-      if (filters.year !== '' && q.year !== filters.year) {
-        return false;
-      }
-
-      // Filtro de Prova
-      if (filters.testId !== '' && q.testId !== filters.testId) {
-        return false;
       }
 
       return true;
@@ -102,13 +119,10 @@ export const App: React.FC = () => {
 
   return (
     <Box sx={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
-      {/* Horizontal Navbar at top */}
+      {/* Horizontal Navbar at top with theme toggle only */}
       <Navbar
         activeTab={activeTab}
         onTabChange={setActiveTab}
-        showSkeleton={showSkeleton}
-        onToggleSkeleton={() => setShowSkeleton(!showSkeleton)}
-        onOpenPalette={() => setPaletteOpen(true)}
       />
 
       {/* Main Content Area */}
@@ -116,7 +130,7 @@ export const App: React.FC = () => {
         {/* Search & Multi-filter Bar */}
         <SearchBar
           filters={filters}
-          onFilterChange={setFilters}
+          onFilterChange={handleFilterChange}
           origins={origins}
           areas={areas}
           tests={tests}
@@ -133,13 +147,13 @@ export const App: React.FC = () => {
               {activeTab === 'areas' && 'Áreas do Conhecimento'}
             </Typography>
             <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-              Explore questões com filtros detalhados e resolução interativa
+              Questões reais integradas diretamente ao banco de dados com resolução interativa
             </Typography>
           </Box>
         </Box>
 
         {/* Question Cards or Loading Skeletons */}
-        {isLoading || showSkeleton ? (
+        {isLoading ? (
           <Stack spacing={0}>
             <QuestionSkeleton />
             <QuestionSkeleton />
@@ -170,7 +184,7 @@ export const App: React.FC = () => {
             <Button
               variant="outlined"
               onClick={() =>
-                setFilters({
+                handleFilterChange({
                   search: '',
                   type: 'all',
                   originId: '',
@@ -186,9 +200,6 @@ export const App: React.FC = () => {
           </Paper>
         )}
       </Container>
-
-      {/* Palette Showcase Drawer */}
-      <PaletteShowcase open={paletteOpen} onClose={() => setPaletteOpen(false)} />
 
       {/* Footer */}
       <Box
