@@ -6,11 +6,14 @@ import {
   Paper,
   Button,
   Stack,
+  Pagination,
 } from '@mui/material';
 import SearchOffIcon from '@mui/icons-material/SearchOff';
+import AddIcon from '@mui/icons-material/Add';
 import { SearchBar } from '../components/search/SearchBar';
 import { QuestionCard } from '../components/questions/QuestionCard';
 import { QuestionSkeleton } from '../components/questions/QuestionSkeleton';
+import { CreateQuestionModal } from '../components/crud/CreateQuestionModal';
 import { Area, FilterState, Origin, Question, Test } from '../types';
 import { getAreas, getOrigins, getQuestions, getTests } from '../services/api';
 import { PALETTE_COLORS } from '../theme/theme';
@@ -27,10 +30,15 @@ export const QuestionsPage: React.FC<QuestionsPageProps> = ({
   const [searchParams, setSearchParams] = useSearchParams();
 
   const [questions, setQuestions] = useState<Question[]>([]);
+  const [totalPages, setTotalPages] = useState<number>(1);
+  const [totalElements, setTotalElements] = useState<number>(0);
+  const [page, setPage] = useState<number>(1); // 1-indexed for MUI Pagination
+
   const [origins, setOrigins] = useState<Origin[]>([]);
   const [areas, setAreas] = useState<Area[]>([]);
   const [tests, setTests] = useState<Test[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [createModalOpen, setCreateModalOpen] = useState<boolean>(false);
 
   // Parse filters from URL search params
   const filters: FilterState = useMemo(() => {
@@ -65,30 +73,35 @@ export const QuestionsPage: React.FC<QuestionsPageProps> = ({
     fetchMetadata();
   }, []);
 
-  // Fetch questions whenever filters change
-  useEffect(() => {
-    const fetchQuestions = async () => {
-      setIsLoading(true);
-      try {
-        const qList = await getQuestions({
-          originId: filters.originId,
-          areaId: filters.areaId,
-          testId: filters.testId,
-          year: filters.year,
-          difficulty: filters.difficulty,
-          search: filters.search,
-          sort: filters.sort,
-        });
-        setQuestions(qList);
-      } catch (err) {
-        console.error('Erro ao carregar questões:', err);
-      } finally {
-        setIsLoading(false);
-      }
-    };
+  const loadQuestionsData = async (currentPage: number) => {
+    setIsLoading(true);
+    try {
+      const pageRes = await getQuestions({
+        originId: filters.originId,
+        areaId: filters.areaId,
+        testId: filters.testId,
+        year: filters.year,
+        difficulty: filters.difficulty,
+        search: filters.search,
+        sort: filters.sort,
+        page: currentPage - 1, // API is 0-indexed
+        size: 5, // 5 questões por vez
+      });
+      setQuestions(pageRes.content);
+      setTotalPages(pageRes.totalPages || 1);
+      setTotalElements(pageRes.totalElements || 0);
+    } catch (err) {
+      console.error('Erro ao carregar questões:', err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
-    fetchQuestions();
+  // Fetch questions whenever filters or page changes
+  useEffect(() => {
+    loadQuestionsData(page);
   }, [
+    page,
     filters.originId,
     filters.areaId,
     filters.testId,
@@ -98,8 +111,8 @@ export const QuestionsPage: React.FC<QuestionsPageProps> = ({
     filters.sort,
   ]);
 
-  // Update URL search parameters when filters change
   const handleFilterChange = (newFilters: FilterState) => {
+    setPage(1); // Reset to page 1 on filter change
     const params: Record<string, string> = {};
     if (newFilters.search) params.search = newFilters.search;
     if (newFilters.type !== 'all') params.type = newFilters.type;
@@ -113,36 +126,40 @@ export const QuestionsPage: React.FC<QuestionsPageProps> = ({
     setSearchParams(params, { replace: true });
   };
 
-  // Client-side filtering if needed (e.g. type)
-  const filteredQuestions = useMemo(() => {
-    return questions.filter((q) => {
-      if (filters.type === 'tests' && !q.testId) {
-        return false;
-      }
-      return true;
-    });
-  }, [questions, filters.type]);
+  const handlePageChange = (_event: React.ChangeEvent<unknown>, value: number) => {
+    setPage(value);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
 
   return (
-    <Box>
+    <Box sx={{ mb: 6 }}>
       <SearchBar
         filters={filters}
         onFilterChange={handleFilterChange}
         origins={origins}
         areas={areas}
         tests={tests}
-        totalResults={filteredQuestions.length}
+        totalResults={totalElements}
       />
 
-      <Box sx={{ mb: 3, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+      <Box sx={{ mb: 3, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 2 }}>
         <Box>
-          <Typography variant="h5" sx={{ fontWeight: 700, color: 'text.primary' }}>
+          <Typography variant="h5" sx={{ fontWeight: 800, color: 'text.primary' }}>
             Banco de Questões
           </Typography>
           <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-            Questões reais em ordem decrescente, com filtros sincronizados na URL e resolução interativa
+            Exibindo 5 questões por página (Total: {totalElements} questões).
           </Typography>
         </Box>
+
+        <Button
+          variant="contained"
+          startIcon={<AddIcon />}
+          onClick={() => setCreateModalOpen(true)}
+          sx={{ fontWeight: 700, backgroundColor: PALETTE_COLORS.primary }}
+        >
+          Nova Questão
+        </Button>
       </Box>
 
       {isLoading ? (
@@ -151,17 +168,37 @@ export const QuestionsPage: React.FC<QuestionsPageProps> = ({
           <QuestionSkeleton />
           <QuestionSkeleton />
         </Stack>
-      ) : filteredQuestions.length > 0 ? (
-        <Stack spacing={0}>
-          {filteredQuestions.map((q) => (
-            <QuestionCard
-              key={q.id}
-              question={q}
-              onBookmarkClick={onBookmarkClick}
-              isSavedInAnyFolder={savedQuestionIds.has(q.id)}
+      ) : questions.length > 0 ? (
+        <Box>
+          <Stack spacing={0}>
+            {questions.map((q) => (
+              <QuestionCard
+                key={q.id}
+                question={q}
+                onBookmarkClick={onBookmarkClick}
+                isSavedInAnyFolder={savedQuestionIds.has(q.id)}
+              />
+            ))}
+          </Stack>
+
+          {/* Paginação de 5 em 5 */}
+          <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4, mb: 2 }}>
+            <Pagination
+              count={totalPages}
+              page={page}
+              onChange={handlePageChange}
+              color="primary"
+              size="large"
+              showFirstButton
+              showLastButton
+              sx={{
+                '& .MuiPaginationItem-root': {
+                  fontWeight: 700,
+                },
+              }}
             />
-          ))}
-        </Stack>
+          </Box>
+        </Box>
       ) : (
         <Paper
           elevation={4}
@@ -198,6 +235,12 @@ export const QuestionsPage: React.FC<QuestionsPageProps> = ({
           </Button>
         </Paper>
       )}
+
+      <CreateQuestionModal
+        open={createModalOpen}
+        onClose={() => setCreateModalOpen(false)}
+        onCreated={() => loadQuestionsData(page)}
+      />
     </Box>
   );
 };

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   AppBar,
   Toolbar,
@@ -8,6 +8,10 @@ import {
   IconButton,
   Tooltip,
   Container,
+  Menu,
+  MenuItem,
+  ListItemIcon,
+  ListItemText,
 } from '@mui/material';
 import DarkModeOutlinedIcon from '@mui/icons-material/DarkModeOutlined';
 import LightModeOutlinedIcon from '@mui/icons-material/LightModeOutlined';
@@ -16,15 +20,33 @@ import MenuBookOutlinedIcon from '@mui/icons-material/MenuBookOutlined';
 import AccountBalanceOutlinedIcon from '@mui/icons-material/AccountBalanceOutlined';
 import CategoryOutlinedIcon from '@mui/icons-material/CategoryOutlined';
 import FolderSpecialOutlinedIcon from '@mui/icons-material/FolderSpecialOutlined';
+import AddIcon from '@mui/icons-material/Add';
+import MenuBookIcon from '@mui/icons-material/MenuBook';
+import ClassIcon from '@mui/icons-material/Class';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAppTheme } from '../../theme/ThemeContext';
 import { PALETTE_COLORS } from '../../theme/theme';
+import { CreateQuestionModal } from '../crud/CreateQuestionModal';
+import { CreateTestModal } from '../crud/CreateTestModal';
+import { CreateOriginModal } from '../crud/CreateOriginModal';
+import { CreateAreaModal } from '../crud/CreateAreaModal';
+import { CreateSubjectModal } from '../crud/CreateSubjectModal';
 
 export const Navbar: React.FC = () => {
   const { mode, toggleColorMode } = useAppTheme();
   const isDark = mode === 'dark';
   const location = useLocation();
   const navigate = useNavigate();
+
+  const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
+  const openMenu = Boolean(anchorEl);
+
+  // Modais de Criação
+  const [openCreateQuestion, setOpenCreateQuestion] = useState(false);
+  const [openCreateTest, setOpenCreateTest] = useState(false);
+  const [openCreateOrigin, setOpenCreateOrigin] = useState(false);
+  const [openCreateArea, setOpenCreateArea] = useState(false);
+  const [openCreateSubject, setOpenCreateSubject] = useState(false);
 
   const navItems = [
     { id: 'questoes', path: '/questoes', label: 'Questões', icon: <QuizOutlinedIcon fontSize="small" /> },
@@ -44,6 +66,14 @@ export const Navbar: React.FC = () => {
   };
 
   const activeTab = getActiveTab();
+
+  const handleOpenMenu = (event: React.MouseEvent<HTMLElement>) => {
+    setAnchorEl(event.currentTarget);
+  };
+
+  const handleCloseMenu = () => {
+    setAnchorEl(null);
+  };
 
   return (
     <AppBar position="sticky" color="inherit">
@@ -141,8 +171,89 @@ export const Navbar: React.FC = () => {
 
           <Box sx={{ flexGrow: { xs: 1, md: 0 } }} />
 
-          {/* Right Action Controls: Light / Dark Mode Toggle ONLY */}
-          <Box sx={{ display: 'flex', alignItems: 'center' }}>
+          {/* Action Controls: Menu + Criar & Mode Toggle */}
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+            <Button
+              variant="contained"
+              startIcon={<AddIcon />}
+              onClick={handleOpenMenu}
+              sx={{
+                fontWeight: 700,
+                borderRadius: 2,
+                backgroundColor: PALETTE_COLORS.primary,
+                color: '#1a1e24',
+                '&:hover': { filter: 'brightness(0.9)' },
+              }}
+            >
+              Criar
+            </Button>
+
+            <Menu
+              anchorEl={anchorEl}
+              open={openMenu}
+              onClose={handleCloseMenu}
+              PaperProps={{
+                elevation: 4,
+                sx: { borderRadius: 2, mt: 1, minWidth: 180 },
+              }}
+            >
+              <MenuItem
+                onClick={() => {
+                  handleCloseMenu();
+                  setOpenCreateQuestion(true);
+                }}
+              >
+                <ListItemIcon>
+                  <QuizOutlinedIcon fontSize="small" />
+                </ListItemIcon>
+                <ListItemText primary="Nova Questão" />
+              </MenuItem>
+              <MenuItem
+                onClick={() => {
+                  handleCloseMenu();
+                  setOpenCreateTest(true);
+                }}
+              >
+                <ListItemIcon>
+                  <MenuBookIcon fontSize="small" />
+                </ListItemIcon>
+                <ListItemText primary="Nova Prova" />
+              </MenuItem>
+              <MenuItem
+                onClick={() => {
+                  handleCloseMenu();
+                  setOpenCreateOrigin(true);
+                }}
+              >
+                <ListItemIcon>
+                  <AccountBalanceOutlinedIcon fontSize="small" />
+                </ListItemIcon>
+                <ListItemText primary="Nova Banca" />
+              </MenuItem>
+              <MenuItem
+                onClick={() => {
+                  handleCloseMenu();
+                  setOpenCreateArea(true);
+                }}
+              >
+                <ListItemIcon>
+                  <CategoryOutlinedIcon fontSize="small" />
+                </ListItemIcon>
+                <ListItemText primary="Nova Área" />
+              </MenuItem>
+              <MenuItem
+                onClick={() => {
+                  handleCloseMenu();
+                  setOpenCreateSubject(true);
+                }}
+              >
+                <ListItemIcon>
+                  <ClassIcon fontSize="small" />
+                </ListItemIcon>
+                <ListItemText primary="Nova Matéria" />
+              </MenuItem>
+            </Menu>
+
             <Tooltip title={isDark ? 'Mudar para Modo Claro' : 'Mudar para Modo Escuro'}>
               <IconButton
                 onClick={toggleColorMode}
@@ -163,6 +274,33 @@ export const Navbar: React.FC = () => {
           </Box>
         </Toolbar>
       </Container>
+
+      {/* Modais de Criação */}
+      <CreateQuestionModal
+        open={openCreateQuestion}
+        onClose={() => setOpenCreateQuestion(false)}
+        onCreated={() => window.location.reload()}
+      />
+      <CreateTestModal
+        open={openCreateTest}
+        onClose={() => setOpenCreateTest(false)}
+        onCreated={() => window.location.reload()}
+      />
+      <CreateOriginModal
+        open={openCreateOrigin}
+        onClose={() => setOpenCreateOrigin(false)}
+        onCreated={() => window.location.reload()}
+      />
+      <CreateAreaModal
+        open={openCreateArea}
+        onClose={() => setOpenCreateArea(false)}
+        onCreated={() => window.location.reload()}
+      />
+      <CreateSubjectModal
+        open={openCreateSubject}
+        onClose={() => setOpenCreateSubject(false)}
+        onCreated={() => window.location.reload()}
+      />
     </AppBar>
   );
 };

@@ -2,12 +2,15 @@ import React, { useState } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { MainLayout } from './layouts/MainLayout';
 import { QuestionsPage } from './pages/QuestionsPage';
+import { QuestionDetailPage } from './pages/QuestionDetailPage';
 import { TestsPage } from './pages/TestsPage';
+import { TestDetailPage } from './pages/TestDetailPage';
 import { TestEvaluationPage } from './pages/TestEvaluationPage';
 import { OriginsPage } from './pages/OriginsPage';
 import { AreasPage } from './pages/AreasPage';
 import { CategoryQuestionsPage } from './pages/CategoryQuestionsPage';
 import { FoldersPage } from './pages/FoldersPage';
+import { FolderDetailPage } from './pages/FolderDetailPage';
 import { SaveToFolderModal } from './components/folders/SaveToFolderModal';
 import { Question } from './types';
 
@@ -29,8 +32,16 @@ export const App: React.FC = () => {
             path="/questoes"
             element={<QuestionsPage onBookmarkClick={handleOpenSaveModal} />}
           />
+          <Route
+            path="/questoes/:id"
+            element={<QuestionDetailPage onBookmarkClick={handleOpenSaveModal} />}
+          />
           <Route path="/provas" element={<TestsPage />} />
-          <Route path="/provas/:id" element={<TestEvaluationPage />} />
+          <Route
+            path="/provas/:id"
+            element={<TestDetailPage onBookmarkQuestion={handleOpenSaveModal} />}
+          />
+          <Route path="/provas/:id/avaliacao" element={<TestEvaluationPage />} />
           <Route path="/bancas" element={<OriginsPage />} />
           <Route
             path="/bancas/:id"
@@ -51,9 +62,10 @@ export const App: React.FC = () => {
               />
             }
           />
+          <Route path="/pastas" element={<FoldersPage />} />
           <Route
-            path="/pastas"
-            element={<FoldersPage onOpenSaveModal={handleOpenSaveModal} />}
+            path="/pastas/:id"
+            element={<FolderDetailPage onBookmarkQuestion={handleOpenSaveModal} />}
           />
           {/* Fallback to questoes */}
           <Route path="*" element={<Navigate to="/questoes" replace />} />
