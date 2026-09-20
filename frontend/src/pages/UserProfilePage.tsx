@@ -233,7 +233,7 @@ export const UserProfilePage: React.FC = () => {
         </Stack>
 
         <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-          Exibindo a frequência de resolução dos últimos 35 dias (estilo GitHub com a cor secundária do sistema).
+          Exibindo a frequência de resolução dos últimos 35 dias.
         </Typography>
 
         <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, justifyContent: 'flex-start' }}>
