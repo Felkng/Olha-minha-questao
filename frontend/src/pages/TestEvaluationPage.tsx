@@ -17,6 +17,8 @@ import {
   CircularProgress,
   IconButton,
   Tooltip,
+  TextField,
+  InputAdornment,
 } from '@mui/material';
 import TimerOutlinedIcon from '@mui/icons-material/TimerOutlined';
 import PauseCircleOutlineIcon from '@mui/icons-material/PauseCircleOutline';
@@ -26,6 +28,7 @@ import HighlightOffIcon from '@mui/icons-material/HighlightOff';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import EmojiEventsOutlinedIcon from '@mui/icons-material/EmojiEventsOutlined';
 import RestartAltIcon from '@mui/icons-material/RestartAlt';
+import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
 import { useParams, useNavigate } from 'react-router-dom';
 import { TestEvaluation, TestSubmissionResponse } from '../types';
 import { getTestEvaluation, submitTest } from '../services/api';
@@ -44,6 +47,9 @@ export const TestEvaluationPage: React.FC = () => {
   // Configuration state
   const [isStarted, setIsStarted] = useState<boolean>(false);
   const [timerMinutes, setTimerMinutes] = useState<number>(30); // 0 = Free Time
+  const [isCustomTimer, setIsCustomTimer] = useState<boolean>(false);
+  const [customHours, setCustomHours] = useState<number>(1);
+  const [customMinutes, setCustomMinutes] = useState<number>(0);
   const [timeRemaining, setTimeRemaining] = useState<number>(30 * 60);
   const [timeSpent, setTimeSpent] = useState<number>(0);
   const [isPaused, setIsPaused] = useState<boolean>(false);
@@ -105,8 +111,15 @@ export const TestEvaluationPage: React.FC = () => {
   }, [isStarted, isPaused, result, timerMinutes]);
 
   const handleStart = () => {
-    if (timerMinutes > 0) {
-      setTimeRemaining(timerMinutes * 60);
+    let effectiveMins = timerMinutes;
+    if (isCustomTimer) {
+      effectiveMins = Math.max(0, customHours * 60 + customMinutes);
+      setTimerMinutes(effectiveMins);
+    }
+    if (effectiveMins > 0) {
+      setTimeRemaining(effectiveMins * 60);
+    } else {
+      setTimeRemaining(0);
     }
     setTimeSpent(0);
     setIsStarted(true);
@@ -211,10 +224,10 @@ export const TestEvaluationPage: React.FC = () => {
         </Typography>
 
         <Typography variant="body2" sx={{ color: 'text.secondary', mb: 3 }}>
-          Escolha o tempo limite desejado para realizar a prova. Ao esgotar o tempo, a prova será submetida automaticamente.
+          Escolha o tempo limite desejado para realizar a prova ou defina um horário personalizado. Ao esgotar o tempo, a prova será submetida automaticamente e questões em branco contarão como erradas.
         </Typography>
 
-        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1.5, mb: 4 }}>
+        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1.5, mb: 3 }}>
           {[
             { label: '15 minutos', val: 15 },
             { label: '30 minutos', val: 30 },
@@ -226,23 +239,98 @@ export const TestEvaluationPage: React.FC = () => {
           ].map((item) => (
             <Button
               key={item.val}
-              variant={timerMinutes === item.val ? 'contained' : 'outlined'}
-              onClick={() => setTimerMinutes(item.val)}
+              variant={!isCustomTimer && timerMinutes === item.val ? 'contained' : 'outlined'}
+              onClick={() => {
+                setIsCustomTimer(false);
+                setTimerMinutes(item.val);
+              }}
               sx={{
                 borderRadius: 2,
                 px: 2.5,
                 py: 1,
                 fontWeight: 600,
-                borderColor: timerMinutes === item.val ? PALETTE_COLORS.primary : 'divider',
+                borderColor: !isCustomTimer && timerMinutes === item.val ? PALETTE_COLORS.primary : 'divider',
               }}
             >
               {item.label}
             </Button>
           ))}
+          <Button
+            variant={isCustomTimer ? 'contained' : 'outlined'}
+            startIcon={<EditOutlinedIcon />}
+            onClick={() => {
+              setIsCustomTimer(true);
+              setTimerMinutes(customHours * 60 + customMinutes);
+            }}
+            sx={{
+              borderRadius: 2,
+              px: 2.5,
+              py: 1,
+              fontWeight: 600,
+              borderColor: isCustomTimer ? PALETTE_COLORS.primary : 'divider',
+            }}
+          >
+            Personalizado
+          </Button>
         </Box>
 
+        {isCustomTimer && (
+          <Paper
+            elevation={0}
+            sx={{
+              p: 2.5,
+              mb: 3,
+              borderRadius: 2,
+              border: '1.5px solid',
+              borderColor: PALETTE_COLORS.primary,
+              backgroundColor: isDark ? 'rgba(217, 183, 99, 0.08)' : 'rgba(217, 183, 99, 0.06)',
+            }}
+          >
+            <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1.5 }}>
+              Definir Tempo Personalizado da Prova:
+            </Typography>
+            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} alignItems="center">
+              <TextField
+                label="Horas"
+                type="number"
+                size="small"
+                value={customHours}
+                onChange={(e) => {
+                  const h = Math.max(0, Math.min(24, Number(e.target.value) || 0));
+                  setCustomHours(h);
+                  setTimerMinutes(h * 60 + customMinutes);
+                }}
+                InputProps={{
+                  endAdornment: <InputAdornment position="end">h</InputAdornment>,
+                  inputProps: { min: 0, max: 24 },
+                }}
+                sx={{ width: { xs: '100%', sm: 140 } }}
+              />
+              <TextField
+                label="Minutos"
+                type="number"
+                size="small"
+                value={customMinutes}
+                onChange={(e) => {
+                  const m = Math.max(0, Math.min(59, Number(e.target.value) || 0));
+                  setCustomMinutes(m);
+                  setTimerMinutes(customHours * 60 + m);
+                }}
+                InputProps={{
+                  endAdornment: <InputAdornment position="end">min</InputAdornment>,
+                  inputProps: { min: 0, max: 59 },
+                }}
+                sx={{ width: { xs: '100%', sm: 140 } }}
+              />
+              <Typography variant="body2" sx={{ fontWeight: 600, color: 'text.secondary' }}>
+                Tempo Total: {customHours * 60 + customMinutes > 0 ? `${customHours}h ${customMinutes}min (${customHours * 60 + customMinutes} minutos)` : '0 min (Tempo Livre)'}
+              </Typography>
+            </Stack>
+          </Paper>
+        )}
+
         <Alert severity="info" sx={{ mb: 4, borderRadius: 2 }}>
-          Durante a prova você poderá navegar livremente entre as questões e pausar o cronômetro caso necessário.
+          Durante o simulado você poderá navegar livremente entre as questões e pausar o cronômetro caso necessário. As respostas e gabarito serão exibidos após a entrega final.
         </Alert>
 
         <Button
