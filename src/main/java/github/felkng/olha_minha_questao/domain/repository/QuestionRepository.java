@@ -14,6 +14,7 @@ public interface QuestionRepository extends JpaRepository<Question, Long>, JpaSp
     Page<Question> findByAreaId(Long areaId, Pageable pageable);
     Page<Question> findByTestId(Long testId, Pageable pageable);
     java.util.List<Question> findByTestId(Long testId);
+    java.util.List<Question> findByTestIdOrderByIdAsc(Long testId);
     long countByOriginId(Long originId);
     long countByAreaId(Long areaId);
     long countByTestId(Long testId);

@@ -75,6 +75,10 @@ public class ExamParserService {
     }
 
     public List<ParsedAnswerKeyDTO> parseAnswerKeyPdf(MultipartFile file) {
+        return parseAnswerKeyPdf(file, null);
+    }
+
+    public List<ParsedAnswerKeyDTO> parseAnswerKeyPdf(MultipartFile file, String provaName) {
         if (file == null || file.isEmpty()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Arquivo PDF de gabarito não fornecido ou vazio.");
         }
@@ -89,8 +93,13 @@ public class ExamParserService {
             };
             body.add("file", resource);
 
+            String uri = "/parse-answer-key-pdf";
+            if (provaName != null && !provaName.isBlank()) {
+                uri += "?prova_name=" + java.net.URLEncoder.encode(provaName, java.nio.charset.StandardCharsets.UTF_8);
+            }
+
             Map<String, List<ParsedAnswerKeyDTO>> response = restClient.post()
-                    .uri("/parse-answer-key-pdf")
+                    .uri(uri)
                     .contentType(MediaType.MULTIPART_FORM_DATA)
                     .body(body)
                     .retrieve()

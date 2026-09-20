@@ -69,7 +69,7 @@ public class TestService {
         Test test = testRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Prova não encontrada com o id: " + id));
 
-        List<Question> questions = questionRepository.findByTestId(id);
+        List<Question> questions = questionRepository.findByTestIdOrderByIdAsc(id);
         List<QuestionResponseDTO> questionDTOs = questions.stream()
                 .map(questionMapper::toDTO)
                 .toList();

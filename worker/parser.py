@@ -12,55 +12,12 @@ def clean_text(text: str) -> str:
     text = re.sub(r'\n\s*\n\s*\n+', '\n\n', text)
     return text.strip()
 
-def extract_text_from_page(page: pdfplumber.page.Page) -> str:
+def parse_column_text(text: str) -> List[Dict[str, Any]]:
     """
-    Extracts text from a page, handling 2-column layouts if present.
+    Parses a single text stream (or column) into questions and alternatives.
     """
-    width = page.width
-    height = page.height
+    lines = text.splitlines()
 
-    # Check if there is a 2-column layout by examining word distribution
-    words = page.extract_words()
-    if not words:
-        return page.extract_text() or ""
-
-    midpoint = width / 2
-    left_words = [w for w in words if w['x1'] <= midpoint + 20]
-    right_words = [w for w in words if w['x0'] >= midpoint - 20]
-
-    # If both sides have significant amount of words, process column-wise
-    if len(left_words) > 20 and len(right_words) > 20:
-        left_box = (0, 0, midpoint + 10, height)
-        right_box = (midpoint - 10, 0, width, height)
-        try:
-            left_crop = page.crop(left_box)
-            right_crop = page.crop(right_box)
-            left_text = left_crop.extract_text() or ""
-            right_text = right_crop.extract_text() or ""
-            return left_text + "\n" + right_text
-        except Exception:
-            pass
-
-    return page.extract_text() or ""
-
-def parse_exam_pdf(pdf_bytes: bytes) -> List[Dict[str, Any]]:
-    """
-    Parses an exam PDF and extracts questions, enunciados and alternatives.
-    """
-    all_text = ""
-    with pdfplumber.open(io.BytesIO(pdf_bytes)) as pdf:
-        for page in pdf.pages:
-            page_text = extract_text_from_page(page)
-            if page_text:
-                all_text += "\n" + page_text
-
-    if not all_text.strip():
-        return []
-
-    lines = all_text.splitlines()
-
-    # Regex patterns for question headers
-    # e.g.: "QUESTÃO 01", "Questão 1", "ITEM 01", "1.", "01 -", "01)"
     q_pattern_explicit = re.compile(
         r'^(?:QUEST[ÃA]O|ITEM)\s*([0-9]{1,3})[:\.\-\s]*(.*)$',
         re.IGNORECASE
@@ -68,67 +25,64 @@ def parse_exam_pdf(pdf_bytes: bytes) -> List[Dict[str, Any]]:
     q_pattern_numbered = re.compile(
         r'^([0-9]{1,3})[\.\-\)]\s+(.*)$'
     )
-
-    # Alternative pattern: e.g. "A)", "(A)", "A.", "a)", "[A]"
+    q_pattern_standalone = re.compile(
+        r'^([0-9]{1,3})$'
+    )
     alt_pattern = re.compile(
         r'^[(\[]?([A-Ea-e])[)\]\.\-]\s*(.*)$'
     )
-
-    # Noise header/footer filter
     noise_pattern = re.compile(
-        r'(?i)^(?:p[áa]gina\s+\d+|enem\s+\d{4}|vestibular|caderno\s+de\s+quest|confidencial).*$'
+        r'(?i)^(?:pcimarkpci|transpetro|enem\s+\d{4}|vestibular|caderno\s+de\s+quest|confidencial|www\.pciconcursos).*$'
     )
 
     raw_questions: List[Dict[str, Any]] = []
     current_q: Optional[Dict[str, Any]] = None
     current_alt: Optional[Dict[str, str]] = None
-    state = "NONE"  # "ENUNCIADO" or "ALTERNATIVE"
+    state = "NONE"
 
-    for raw_line in lines:
-        line = raw_line.strip()
-        if not line:
+    for line in lines:
+        line = line.strip()
+        if not line or noise_pattern.match(line):
             continue
 
-        if noise_pattern.match(line):
-            continue
-
-        # Check if line starts a new question
-        match_q = q_pattern_explicit.match(line)
+        match_q = q_pattern_explicit.match(line) or q_pattern_numbered.match(line)
+        standalone = False
         if not match_q:
-            match_q = q_pattern_numbered.match(line)
+            match_stand = q_pattern_standalone.match(line)
+            if match_stand:
+                num = int(match_stand.group(1))
+                if 1 <= num <= 200:
+                    match_q = match_stand
+                    standalone = True
 
         if match_q:
-            # Save previous question
             if current_q:
                 if current_alt:
                     current_q["alternatives"].append(current_alt)
                     current_alt = None
-                raw_questions.append(current_q)
+                if len(current_q["alternatives"]) >= 2:
+                    raw_questions.append(current_q)
 
-            q_id = str(int(match_q.group(1)))  # Normalize '01' to '1'
-            remaining_enunciado = match_q.group(2).strip()
-
+            q_id = str(int(match_q.group(1)))
+            enunc = "" if standalone else match_q.group(2).strip()
             current_q = {
                 "identifier": q_id,
-                "enunciado": remaining_enunciado,
+                "enunciado": enunc,
                 "alternatives": []
             }
             state = "ENUNCIADO"
             current_alt = None
             continue
 
-        if current_q is None:
+        if not current_q:
             continue
 
-        # Check if line is an alternative (A, B, C, D, E)
         match_alt = alt_pattern.match(line)
         if match_alt:
             letter = match_alt.group(1).upper()
             alt_text = match_alt.group(2).strip()
-
             if current_alt:
                 current_q["alternatives"].append(current_alt)
-
             current_alt = {
                 "identifier": letter,
                 "text": alt_text
@@ -136,7 +90,6 @@ def parse_exam_pdf(pdf_bytes: bytes) -> List[Dict[str, Any]]:
             state = "ALTERNATIVE"
             continue
 
-        # Check for inline alternatives on the same line (e.g. "(A) 10 (B) 20 (C) 30 (D) 40 (E) 50")
         inline_alts = re.findall(r'^[(\[]?([A-Ea-e])[)\]\.\-]\s*([^(\[]+)', line)
         if len(inline_alts) >= 2:
             if current_alt:
@@ -150,88 +103,140 @@ def parse_exam_pdf(pdf_bytes: bytes) -> List[Dict[str, Any]]:
             state = "ALTERNATIVE"
             continue
 
-        # Append to current context
         if state == "ENUNCIADO":
             if current_q["enunciado"]:
-                current_q["enunciado"] += "\n" + line
+                if current_q["enunciado"].endswith('-'):
+                    current_q["enunciado"] = current_q["enunciado"][:-1] + line
+                else:
+                    current_q["enunciado"] += " " + line
             else:
                 current_q["enunciado"] = line
         elif state == "ALTERNATIVE" and current_alt:
             if current_alt["text"]:
-                current_alt["text"] += " " + line
+                if current_alt["text"].endswith('-'):
+                    current_alt["text"] = current_alt["text"][:-1] + line
+                else:
+                    current_alt["text"] += " " + line
             else:
                 current_alt["text"] = line
 
-    # Save last question
     if current_q:
         if current_alt:
             current_q["alternatives"].append(current_alt)
-        raw_questions.append(current_q)
+        if len(current_q["alternatives"]) >= 2:
+            raw_questions.append(current_q)
 
-    # Post-process questions: clean texts and ensure valid alternatives
-    cleaned_questions = []
-    for q in raw_questions:
+    return raw_questions
+
+def parse_exam_pdf(pdf_bytes: bytes) -> List[Dict[str, Any]]:
+    """
+    Parses an exam PDF and extracts questions, enunciados and alternatives.
+    Handles cover instruction pages, 2-column layouts, and standalone numbering.
+    """
+    all_questions: List[Dict[str, Any]] = []
+
+    with pdfplumber.open(io.BytesIO(pdf_bytes)) as pdf:
+        for p in pdf.pages:
+            p_text = p.extract_text() or ""
+            # Skip cover instruction pages
+            if re.search(r'(?i)LEIA ATENTAMENTE AS INSTRU[ÇC][ÕO]ES', p_text):
+                continue
+
+            width, height = p.width, p.height
+            words = p.extract_words()
+            if not words:
+                continue
+
+            midpoint = width / 2
+            left_words = [w for w in words if w['x1'] <= midpoint + 20]
+            right_words = [w for w in words if w['x0'] >= midpoint - 20]
+
+            # Detect 2-column layout
+            if len(left_words) > 15 and len(right_words) > 15:
+                try:
+                    left_crop = p.crop((0, 0, midpoint, height))
+                    right_crop = p.crop((midpoint, 0, width, height))
+                    all_questions.extend(parse_column_text(left_crop.extract_text() or ""))
+                    all_questions.extend(parse_column_text(right_crop.extract_text() or ""))
+                    continue
+                except Exception:
+                    pass
+
+            all_questions.extend(parse_column_text(p_text))
+
+    # Sort questions by integer identifier
+    all_questions.sort(key=lambda x: int(x["identifier"]) if x["identifier"].isdigit() else 999)
+
+    # Clean text content
+    for q in all_questions:
         q["enunciado"] = clean_text(q["enunciado"])
-        cleaned_alts = []
-        for alt in q.get("alternatives", []):
-            alt["text"] = clean_text(alt["text"])
-            cleaned_alts.append(alt)
-        q["alternatives"] = cleaned_alts
-        cleaned_questions.append(q)
+        for a in q["alternatives"]:
+            a["text"] = clean_text(a["text"])
 
-    return cleaned_questions
+    return all_questions
 
-def parse_answer_key_pdf(pdf_bytes: bytes) -> List[Dict[str, str]]:
+def parse_answer_key_pdf(pdf_bytes: bytes, prova_name: Optional[str] = None) -> List[Dict[str, str]]:
     """
     Parses an answer key PDF (gabarito) and maps question identifiers to correct alternatives.
+    Supports multi-prova answer keys using prova_name (e.g. 'PROVA 5' or cargo name).
     """
     answers_map: Dict[str, str] = {}
+    prova_clean = prova_name.strip().lower() if prova_name else None
 
     with pdfplumber.open(io.BytesIO(pdf_bytes)) as pdf:
         for page in pdf.pages:
-            # 1. Try table extraction
-            try:
-                tables = page.extract_tables() or []
-                for table in tables:
-                    if not table or len(table) < 2:
-                        continue
-                    # Check each cell in table
-                    for row in table:
-                        if not row:
-                            continue
-                        clean_row = [str(c).strip() if c is not None else "" for c in row]
-                        # Look for pair of (number, letter)
-                        # Could be in columns: [1, A, 2, B, 3, C] or [Questão, Gabarito]
-                        for i in range(len(clean_row) - 1):
-                            cell_q = clean_row[i]
-                            cell_ans = clean_row[i+1]
-                            # Check if cell_q is number and cell_ans is A-E
-                            if re.match(r'^[0-9]{1,3}$', cell_q) and re.match(r'^[A-Ea-e]$', cell_ans):
-                                q_id = str(int(cell_q))
-                                answers_map[q_id] = cell_ans.upper()
-            except Exception:
-                pass
+            p_text = page.extract_text() or ""
+            tables = page.extract_tables() or []
 
-            # 2. Text regex extraction as fallback/supplement
-            text = page.extract_text() or ""
-            # Matches "1 - A", "01. B", "Questão 1: C", "1 A", "1=A"
-            matches = re.findall(
-                r'(?i)(?:QUEST[ÃA]O|ITEM)?\s*([0-9]{1,3})\s*[\s\-\:\.\=]+\s*([A-Ea-e])\b',
-                text
-            )
-            for m in matches:
-                q_id = str(int(m[0]))
-                ans = m[1].upper()
-                if q_id not in answers_map:
-                    answers_map[q_id] = ans
+            is_multi_prova_page = False
+            for table in tables:
+                if not table or len(table) < 3:
+                    continue
 
-    # Convert to list sorted by integer identifier
-    result = []
-    for q_id, ans in answers_map.items():
-        result.append({
-            "identifier": q_id,
-            "correctAlternative": ans
-        })
+                # Check if header contains PROVA X
+                has_prova_header = any(
+                    re.search(r'PROVA\s*\d+', str(c), re.I)
+                    for r in table[:3] for c in r if c
+                )
 
-    result.sort(key=lambda x: int(x["identifier"]) if x["identifier"].isdigit() else x["identifier"])
+                if has_prova_header:
+                    is_multi_prova_page = True
+                    target_col_start = None
+                    target_col_end = None
+
+                    for r_idx in range(min(5, len(table))):
+                        row = table[r_idx]
+                        headers = [
+                            (c_idx, str(c).strip())
+                            for c_idx, c in enumerate(row)
+                            if c and re.search(r'PROVA\s*\d+', str(c), re.I)
+                        ]
+                        for i, (c_idx, text) in enumerate(headers):
+                            if prova_clean and prova_clean in text.lower():
+                                target_col_start = 0 if i == 0 else headers[i][0]
+                                target_col_end = headers[i+1][0] if i + 1 < len(headers) else len(row)
+                                break
+                        if target_col_start is not None:
+                            break
+
+                    if target_col_start is not None:
+                        for row in table:
+                            sub_cells = [str(c).strip() for c in row[target_col_start:target_col_end] if c]
+                            sub_text = " ".join(sub_cells)
+                            matches = re.findall(r'([0-9]{1,3})\s*[\-\:\.]\s*([A-Ea-e])\b', sub_text)
+                            for q_id, ans in matches:
+                                answers_map[str(int(q_id))] = ans.upper()
+
+            if is_multi_prova_page:
+                continue
+
+            # Standard extraction for general pages (like Conhecimentos Básicos)
+            matches = re.findall(r'(?:^|\s)([0-9]{1,3})\s*[\-\:\.]\s*([A-Ea-e])\b', p_text)
+            for q_id, ans in matches:
+                q_num = str(int(q_id))
+                if q_num not in answers_map:
+                    answers_map[q_num] = ans.upper()
+
+    result = [{"identifier": q_id, "correctAlternative": ans} for q_id, ans in answers_map.items()]
+    result.sort(key=lambda x: int(x["identifier"]) if x["identifier"].isdigit() else 999)
     return result

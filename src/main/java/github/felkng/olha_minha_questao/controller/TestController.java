@@ -83,8 +83,9 @@ public class TestController {
 
     @PostMapping(value = "/parse-answer-key-pdf", consumes = org.springframework.http.MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<List<github.felkng.olha_minha_questao.dto.parser.ParsedAnswerKeyDTO>> parseAnswerKeyPdf(
-            @RequestParam("file") org.springframework.web.multipart.MultipartFile file) {
-        return ResponseEntity.ok(examParserService.parseAnswerKeyPdf(file));
+            @RequestParam("file") org.springframework.web.multipart.MultipartFile file,
+            @RequestParam(value = "provaName", required = false) String provaName) {
+        return ResponseEntity.ok(examParserService.parseAnswerKeyPdf(file, provaName));
     }
 
     @PutMapping("/{id}")
