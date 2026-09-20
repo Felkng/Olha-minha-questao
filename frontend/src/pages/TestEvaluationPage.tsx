@@ -29,11 +29,14 @@ import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import EmojiEventsOutlinedIcon from '@mui/icons-material/EmojiEventsOutlined';
 import RestartAltIcon from '@mui/icons-material/RestartAlt';
 import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
+import MenuBookIcon from '@mui/icons-material/MenuBook';
+import BorderColorIcon from '@mui/icons-material/BorderColor';
 import { useParams, useNavigate } from 'react-router-dom';
-import { TestEvaluation, TestSubmissionResponse } from '../types';
+import { TestEvaluation, TestSubmissionResponse, TextualReference } from '../types';
 import { getTestEvaluation, submitTest } from '../services/api';
 import { PALETTE_COLORS } from '../theme/theme';
 import { useAppTheme } from '../theme/ThemeContext';
+import { TextualReferenceDrawer } from '../components/questions/TextualReferenceDrawer';
 
 export const TestEvaluationPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -43,6 +46,8 @@ export const TestEvaluationPage: React.FC = () => {
 
   const [evaluation, setEvaluation] = useState<TestEvaluation | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
+  const [activeDrawerRef, setActiveDrawerRef] = useState<TextualReference | null>(null);
+  const [activeDrawerQuestionId, setActiveDrawerQuestionId] = useState<string | undefined>(undefined);
 
   // Configuration state
   const [isStarted, setIsStarted] = useState<boolean>(false);
@@ -500,6 +505,29 @@ export const TestEvaluationPage: React.FC = () => {
                 />
               </Box>
 
+              {q.textualReference && (
+                <Box sx={{ mb: 2 }}>
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    startIcon={<MenuBookIcon />}
+                    onClick={() => {
+                      setActiveDrawerRef(q.textualReference!);
+                      setActiveDrawerQuestionId(q.identifier);
+                    }}
+                    sx={{
+                      fontWeight: 700,
+                      borderColor: PALETTE_COLORS.primary,
+                      color: PALETTE_COLORS.primary,
+                      borderRadius: 1.5,
+                      textTransform: 'none',
+                    }}
+                  >
+                    Ver Texto de Apoio: {q.textualReference.title || q.textualReference.subtitle || 'Referência'}
+                  </Button>
+                </Box>
+              )}
+
               <Typography variant="body1" sx={{ mb: 2.5, lineHeight: 1.6 }}>
                 {q.enunciado}
               </Typography>
@@ -723,6 +751,67 @@ export const TestEvaluationPage: React.FC = () => {
             )}
           </Box>
 
+          {currentQuestion.textualReference && (
+            <Paper
+              elevation={0}
+              onClick={() => {
+                setActiveDrawerRef(currentQuestion.textualReference!);
+                setActiveDrawerQuestionId(currentQuestion.identifier);
+              }}
+              sx={{
+                p: 1.5,
+                px: 2,
+                mb: 2.5,
+                borderRadius: 2,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                flexWrap: 'wrap',
+                gap: 1.5,
+                border: '1.5px solid',
+                borderColor: PALETTE_COLORS.primary,
+                backgroundColor: isDark ? 'rgba(217, 183, 99, 0.1)' : 'rgba(217, 183, 99, 0.08)',
+                transition: 'all 0.2s ease',
+                '&:hover': {
+                  backgroundColor: isDark ? 'rgba(217, 183, 99, 0.18)' : 'rgba(217, 183, 99, 0.15)',
+                  transform: 'translateY(-1px)',
+                },
+              }}
+            >
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                <MenuBookIcon sx={{ color: PALETTE_COLORS.primary, fontSize: '1.4rem' }} />
+                <Box>
+                  <Typography variant="subtitle2" sx={{ fontWeight: 800, color: 'text.primary' }}>
+                    Texto de Apoio: {currentQuestion.textualReference.title || currentQuestion.textualReference.subtitle || 'Referência Textual'}
+                  </Typography>
+                  {currentQuestion.textualReference.subtitle && currentQuestion.textualReference.title && (
+                    <Typography variant="caption" sx={{ fontStyle: 'italic', color: 'text.secondary', display: 'block' }}>
+                      {currentQuestion.textualReference.subtitle}
+                    </Typography>
+                  )}
+                </Box>
+              </Box>
+
+              <Button
+                variant="contained"
+                size="small"
+                startIcon={<BorderColorIcon sx={{ fontSize: '0.9rem' }} />}
+                sx={{
+                  backgroundColor: PALETTE_COLORS.primary,
+                  color: '#1a1e24',
+                  fontWeight: 700,
+                  textTransform: 'none',
+                  borderRadius: '6px',
+                  px: 1.8,
+                  py: 0.6,
+                }}
+              >
+                Abrir no Drawer Lateral (Anotações)
+              </Button>
+            </Paper>
+          )}
+
           <Typography variant="body1" sx={{ fontSize: '1.05rem', lineHeight: 1.7, mb: 3 }}>
             {currentQuestion.enunciado}
           </Typography>
@@ -840,6 +929,16 @@ export const TestEvaluationPage: React.FC = () => {
           </Button>
         </DialogActions>
       </Dialog>
+
+      <TextualReferenceDrawer
+        open={Boolean(activeDrawerRef)}
+        onClose={() => {
+          setActiveDrawerRef(null);
+          setActiveDrawerQuestionId(undefined);
+        }}
+        reference={activeDrawerRef}
+        questionIdentifier={activeDrawerQuestionId}
+      />
     </Box>
   );
 };

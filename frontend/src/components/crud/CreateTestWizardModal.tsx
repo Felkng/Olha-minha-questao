@@ -28,8 +28,6 @@ import {
   AccordionDetails,
   Chip,
   Tooltip,
-  Drawer,
-  Divider,
 } from '@mui/material';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
@@ -41,9 +39,6 @@ import MenuBookIcon from '@mui/icons-material/MenuBook';
 import EditIcon from '@mui/icons-material/Edit';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
-import VisibilityOutlinedIcon from '@mui/icons-material/VisibilityOutlined';
-import OpenInNewIcon from '@mui/icons-material/OpenInNew';
-import CloseIcon from '@mui/icons-material/Close';
 import { Area, Origin, TextualReference, AvailableProvaOption } from '../../types';
 import {
   getAreas,
@@ -120,7 +115,6 @@ export const CreateTestWizardModal: React.FC<CreateTestWizardModalProps> = ({
   const [textualReferences, setTextualReferences] = useState<TextualReference[]>([]);
   const [openTextualRefDialog, setOpenTextualRefDialog] = useState(false);
   const [editingRefIndex, setEditingRefIndex] = useState<number | null>(null);
-  const [viewingRef, setViewingRef] = useState<TextualReference | null>(null);
   const [refTitle, setRefTitle] = useState('');
   const [refSubtitle, setRefSubtitle] = useState('');
   const [refAuthor, setRefAuthor] = useState('');
@@ -170,7 +164,6 @@ export const CreateTestWizardModal: React.FC<CreateTestWizardModalProps> = ({
     setExamPdfFile(null);
     setQuestions([]);
     setTextualReferences([]);
-    setViewingRef(null);
     setAvailableProvas([]);
     setSelectedProvaId('');
     setAnswerKeyPdfFile(null);
@@ -720,15 +713,6 @@ export const CreateTestWizardModal: React.FC<CreateTestWizardModalProps> = ({
                           </Box>
 
                           <Stack direction="row" spacing={0.5} onClick={(e) => e.stopPropagation()}>
-                            <Tooltip title="Visualizar em Drawer Lateral">
-                              <IconButton
-                                size="small"
-                                color="primary"
-                                onClick={() => setViewingRef(ref)}
-                              >
-                                <VisibilityOutlinedIcon fontSize="small" />
-                              </IconButton>
-                            </Tooltip>
                             <Tooltip title="Editar Referência">
                               <IconButton
                                 size="small"
@@ -971,22 +955,6 @@ export const CreateTestWizardModal: React.FC<CreateTestWizardModalProps> = ({
                               ))}
                             </Select>
                           </FormControl>
-
-                          {q.textualReferenceIndex !== undefined && q.textualReferenceIndex !== null && textualReferences[q.textualReferenceIndex] && (
-                            <Tooltip title="Visualizar texto de apoio">
-                              <IconButton
-                                size="small"
-                                color="primary"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setViewingRef(textualReferences[q.textualReferenceIndex!]);
-                                }}
-                                sx={{ p: 0.5 }}
-                              >
-                                <VisibilityOutlinedIcon sx={{ fontSize: '1.1rem' }} />
-                              </IconButton>
-                            </Tooltip>
-                          )}
                         </Box>
                       )}
 
@@ -1544,116 +1512,6 @@ export const CreateTestWizardModal: React.FC<CreateTestWizardModalProps> = ({
         </Button>
       </DialogActions>
     </Dialog>
-
-    <Drawer
-      anchor="right"
-      open={Boolean(viewingRef)}
-      onClose={() => setViewingRef(null)}
-      PaperProps={{
-        sx: {
-          width: { xs: '100%', sm: 540 },
-          p: 3,
-          bgcolor: 'background.paper',
-        },
-      }}
-    >
-      {viewingRef && (
-        <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
-            <Stack direction="row" spacing={1} alignItems="center">
-              <MenuBookIcon color="primary" />
-              <Typography variant="h6" sx={{ fontWeight: 800 }}>
-                Texto de Apoio
-              </Typography>
-            </Stack>
-            <IconButton size="small" onClick={() => setViewingRef(null)}>
-              <CloseIcon />
-            </IconButton>
-          </Box>
-
-          <Divider sx={{ mb: 2 }} />
-
-          <Box sx={{ flex: 1, overflowY: 'auto', pr: 1 }}>
-            <Typography variant="subtitle1" sx={{ fontWeight: 800, color: 'text.primary', mb: 0.5 }}>
-              {viewingRef.title || viewingRef.subtitle || 'Sem título'}
-            </Typography>
-
-            {viewingRef.subtitle && viewingRef.title && (
-              <Typography variant="subtitle2" sx={{ fontStyle: 'italic', color: 'text.secondary', mb: 1.5 }}>
-                {viewingRef.subtitle}
-              </Typography>
-            )}
-
-            {viewingRef.caption && (
-              <Typography variant="caption" sx={{ display: 'block', fontWeight: 600, color: PALETTE_COLORS.secondary, mb: 1.5 }}>
-                {viewingRef.caption}
-              </Typography>
-            )}
-
-            {viewingRef.content ? (
-              <Paper variant="outlined" sx={{ p: 2, bgcolor: isDark ? 'rgba(0,0,0,0.2)' : '#fafafa', borderRadius: 2, mb: 2 }}>
-                <Typography variant="body2" sx={{ whiteSpace: 'pre-line', lineHeight: 1.8 }}>
-                  {viewingRef.content}
-                </Typography>
-              </Paper>
-            ) : (
-              <Typography variant="body2" color="text.secondary" sx={{ fontStyle: 'italic', mb: 2 }}>
-                Nenhum conteúdo textual informado.
-              </Typography>
-            )}
-
-            {(viewingRef.author || viewingRef.reference || viewingRef.source) && (
-              <Box sx={{ pt: 1.5, borderTop: '1px dashed', borderColor: 'divider' }}>
-                {viewingRef.author && (
-                  <Typography variant="body2" sx={{ mb: 0.5 }}>
-                    <strong>Autor:</strong> {viewingRef.author}
-                  </Typography>
-                )}
-                {(viewingRef.reference || viewingRef.source) && (
-                  <Typography variant="body2">
-                    <strong>Fonte / Referência:</strong>{' '}
-                    {(() => {
-                      const url = viewingRef.reference || viewingRef.source || '';
-                      const isUrl = url.startsWith('http://') || url.startsWith('https://') || url.startsWith('www.');
-                      const fullUrl = url.startsWith('www.') ? `https://${url}` : url;
-                      return isUrl ? (
-                        <a
-                          href={fullUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          style={{
-                            color: PALETTE_COLORS.primary,
-                            textDecoration: 'underline',
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: 4,
-                          }}
-                        >
-                          {url}
-                          <OpenInNewIcon sx={{ fontSize: '0.9rem' }} />
-                        </a>
-                      ) : (
-                        url
-                      );
-                    })()}
-                  </Typography>
-                )}
-              </Box>
-            )}
-          </Box>
-
-          <Box sx={{ pt: 2, borderTop: '1px solid', borderColor: 'divider', textAlign: 'right' }}>
-            <Button
-              variant="contained"
-              onClick={() => setViewingRef(null)}
-              sx={{ fontWeight: 700, backgroundColor: PALETTE_COLORS.primary }}
-            >
-              Fechar Leitura
-            </Button>
-          </Box>
-        </Box>
-      )}
-    </Drawer>
   </>
   );
 };

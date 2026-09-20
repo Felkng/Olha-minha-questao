@@ -24,12 +24,14 @@ import RestartAltIcon from '@mui/icons-material/RestartAlt';
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import MenuBookIcon from '@mui/icons-material/MenuBook';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
+import BorderColorIcon from '@mui/icons-material/BorderColor';
 import { Link } from 'react-router-dom';
 import { DifficultyLevel, Question } from '../../types';
 import { PALETTE_COLORS } from '../../theme/theme';
 import { useAppTheme } from '../../theme/ThemeContext';
 import { submitQuestionAttempt } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
+import { TextualReferenceDrawer } from './TextualReferenceDrawer';
 
 interface QuestionCardProps {
   question: Question;
@@ -63,6 +65,7 @@ export const QuestionCard: React.FC<QuestionCardProps> = ({
   const [hasAttemptedBefore, setHasAttemptedBefore] = useState<boolean>(false);
   const [copiedToastOpen, setCopiedToastOpen] = useState<boolean>(false);
   const [showTextualReference, setShowTextualReference] = useState<boolean>(false);
+  const [isTextualDrawerOpen, setIsTextualDrawerOpen] = useState<boolean>(false);
 
   const isAttemptedByCurrentUser = attemptedQuestionIds.has(question.id);
 
@@ -378,7 +381,8 @@ export const QuestionCard: React.FC<QuestionCardProps> = ({
 
       {/* Textual Reference (Texto de Apoio) */}
       {question.textualReference && (
-        <Box
+        <>
+          <Box
           sx={{
             mb: 2.5,
             border: `1px solid ${isDark ? 'rgba(217, 183, 99, 0.3)' : 'rgba(217, 183, 99, 0.4)'}`,
@@ -388,39 +392,71 @@ export const QuestionCard: React.FC<QuestionCardProps> = ({
           }}
         >
           <Box
-            onClick={() => setShowTextualReference(!showTextualReference)}
             sx={{
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
               p: 1.25,
               px: 2,
-              cursor: 'pointer',
               backgroundColor: isDark ? 'rgba(217, 183, 99, 0.08)' : 'rgba(217, 183, 99, 0.1)',
-              transition: 'background-color 0.15s',
-              '&:hover': {
-                backgroundColor: isDark ? 'rgba(217, 183, 99, 0.15)' : 'rgba(217, 183, 99, 0.18)',
-              },
+              flexWrap: 'wrap',
+              gap: 1,
             }}
           >
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+            <Box
+              onClick={() => setIsTextualDrawerOpen(true)}
+              sx={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 1,
+                cursor: 'pointer',
+                flexGrow: 1,
+                '&:hover': { opacity: 0.85 },
+              }}
+            >
               <MenuBookIcon sx={{ color: PALETTE_COLORS.primary, fontSize: '1.2rem' }} />
               <Typography variant="subtitle2" sx={{ fontWeight: 700, color: 'text.primary' }}>
                 Texto de Apoio: {question.textualReference.title || question.textualReference.subtitle || 'Referência Textual'}
               </Typography>
             </Box>
-            <Button
-              size="small"
-              variant="text"
-              sx={{
-                color: PALETTE_COLORS.primary,
-                fontWeight: 700,
-                textTransform: 'none',
-                fontSize: '0.82rem',
-              }}
-            >
-              {showTextualReference ? 'Ocultar Texto' : 'Ver Texto'}
-            </Button>
+
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Button
+                size="small"
+                variant="contained"
+                startIcon={<BorderColorIcon sx={{ fontSize: '0.9rem' }} />}
+                onClick={() => setIsTextualDrawerOpen(true)}
+                sx={{
+                  backgroundColor: PALETTE_COLORS.primary,
+                  color: '#1a1e24',
+                  fontWeight: 700,
+                  textTransform: 'none',
+                  fontSize: '0.8rem',
+                  borderRadius: '6px',
+                  py: 0.4,
+                  px: 1.5,
+                  '&:hover': {
+                    backgroundColor: isDark ? '#ffd700' : '#d4af37',
+                  },
+                }}
+              >
+                Abrir no Drawer Lateral (Anotações)
+              </Button>
+
+              <Button
+                size="small"
+                variant="text"
+                onClick={() => setShowTextualReference(!showTextualReference)}
+                sx={{
+                  color: 'text.secondary',
+                  fontWeight: 600,
+                  textTransform: 'none',
+                  fontSize: '0.8rem',
+                }}
+              >
+                {showTextualReference ? 'Ocultar Inline' : 'Ver Inline'}
+              </Button>
+            </Box>
           </Box>
 
           <Collapse in={showTextualReference}>
@@ -529,7 +565,15 @@ export const QuestionCard: React.FC<QuestionCardProps> = ({
             </Box>
           </Collapse>
         </Box>
-      )}
+
+        <TextualReferenceDrawer
+          open={isTextualDrawerOpen}
+          onClose={() => setIsTextualDrawerOpen(false)}
+          reference={question.textualReference}
+          questionIdentifier={question.identifier}
+        />
+      </>
+    )}
 
       {/* Question Statement (Enunciado) */}
       <Typography
