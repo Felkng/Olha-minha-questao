@@ -10,11 +10,12 @@ import {
 } from '@mui/material';
 import { createOrigin } from '../../services/api';
 import { PALETTE_COLORS } from '../../theme/theme';
+import { Origin } from '../../types';
 
 interface CreateOriginModalProps {
   open: boolean;
   onClose: () => void;
-  onCreated?: () => void;
+  onCreated?: (origin?: Origin) => void;
 }
 
 export const CreateOriginModal: React.FC<CreateOriginModalProps> = ({
@@ -30,11 +31,11 @@ export const CreateOriginModal: React.FC<CreateOriginModalProps> = ({
     if (!name.trim()) return;
     setLoading(true);
     try {
-      await createOrigin({ name: name.trim(), description: description.trim() });
+      const created = await createOrigin({ name: name.trim(), description: description.trim() });
       setName('');
       setDescription('');
       onClose();
-      if (onCreated) onCreated();
+      if (onCreated) onCreated(created);
     } catch (err) {
       console.error('Erro ao criar banca:', err);
     } finally {

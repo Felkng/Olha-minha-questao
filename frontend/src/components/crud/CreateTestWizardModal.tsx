@@ -27,6 +27,7 @@ import {
   AccordionSummary,
   AccordionDetails,
   Chip,
+  Tooltip,
 } from '@mui/material';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
@@ -45,7 +46,8 @@ import {
   parseAnswerKeyPdf,
 } from '../../services/api';
 import { PALETTE_COLORS } from '../../theme/theme';
-import { useAuth } from '../../context/AuthContext';
+import { CreateOriginModal } from './CreateOriginModal';
+import { CreateAreaModal } from './CreateAreaModal';
 
 interface CreateTestWizardModalProps {
   open: boolean;
@@ -78,8 +80,6 @@ export const CreateTestWizardModal: React.FC<CreateTestWizardModalProps> = ({
   onClose,
   onCreated,
 }) => {
-  const { isAdmin } = useAuth();
-
   // Wizard state
   const [activeStep, setActiveStep] = useState(0);
 
@@ -91,6 +91,10 @@ export const CreateTestWizardModal: React.FC<CreateTestWizardModalProps> = ({
   const [description, setDescription] = useState('');
   const [creationMode, setCreationMode] = useState<'manual' | 'pdf'>('manual');
   const [examPdfFile, setExamPdfFile] = useState<File | null>(null);
+
+  // Submodals for creating origin and area
+  const [openCreateOrigin, setOpenCreateOrigin] = useState(false);
+  const [openCreateArea, setOpenCreateArea] = useState(false);
 
   // Step 1: Questions
   const [questions, setQuestions] = useState<QuestionForm[]>([]);
@@ -119,7 +123,7 @@ export const CreateTestWizardModal: React.FC<CreateTestWizardModalProps> = ({
   const loadOptions = async () => {
     try {
       const [oList, aList] = await Promise.all([
-        isAdmin ? getOrigins() : Promise.resolve([]),
+        getOrigins(),
         getAreas(),
       ]);
       setOrigins(oList);
@@ -395,7 +399,8 @@ export const CreateTestWizardModal: React.FC<CreateTestWizardModalProps> = ({
   };
 
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
+    <>
+      <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
       <DialogTitle sx={{ fontWeight: 800, pb: 1 }}>
         Cadastrar Nova Prova / Simulado
       </DialogTitle>
@@ -429,18 +434,18 @@ export const CreateTestWizardModal: React.FC<CreateTestWizardModalProps> = ({
               size="small"
             />
 
-            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
+            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} alignItems="center">
               <TextField
                 label="Ano"
                 type="number"
                 value={year}
                 onChange={(e) => setYear(e.target.value ? Number(e.target.value) : '')}
-                fullWidth
+                sx={{ width: { xs: '100%', sm: '140px' } }}
                 required
                 size="small"
               />
 
-              {isAdmin && (
+              <Box sx={{ display: 'flex', gap: 0.5, flex: 1, width: '100%', alignItems: 'center' }}>
                 <FormControl fullWidth size="small">
                   <InputLabel>Banca (Opcional)</InputLabel>
                   <Select
@@ -458,25 +463,45 @@ export const CreateTestWizardModal: React.FC<CreateTestWizardModalProps> = ({
                     ))}
                   </Select>
                 </FormControl>
-              )}
+                <Tooltip title="Cadastrar nova Banca">
+                  <IconButton
+                    color="primary"
+                    onClick={() => setOpenCreateOrigin(true)}
+                    sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 1, p: '7px' }}
+                  >
+                    <AddIcon fontSize="small" />
+                  </IconButton>
+                </Tooltip>
+              </Box>
 
-              <FormControl fullWidth size="small">
-                <InputLabel>Área (Opcional)</InputLabel>
-                <Select
-                  value={areaId}
-                  label="Área (Opcional)"
-                  onChange={(e) => setAreaId(e.target.value as number)}
-                >
-                  <MenuItem value="">
-                    <em>Nenhuma</em>
-                  </MenuItem>
-                  {areas.map((a) => (
-                    <MenuItem key={a.id} value={a.id}>
-                      {a.name}
+              <Box sx={{ display: 'flex', gap: 0.5, flex: 1, width: '100%', alignItems: 'center' }}>
+                <FormControl fullWidth size="small">
+                  <InputLabel>Área (Opcional)</InputLabel>
+                  <Select
+                    value={areaId}
+                    label="Área (Opcional)"
+                    onChange={(e) => setAreaId(e.target.value as number)}
+                  >
+                    <MenuItem value="">
+                      <em>Nenhuma</em>
                     </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
+                    {areas.map((a) => (
+                      <MenuItem key={a.id} value={a.id}>
+                        {a.name}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+                <Tooltip title="Cadastrar nova Área">
+                  <IconButton
+                    color="primary"
+                    onClick={() => setOpenCreateArea(true)}
+                    sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 1, p: '7px' }}
+                  >
+                    <AddIcon fontSize="small" />
+                  </IconButton>
+                </Tooltip>
+              </Box>
             </Stack>
 
             <TextField
@@ -538,9 +563,6 @@ export const CreateTestWizardModal: React.FC<CreateTestWizardModalProps> = ({
                       Arquivo selecionado: {examPdfFile.name} ({(examPdfFile.size / 1024 / 1024).toFixed(2)} MB)
                     </Typography>
                   )}
-                  <Typography variant="caption" display="block" color="text.secondary" sx={{ mt: 0.5 }}>
-                    O sistema usará o Worker Python com <code>pdfplumber</code> para identificar as questões, números e alternativas A, B, C, D, E.
-                  </Typography>
                 </Box>
               )}
             </Paper>
@@ -937,5 +959,30 @@ export const CreateTestWizardModal: React.FC<CreateTestWizardModalProps> = ({
         </Stack>
       </DialogActions>
     </Dialog>
+
+    <CreateOriginModal
+      open={openCreateOrigin}
+      onClose={() => setOpenCreateOrigin(false)}
+      onCreated={(newOrigin) => {
+        if (newOrigin) {
+          setOrigins((prev) => [...prev, newOrigin]);
+          setOriginId(newOrigin.id);
+        }
+        setOpenCreateOrigin(false);
+      }}
+    />
+
+    <CreateAreaModal
+      open={openCreateArea}
+      onClose={() => setOpenCreateArea(false)}
+      onCreated={(newArea) => {
+        if (newArea) {
+          setAreas((prev) => [...prev, newArea]);
+          setAreaId(newArea.id);
+        }
+        setOpenCreateArea(false);
+      }}
+    />
+  </>
   );
 };

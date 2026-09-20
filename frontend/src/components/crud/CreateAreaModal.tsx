@@ -10,11 +10,12 @@ import {
 } from '@mui/material';
 import { createArea } from '../../services/api';
 import { PALETTE_COLORS } from '../../theme/theme';
+import { Area } from '../../types';
 
 interface CreateAreaModalProps {
   open: boolean;
   onClose: () => void;
-  onCreated?: () => void;
+  onCreated?: (area?: Area) => void;
 }
 
 export const CreateAreaModal: React.FC<CreateAreaModalProps> = ({
@@ -30,11 +31,11 @@ export const CreateAreaModal: React.FC<CreateAreaModalProps> = ({
     if (!name.trim()) return;
     setLoading(true);
     try {
-      await createArea({ name: name.trim(), description: description.trim() });
+      const created = await createArea({ name: name.trim(), description: description.trim() });
       setName('');
       setDescription('');
       onClose();
-      if (onCreated) onCreated();
+      if (onCreated) onCreated(created);
     } catch (err) {
       console.error('Erro ao criar área:', err);
     } finally {
