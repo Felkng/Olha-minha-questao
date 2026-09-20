@@ -21,6 +21,9 @@ import {
   UserProfile,
   UserSummary,
   QuestionBoardResponse,
+  ParsedQuestion,
+  ParsedAnswerKey,
+  TestWithQuestionsRequest,
 } from '../types';
 
 const apiClient = axios.create({
@@ -292,12 +295,43 @@ export const getTestCards = async (): Promise<TestCard[]> => {
 export const createTest = async (testData: {
   name: string;
   year: number;
-  originId: number;
-  areaId: number;
+  originId?: number;
+  areaId?: number;
   description?: string;
 }): Promise<Test> => {
   const response = await apiClient.post<Test>('/tests', testData);
   return response.data;
+};
+
+export const createTestWithQuestions = async (
+  data: TestWithQuestionsRequest
+): Promise<Test> => {
+  const response = await apiClient.post<Test>('/tests/with-questions', data);
+  return response.data;
+};
+
+export const parseExamPdf = async (file: File): Promise<ParsedQuestion[]> => {
+  const formData = new FormData();
+  formData.append('file', file);
+  const response = await apiClient.post<ParsedQuestion[]>('/tests/parse-exam-pdf', formData, {
+    headers: {
+      'Content-Type': 'multipart/form-data',
+    },
+    timeout: 60000,
+  });
+  return Array.isArray(response.data) ? response.data : [];
+};
+
+export const parseAnswerKeyPdf = async (file: File): Promise<ParsedAnswerKey[]> => {
+  const formData = new FormData();
+  formData.append('file', file);
+  const response = await apiClient.post<ParsedAnswerKey[]>('/tests/parse-answer-key-pdf', formData, {
+    headers: {
+      'Content-Type': 'multipart/form-data',
+    },
+    timeout: 60000,
+  });
+  return Array.isArray(response.data) ? response.data : [];
 };
 
 export const getTestEvaluation = async (testId: number): Promise<TestEvaluation> => {

@@ -364,3 +364,42 @@ export type BoardElement =
   | BoardStarElement
   | BoardTextElement;
 
+export interface ParsedAlternative {
+  identifier: string;
+  text: string;
+}
+
+export interface ParsedQuestion {
+  identifier: string;
+  enunciado: string;
+  alternatives: ParsedAlternative[];
+}
+
+export interface ParsedAnswerKey {
+  identifier: string;
+  correctAlternative: string;
+}
+
+export interface TestWithQuestionsRequest {
+  name: string;
+  year: number;
+  originId?: number | null;
+  areaId?: number | null;
+  description?: string;
+  questions: {
+    enunciado: string;
+    identifier?: string;
+    year?: number;
+    originId?: number | null;
+    areaId?: number | null;
+    subjectId?: number | null;
+    correctAlternativeId?: number | null;
+    alternatives: {
+      identifier: string;
+      text: string;
+      isCorrect?: boolean;
+    }[];
+  }[];
+}
+
+

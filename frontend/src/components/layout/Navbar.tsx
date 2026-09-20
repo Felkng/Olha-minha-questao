@@ -30,7 +30,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { useAppTheme } from '../../theme/ThemeContext';
 import { PALETTE_COLORS } from '../../theme/theme';
 import { CreateQuestionModal } from '../crud/CreateQuestionModal';
-import { CreateTestModal } from '../crud/CreateTestModal';
+import { CreateTestWizardModal } from '../crud/CreateTestWizardModal';
 import { CreateOriginModal } from '../crud/CreateOriginModal';
 import { CreateAreaModal } from '../crud/CreateAreaModal';
 import { CreateSubjectModal } from '../crud/CreateSubjectModal';
@@ -438,7 +438,7 @@ export const Navbar: React.FC = () => {
         onClose={() => setOpenCreateQuestion(false)}
         onCreated={() => window.location.reload()}
       />
-      <CreateTestModal
+      <CreateTestWizardModal
         open={openCreateTest}
         onClose={() => setOpenCreateTest(false)}
         onCreated={() => window.location.reload()}
