@@ -16,6 +16,7 @@ import {
   RadioGroup,
   FormControlLabel,
   Paper,
+  FormHelperText,
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
@@ -28,6 +29,7 @@ import {
   getTests,
 } from '../../services/api';
 import { PALETTE_COLORS } from '../../theme/theme';
+import { useAuth } from '../../context/AuthContext';
 
 interface CreateQuestionModalProps {
   open: boolean;
@@ -45,6 +47,8 @@ export const CreateQuestionModal: React.FC<CreateQuestionModalProps> = ({
   onClose,
   onCreated,
 }) => {
+  const { user, isAdmin } = useAuth();
+
   const [enunciado, setEnunciado] = useState('');
   const [identifier, setIdentifier] = useState('');
   const [year, setYear] = useState<number | ''>(new Date().getFullYear());
@@ -72,15 +76,20 @@ export const CreateQuestionModal: React.FC<CreateQuestionModalProps> = ({
     if (open) {
       loadOptions();
     }
-  }, [open]);
+  }, [open, isAdmin, user?.id]);
 
   const loadOptions = async () => {
     try {
-      const [oList, aList, tList] = await Promise.all([
-        getOrigins(),
+      const promises: [Promise<Origin[]>, Promise<Area[]>, Promise<Test[]>] = [
+        isAdmin ? getOrigins() : Promise.resolve([]),
         getAreas(),
-        getTests(),
-      ]);
+        isAdmin
+          ? getTests()
+          : user?.id
+          ? getTests({ createdByUserId: user.id })
+          : Promise.resolve([]),
+      ];
+      const [oList, aList, tList] = await Promise.all(promises);
       setOrigins(oList);
       setAreas(aList);
       setTests(tList);
@@ -121,10 +130,10 @@ export const CreateQuestionModal: React.FC<CreateQuestionModalProps> = ({
   };
 
   const handleSubmit = async () => {
-    if (!enunciado.trim() || !year || !originId || !areaId) return;
+    if (!enunciado.trim() || !year || !areaId) return;
     const validAlts = alternatives.filter((a) => a.text.trim().length > 0);
     if (validAlts.length < 2) {
-      alert('Informe pelo menos 2 alternativas com texto!');
+      alert('Informe pelo menos 2 alternativas preenchidas com texto!');
       return;
     }
 
@@ -140,7 +149,7 @@ export const CreateQuestionModal: React.FC<CreateQuestionModalProps> = ({
         enunciado: enunciado.trim(),
         identifier: identifier.trim() || `Q-${Date.now().toString().slice(-4)}`,
         year: Number(year),
-        originId: Number(originId),
+        originId: isAdmin && originId ? Number(originId) : undefined,
         areaId: Number(areaId),
         subjectId: subjectId ? Number(subjectId) : undefined,
         testId: testId ? Number(testId) : undefined,
@@ -161,6 +170,13 @@ export const CreateQuestionModal: React.FC<CreateQuestionModalProps> = ({
       setLoading(false);
     }
   };
+
+  const validAlternativesCount = alternatives.filter((a) => a.text.trim().length > 0).length;
+  const isFormValid =
+    enunciado.trim().length > 0 &&
+    Boolean(year) &&
+    Boolean(areaId) &&
+    validAlternativesCount >= 2;
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
@@ -198,20 +214,23 @@ export const CreateQuestionModal: React.FC<CreateQuestionModalProps> = ({
           </Stack>
 
           <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
-            <FormControl fullWidth required size="small">
-              <InputLabel>Banca</InputLabel>
-              <Select
-                value={originId}
-                label="Banca"
-                onChange={(e) => setOriginId(e.target.value as number)}
-              >
-                {origins.map((o) => (
-                  <MenuItem key={o.id} value={o.id}>
-                    {o.name}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
+            {isAdmin && (
+              <FormControl fullWidth size="small">
+                <InputLabel>Banca (Opcional - Admin)</InputLabel>
+                <Select
+                  value={originId}
+                  label="Banca (Opcional - Admin)"
+                  onChange={(e) => setOriginId(e.target.value as number)}
+                >
+                  <MenuItem value="">Nenhuma Banca (Questão Avulsa)</MenuItem>
+                  {origins.map((o) => (
+                    <MenuItem key={o.id} value={o.id}>
+                      {o.name}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            )}
 
             <FormControl fullWidth required size="small">
               <InputLabel>Área</InputLabel>
@@ -235,6 +254,7 @@ export const CreateQuestionModal: React.FC<CreateQuestionModalProps> = ({
                 label="Matéria (Opcional)"
                 onChange={(e) => setSubjectId(e.target.value as number)}
               >
+                <MenuItem value="">Nenhuma Matéria</MenuItem>
                 {subjects.map((s) => (
                   <MenuItem key={s.id} value={s.id}>
                     {s.name}
@@ -245,10 +265,12 @@ export const CreateQuestionModal: React.FC<CreateQuestionModalProps> = ({
           </Stack>
 
           <FormControl fullWidth size="small">
-            <InputLabel>Prova Vinculada (Opcional)</InputLabel>
+            <InputLabel>
+              {isAdmin ? 'Prova Vinculada (Opcional)' : 'Minhas Provas Vinculadas (Opcional)'}
+            </InputLabel>
             <Select
               value={testId}
-              label="Prova Vinculada (Opcional)"
+              label={isAdmin ? 'Prova Vinculada (Opcional)' : 'Minhas Provas Vinculadas (Opcional)'}
               onChange={(e) => setTestId(e.target.value as number)}
             >
               <MenuItem value="">Nenhuma Prova (Questão Avulsa)</MenuItem>
@@ -258,10 +280,15 @@ export const CreateQuestionModal: React.FC<CreateQuestionModalProps> = ({
                 </MenuItem>
               ))}
             </Select>
+            {!isAdmin && tests.length === 0 && (
+              <FormHelperText>
+                Você ainda não criou nenhuma prova. Questões criadas ficarão como questões avulsas ou crie uma prova primeiro.
+              </FormHelperText>
+            )}
           </FormControl>
 
           <Typography variant="subtitle2" sx={{ fontWeight: 800, pt: 1 }}>
-            ALTERNATIVAS DA QUESTÃO (Selecione a opção correta no botão de rádio):
+            ALTERNATIVAS DA QUESTÃO (Mínimo de 2 alternativas fechadas. Selecione a opção correta no botão de rádio):
           </Typography>
 
           <RadioGroup
@@ -328,7 +355,7 @@ export const CreateQuestionModal: React.FC<CreateQuestionModalProps> = ({
         <Button
           variant="contained"
           onClick={handleSubmit}
-          disabled={!enunciado.trim() || !year || !originId || !areaId || loading}
+          disabled={!isFormValid || loading}
           sx={{ fontWeight: 700, backgroundColor: PALETTE_COLORS.primary }}
         >
           {loading ? 'Cadastrando...' : 'Cadastrar Questão'}
