@@ -1,0 +1,1 @@
+ALTER TABLE question ALTER COLUMN origin_id DROP NOT NULL;
