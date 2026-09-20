@@ -199,8 +199,23 @@ public class QuestionService {
 
     @Transactional
     public QuestionResponseDTO create(QuestionRequestDTO dto, Long userId) {
-        Origin origin = originRepository.findById(dto.getOriginId())
-                .orElseThrow(() -> new ResourceNotFoundException("Origem não encontrada com o id: " + dto.getOriginId()));
+        if (dto.getAlternatives() == null || dto.getAlternatives().size() < 2) {
+            throw new IllegalArgumentException("A questão deve conter no mínimo 2 alternativas.");
+        }
+
+        User creator = null;
+        if (userId != null) {
+            creator = userRepository.findById(userId).orElse(null);
+        }
+
+        Origin origin = null;
+        if (dto.getOriginId() != null) {
+            // Apenas administradores podem definir a banca da questão
+            if (creator == null || creator.getRole() == github.felkng.olha_minha_questao.domain.entity.UserRole.ADMIN) {
+                origin = originRepository.findById(dto.getOriginId())
+                        .orElseThrow(() -> new ResourceNotFoundException("Origem não encontrada com o id: " + dto.getOriginId()));
+            }
+        }
 
         Area area = areaRepository.findById(dto.getAreaId())
                 .orElseThrow(() -> new ResourceNotFoundException("Área não encontrada com o id: " + dto.getAreaId()));
@@ -215,11 +230,15 @@ public class QuestionService {
         if (dto.getTestId() != null) {
             test = testRepository.findById(dto.getTestId())
                     .orElseThrow(() -> new ResourceNotFoundException("Prova não encontrada com o id: " + dto.getTestId()));
-        }
 
-        User creator = null;
-        if (userId != null) {
-            creator = userRepository.findById(userId).orElse(null);
+            // Usuários comuns só podem associar questões a provas criadas por eles mesmos
+            if (creator != null && creator.getRole() != github.felkng.olha_minha_questao.domain.entity.UserRole.ADMIN) {
+                if (test.getCreatedByUser() == null || !test.getCreatedByUser().getId().equals(creator.getId())) {
+                    throw new org.springframework.web.server.ResponseStatusException(
+                            org.springframework.http.HttpStatus.FORBIDDEN,
+                            "Usuários comuns só podem associar questões a provas criadas por eles mesmos.");
+                }
+            }
         }
 
         Question question = questionMapper.toEntity(dto);
@@ -283,8 +302,15 @@ public class QuestionService {
         Question question = questionRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Questão não encontrada com o id: " + id));
 
-        Origin origin = originRepository.findById(dto.getOriginId())
-                .orElseThrow(() -> new ResourceNotFoundException("Origem não encontrada com o id: " + dto.getOriginId()));
+        if (dto.getAlternatives() != null && dto.getAlternatives().size() < 2) {
+            throw new IllegalArgumentException("A questão deve conter no mínimo 2 alternativas.");
+        }
+
+        Origin origin = null;
+        if (dto.getOriginId() != null) {
+            origin = originRepository.findById(dto.getOriginId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Origem não encontrada com o id: " + dto.getOriginId()));
+        }
 
         Area area = areaRepository.findById(dto.getAreaId())
                 .orElseThrow(() -> new ResourceNotFoundException("Área não encontrada com o id: " + dto.getAreaId()));
