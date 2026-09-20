@@ -23,7 +23,7 @@ import RestartAltIcon from '@mui/icons-material/RestartAlt';
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import MenuBookIcon from '@mui/icons-material/MenuBook';
 import BorderColorIcon from '@mui/icons-material/BorderColor';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { DifficultyLevel, Question } from '../../types';
 import { PALETTE_COLORS } from '../../theme/theme';
 import { useAppTheme } from '../../theme/ThemeContext';
@@ -56,6 +56,7 @@ export const QuestionCard: React.FC<QuestionCardProps> = ({
   const { mode } = useAppTheme();
   const isDark = mode === 'dark';
   const { attemptedQuestionIds, markQuestionAttempted } = useAuth();
+  const location = useLocation();
 
   const [selectedAlternativeId, setSelectedAlternativeId] = useState<number | null>(null);
   const [isAnswered, setIsAnswered] = useState<boolean>(false);
@@ -305,6 +306,10 @@ export const QuestionCard: React.FC<QuestionCardProps> = ({
                 size="small"
                 component={Link}
                 to={`/questoes/${question.id}`}
+                state={{
+                  from: location.pathname + location.search,
+                  fromTitle: location.pathname.includes('/provas') ? 'Voltar para a Prova' : 'Voltar para Questões',
+                }}
                 sx={{
                   color: 'text.secondary',
                   '&:hover': {

@@ -21,10 +21,11 @@ import MenuBookOutlinedIcon from '@mui/icons-material/MenuBookOutlined';
 import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
 import AccountBalanceIcon from '@mui/icons-material/AccountBalance';
 import CategoryIcon from '@mui/icons-material/Category';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { Question, TestCard } from '../types';
 import { getTestById, getTestEvaluation } from '../services/api';
 import { QuestionCard } from '../components/questions/QuestionCard';
+import { QuestionWhiteboard } from '../components/whiteboard/QuestionWhiteboard';
 import { TestQuestionsNavigator } from '../components/questions/TestQuestionsNavigator';
 import { SaveTestToFolderModal } from '../components/folders/SaveTestToFolderModal';
 import { PALETTE_COLORS } from '../theme/theme';
@@ -39,13 +40,21 @@ export const TestDetailPage: React.FC<TestDetailPageProps> = ({
 }) => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { attemptedQuestionIds } = useAuth();
+
+  const initialQ = Number(searchParams.get('q'));
+  const initialMode = searchParams.get('mode') as 'single' | 'all' | null;
 
   const [test, setTest] = useState<TestCard | null>(null);
   const [questions, setQuestions] = useState<Question[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
-  const [activeQuestionIndex, setActiveQuestionIndex] = useState<number>(0);
-  const [viewMode, setViewMode] = useState<'single' | 'all'>('single');
+  const [activeQuestionIndex, setActiveQuestionIndex] = useState<number>(
+    initialQ > 0 ? initialQ - 1 : 0
+  );
+  const [viewMode, setViewMode] = useState<'single' | 'all'>(
+    initialMode === 'all' ? 'all' : 'single'
+  );
 
   const [saveModalOpen, setSaveModalOpen] = useState<boolean>(false);
   const [toastOpen, setToastOpen] = useState<boolean>(false);
@@ -71,6 +80,37 @@ export const TestDetailPage: React.FC<TestDetailPageProps> = ({
       setLoading(false);
     }
   };
+
+  const handleSelectQuestion = (idx: number) => {
+    setActiveQuestionIndex(idx);
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        next.set('q', String(idx + 1));
+        return next;
+      },
+      { replace: true }
+    );
+  };
+
+  const handleViewModeChange = (modeVal: 'single' | 'all') => {
+    setViewMode(modeVal);
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        next.set('mode', modeVal);
+        return next;
+      },
+      { replace: true }
+    );
+  };
+
+  useEffect(() => {
+    const qParam = Number(searchParams.get('q'));
+    if (qParam > 0 && qParam - 1 !== activeQuestionIndex && qParam - 1 < questions.length) {
+      setActiveQuestionIndex(qParam - 1);
+    }
+  }, [searchParams, questions.length]);
 
   const handleShare = () => {
     navigator.clipboard.writeText(window.location.href);
@@ -200,7 +240,7 @@ export const TestDetailPage: React.FC<TestDetailPageProps> = ({
             size="small"
             value={viewMode}
             exclusive
-            onChange={(_, val) => val && setViewMode(val)}
+            onChange={(_, val) => val && handleViewModeChange(val)}
           >
             <ToggleButton value="single" sx={{ px: 2, fontWeight: 700, textTransform: 'none' }}>
               Questão a Questão (Foco)
@@ -219,7 +259,7 @@ export const TestDetailPage: React.FC<TestDetailPageProps> = ({
           activeIndex={activeQuestionIndex}
           isQuestionAnswered={(idx) => Boolean(questions[idx] && attemptedQuestionIds.has(questions[idx].id))}
           onSelectQuestion={(idx) => {
-            setActiveQuestionIndex(idx);
+            handleSelectQuestion(idx);
           }}
           questionIdentifiers={questions.map((q) => q.identifier)}
         />
@@ -233,6 +273,14 @@ export const TestDetailPage: React.FC<TestDetailPageProps> = ({
             onBookmarkClick={onBookmarkQuestion}
           />
 
+          {/* Lousa de Raciocínio Interativa da Questão */}
+          <Box sx={{ mt: 3 }}>
+            <QuestionWhiteboard
+              key={questions[activeQuestionIndex].id}
+              questionId={questions[activeQuestionIndex].id}
+            />
+          </Box>
+
           {/* Navigation Controls: Previous & Next (Free to navigate without requiring answer) */}
           <Paper
             elevation={2}
@@ -244,7 +292,7 @@ export const TestDetailPage: React.FC<TestDetailPageProps> = ({
               borderRadius: 3,
               border: '1px solid',
               borderColor: 'divider',
-              mt: 2,
+              mt: 3,
             }}
           >
             <Button
@@ -252,7 +300,8 @@ export const TestDetailPage: React.FC<TestDetailPageProps> = ({
               startIcon={<ArrowBackIcon />}
               disabled={activeQuestionIndex === 0}
               onClick={() => {
-                setActiveQuestionIndex((prev) => Math.max(0, prev - 1));
+                const nextIdx = Math.max(0, activeQuestionIndex - 1);
+                handleSelectQuestion(nextIdx);
                 window.scrollTo({ top: 250, behavior: 'smooth' });
               }}
               sx={{ fontWeight: 700, px: 2.5, borderRadius: 2 }}
@@ -269,7 +318,8 @@ export const TestDetailPage: React.FC<TestDetailPageProps> = ({
               endIcon={<ArrowForwardIcon />}
               disabled={activeQuestionIndex === questions.length - 1}
               onClick={() => {
-                setActiveQuestionIndex((prev) => Math.min(questions.length - 1, prev + 1));
+                const nextIdx = Math.min(questions.length - 1, activeQuestionIndex + 1);
+                handleSelectQuestion(nextIdx);
                 window.scrollTo({ top: 250, behavior: 'smooth' });
               }}
               sx={{

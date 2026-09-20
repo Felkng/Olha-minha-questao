@@ -6,7 +6,7 @@ import {
   Alert,
 } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { Question } from '../types';
 import { getQuestionById } from '../services/api';
 import { QuestionCard } from '../components/questions/QuestionCard';
@@ -22,6 +22,22 @@ export const QuestionDetailPage: React.FC<QuestionDetailPageProps> = ({
 }) => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
+
+  const stateFrom = (location.state as { from?: string; fromTitle?: string } | null)?.from;
+  const stateFromTitle = (location.state as { from?: string; fromTitle?: string } | null)?.fromTitle;
+
+  const handleBack = () => {
+    if (stateFrom) {
+      navigate(stateFrom);
+    } else if (window.history.state && window.history.state.idx > 0) {
+      navigate(-1);
+    } else {
+      navigate('/questoes');
+    }
+  };
+
+  const backLabel = stateFromTitle || (stateFrom?.includes('/provas') ? 'Voltar para a Prova' : 'Voltar para Questões');
 
   const [question, setQuestion] = useState<Question | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
@@ -57,10 +73,10 @@ export const QuestionDetailPage: React.FC<QuestionDetailPageProps> = ({
       <Box sx={{ mb: 6 }}>
         <Button
           startIcon={<ArrowBackIcon />}
-          onClick={() => navigate('/questoes')}
+          onClick={handleBack}
           sx={{ mb: 3, color: 'text.secondary', fontWeight: 600 }}
         >
-          Voltar para Banco de Questões
+          {backLabel}
         </Button>
         <Alert severity="error" sx={{ borderRadius: 2 }}>
           Questão não encontrada no sistema.
@@ -74,10 +90,10 @@ export const QuestionDetailPage: React.FC<QuestionDetailPageProps> = ({
       <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
         <Button
           startIcon={<ArrowBackIcon />}
-          onClick={() => navigate('/questoes')}
+          onClick={handleBack}
           sx={{ color: 'text.secondary', fontWeight: 600 }}
         >
-          Voltar para Questões
+          {backLabel}
         </Button>
       </Box>
 

@@ -1163,7 +1163,7 @@ export const UserProfilePage: React.FC = () => {
                           <Tooltip title="Visualizar questão">
                             <IconButton
                               size="small"
-                              onClick={() => navigate(`/questoes/${q.id}`)}
+                              onClick={() => navigate(`/questoes/${q.id}`, { state: { from: '/perfil', fromTitle: 'Voltar para o Perfil' } })}
                             >
                               <VisibilityIcon fontSize="small" />
                             </IconButton>
