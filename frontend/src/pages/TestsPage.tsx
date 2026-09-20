@@ -9,11 +9,16 @@ import {
   CircularProgress,
   Stack,
   Alert,
+  TextField,
+  InputAdornment,
+  IconButton,
 } from '@mui/material';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import MenuBookIcon from '@mui/icons-material/MenuBook';
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
+import SearchIcon from '@mui/icons-material/Search';
+import ClearIcon from '@mui/icons-material/Clear';
 import { useNavigate } from 'react-router-dom';
 import { TestCard } from '../types';
 import { getTestCards } from '../services/api';
@@ -27,6 +32,7 @@ export const TestsPage: React.FC = () => {
 
   const [tests, setTests] = useState<TestCard[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
+  const [searchTerm, setSearchTerm] = useState<string>('');
 
   useEffect(() => {
     loadTests();
@@ -110,6 +116,16 @@ export const TestsPage: React.FC = () => {
     );
   }
 
+  const filteredTests = tests.filter((test) => {
+    if (!searchTerm.trim()) return true;
+    const term = searchTerm.toLowerCase();
+    const matchName = test.name.toLowerCase().includes(term);
+    const matchOrigin = test.originName ? test.originName.toLowerCase().includes(term) : false;
+    const matchArea = test.areaName ? test.areaName.toLowerCase().includes(term) : false;
+    const matchYear = test.year ? String(test.year).includes(term) : false;
+    return matchName || matchOrigin || matchArea || matchYear;
+  });
+
   return (
     <Box sx={{ mb: 6 }}>
       <Box sx={{ mb: 3 }}>
@@ -121,13 +137,60 @@ export const TestsPage: React.FC = () => {
         </Typography>
       </Box>
 
+      {/* Barra de Pesquisa */}
+      <Box sx={{ mb: 3.5, display: 'flex', gap: 2, alignItems: 'center', flexWrap: 'wrap' }}>
+        <TextField
+          placeholder="Pesquisar prova por nome, banca, área ou ano..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          size="small"
+          sx={{
+            flex: { xs: '1 1 100%', sm: '0 1 480px' },
+            '& .MuiOutlinedInput-root': {
+              borderRadius: 2,
+            },
+          }}
+          InputProps={{
+            startAdornment: (
+              <InputAdornment position="start">
+                <SearchIcon sx={{ color: PALETTE_COLORS.primary }} />
+              </InputAdornment>
+            ),
+            endAdornment: searchTerm ? (
+              <InputAdornment position="end">
+                <IconButton size="small" onClick={() => setSearchTerm('')} edge="end">
+                  <ClearIcon fontSize="small" />
+                </IconButton>
+              </InputAdornment>
+            ) : null,
+          }}
+        />
+        {searchTerm && (
+          <Typography variant="body2" sx={{ color: 'text.secondary', fontWeight: 600 }}>
+            {filteredTests.length} {filteredTests.length === 1 ? 'prova encontrada' : 'provas encontradas'}
+          </Typography>
+        )}
+      </Box>
+
       {tests.length === 0 ? (
         <Alert severity="info" sx={{ borderRadius: 2 }}>
           Nenhuma prova encontrada cadastrada no sistema.
         </Alert>
+      ) : filteredTests.length === 0 ? (
+        <Alert
+          severity="info"
+          sx={{ borderRadius: 2 }}
+          action={
+            <Button color="inherit" size="small" onClick={() => setSearchTerm('')}>
+              Limpar busca
+            </Button>
+          }
+        >
+          Nenhuma prova encontrada para "{searchTerm}".
+        </Alert>
       ) : (
         <Grid container spacing={3}>
-          {tests.map((test) => (
+          {filteredTests.map((test) => (
             <Grid item xs={12} md={6} key={test.id}>
               <Paper
                 elevation={4}

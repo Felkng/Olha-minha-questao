@@ -9,11 +9,16 @@ import {
   CircularProgress,
   Stack,
   Alert,
+  TextField,
+  InputAdornment,
+  IconButton,
 } from '@mui/material';
 import AccountBalanceIcon from '@mui/icons-material/AccountBalance';
 import QuizOutlinedIcon from '@mui/icons-material/QuizOutlined';
 import MenuBookOutlinedIcon from '@mui/icons-material/MenuBookOutlined';
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
+import SearchIcon from '@mui/icons-material/Search';
+import ClearIcon from '@mui/icons-material/Clear';
 import { useNavigate } from 'react-router-dom';
 import { OriginCard } from '../types';
 import { getOriginCards } from '../services/api';
@@ -27,6 +32,7 @@ export const OriginsPage: React.FC = () => {
 
   const [origins, setOrigins] = useState<OriginCard[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
+  const [searchTerm, setSearchTerm] = useState<string>('');
 
   useEffect(() => {
     loadOrigins();
@@ -52,6 +58,14 @@ export const OriginsPage: React.FC = () => {
     );
   }
 
+  const filteredOrigins = origins.filter((origin) => {
+    if (!searchTerm.trim()) return true;
+    const term = searchTerm.toLowerCase();
+    const matchName = origin.name.toLowerCase().includes(term);
+    const matchDesc = origin.description ? origin.description.toLowerCase().includes(term) : false;
+    return matchName || matchDesc;
+  });
+
   return (
     <Box sx={{ mb: 6 }}>
       <Box sx={{ mb: 3 }}>
@@ -63,13 +77,60 @@ export const OriginsPage: React.FC = () => {
         </Typography>
       </Box>
 
+      {/* Barra de Pesquisa */}
+      <Box sx={{ mb: 3.5, display: 'flex', gap: 2, alignItems: 'center', flexWrap: 'wrap' }}>
+        <TextField
+          placeholder="Pesquisar banca por nome ou descrição..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          size="small"
+          sx={{
+            flex: { xs: '1 1 100%', sm: '0 1 480px' },
+            '& .MuiOutlinedInput-root': {
+              borderRadius: 2,
+            },
+          }}
+          InputProps={{
+            startAdornment: (
+              <InputAdornment position="start">
+                <SearchIcon sx={{ color: PALETTE_COLORS.secondary }} />
+              </InputAdornment>
+            ),
+            endAdornment: searchTerm ? (
+              <InputAdornment position="end">
+                <IconButton size="small" onClick={() => setSearchTerm('')} edge="end">
+                  <ClearIcon fontSize="small" />
+                </IconButton>
+              </InputAdornment>
+            ) : null,
+          }}
+        />
+        {searchTerm && (
+          <Typography variant="body2" sx={{ color: 'text.secondary', fontWeight: 600 }}>
+            {filteredOrigins.length} {filteredOrigins.length === 1 ? 'banca encontrada' : 'bancas encontradas'}
+          </Typography>
+        )}
+      </Box>
+
       {origins.length === 0 ? (
         <Alert severity="info" sx={{ borderRadius: 2 }}>
           Nenhuma banca encontrada cadastrada no sistema.
         </Alert>
+      ) : filteredOrigins.length === 0 ? (
+        <Alert
+          severity="info"
+          sx={{ borderRadius: 2 }}
+          action={
+            <Button color="inherit" size="small" onClick={() => setSearchTerm('')}>
+              Limpar busca
+            </Button>
+          }
+        >
+          Nenhuma banca encontrada para "{searchTerm}".
+        </Alert>
       ) : (
         <Grid container spacing={3}>
-          {origins.map((origin) => (
+          {filteredOrigins.map((origin) => (
             <Grid item xs={12} sm={6} md={4} key={origin.id}>
               <Paper
                 elevation={4}

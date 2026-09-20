@@ -9,11 +9,16 @@ import {
   CircularProgress,
   Stack,
   Alert,
+  TextField,
+  InputAdornment,
+  IconButton,
 } from '@mui/material';
 import CategoryIcon from '@mui/icons-material/Category';
 import QuizOutlinedIcon from '@mui/icons-material/QuizOutlined';
 import MenuBookOutlinedIcon from '@mui/icons-material/MenuBookOutlined';
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
+import SearchIcon from '@mui/icons-material/Search';
+import ClearIcon from '@mui/icons-material/Clear';
 import { useNavigate } from 'react-router-dom';
 import { AreaCard } from '../types';
 import { getAreaCards } from '../services/api';
@@ -27,6 +32,7 @@ export const AreasPage: React.FC = () => {
 
   const [areas, setAreas] = useState<AreaCard[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
+  const [searchTerm, setSearchTerm] = useState<string>('');
 
   useEffect(() => {
     loadAreas();
@@ -52,6 +58,14 @@ export const AreasPage: React.FC = () => {
     );
   }
 
+  const filteredAreas = areas.filter((area) => {
+    if (!searchTerm.trim()) return true;
+    const term = searchTerm.toLowerCase();
+    const matchName = area.name.toLowerCase().includes(term);
+    const matchDesc = area.description ? area.description.toLowerCase().includes(term) : false;
+    return matchName || matchDesc;
+  });
+
   return (
     <Box sx={{ mb: 6 }}>
       <Box sx={{ mb: 3 }}>
@@ -63,13 +77,60 @@ export const AreasPage: React.FC = () => {
         </Typography>
       </Box>
 
+      {/* Barra de Pesquisa */}
+      <Box sx={{ mb: 3.5, display: 'flex', gap: 2, alignItems: 'center', flexWrap: 'wrap' }}>
+        <TextField
+          placeholder="Pesquisar área por nome ou descrição..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          size="small"
+          sx={{
+            flex: { xs: '1 1 100%', sm: '0 1 480px' },
+            '& .MuiOutlinedInput-root': {
+              borderRadius: 2,
+            },
+          }}
+          InputProps={{
+            startAdornment: (
+              <InputAdornment position="start">
+                <SearchIcon sx={{ color: PALETTE_COLORS.primary }} />
+              </InputAdornment>
+            ),
+            endAdornment: searchTerm ? (
+              <InputAdornment position="end">
+                <IconButton size="small" onClick={() => setSearchTerm('')} edge="end">
+                  <ClearIcon fontSize="small" />
+                </IconButton>
+              </InputAdornment>
+            ) : null,
+          }}
+        />
+        {searchTerm && (
+          <Typography variant="body2" sx={{ color: 'text.secondary', fontWeight: 600 }}>
+            {filteredAreas.length} {filteredAreas.length === 1 ? 'área encontrada' : 'áreas encontradas'}
+          </Typography>
+        )}
+      </Box>
+
       {areas.length === 0 ? (
         <Alert severity="info" sx={{ borderRadius: 2 }}>
           Nenhuma área encontrada cadastrada no sistema.
         </Alert>
+      ) : filteredAreas.length === 0 ? (
+        <Alert
+          severity="info"
+          sx={{ borderRadius: 2 }}
+          action={
+            <Button color="inherit" size="small" onClick={() => setSearchTerm('')}>
+              Limpar busca
+            </Button>
+          }
+        >
+          Nenhuma área encontrada para "{searchTerm}".
+        </Alert>
       ) : (
         <Grid container spacing={3}>
-          {areas.map((area) => (
+          {filteredAreas.map((area) => (
             <Grid item xs={12} sm={6} md={4} key={area.id}>
               <Paper
                 elevation={4}
