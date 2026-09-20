@@ -86,8 +86,15 @@ public class TestService {
 
     @Transactional(readOnly = true)
     public List<TestResponseDTO> findAll(Long originId, Long areaId, Integer year) {
+        return findAll(originId, areaId, year, null);
+    }
+
+    @Transactional(readOnly = true)
+    public List<TestResponseDTO> findAll(Long originId, Long areaId, Integer year, Long createdByUserId) {
         List<Test> tests;
-        if (originId != null && year != null) {
+        if (createdByUserId != null) {
+            tests = testRepository.findByCreatedByUserIdOrderByYearDescIdDesc(createdByUserId);
+        } else if (originId != null && year != null) {
             tests = testRepository.findByOriginIdAndYear(originId, year);
         } else if (originId != null) {
             tests = testRepository.findByOriginId(originId);

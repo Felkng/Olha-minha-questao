@@ -31,8 +31,9 @@ public class TestController {
     public ResponseEntity<List<TestResponseDTO>> findAll(
             @RequestParam(required = false) Long originId,
             @RequestParam(required = false) Long areaId,
-            @RequestParam(required = false) Integer year) {
-        return ResponseEntity.ok(testService.findAll(originId, areaId, year));
+            @RequestParam(required = false) Integer year,
+            @RequestParam(required = false) Long createdByUserId) {
+        return ResponseEntity.ok(testService.findAll(originId, areaId, year, createdByUserId));
     }
 
     @GetMapping("/cards")
