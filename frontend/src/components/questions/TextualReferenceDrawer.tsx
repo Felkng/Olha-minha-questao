@@ -270,6 +270,13 @@ export const TextualReferenceDrawer: React.FC<TextualReferenceDrawerProps> = ({
     );
   }, [reference?.content, annotations, isDark]);
 
+  const handleScroll = () => {
+    if (floatingMenuPos) {
+      setFloatingMenuPos(null);
+      setSelectedRange(null);
+    }
+  };
+
   if (!reference) return null;
 
   return (
@@ -279,79 +286,83 @@ export const TextualReferenceDrawer: React.FC<TextualReferenceDrawerProps> = ({
       onClose={onClose}
       PaperProps={{
         sx: {
-          width: { xs: '100vw', sm: 520, md: 600 },
-          p: { xs: 2.5, md: 3.5 },
+          width: { xs: '100vw', sm: 540, md: 640 },
           backgroundColor: isDark ? '#1a1e24' : '#ffffff',
           boxShadow: '-4px 0 24px rgba(0,0,0,0.25)',
-          overflowY: 'auto',
+          display: 'flex',
+          flexDirection: 'column',
+          height: '100%',
+          overflow: 'hidden',
         },
       }}
     >
-      {/* Drawer Header */}
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-          <MenuBookIcon sx={{ color: PALETTE_COLORS.primary, fontSize: '1.6rem' }} />
-          <Box>
-            <Typography variant="h6" sx={{ fontWeight: 800, lineHeight: 1.2 }}>
-              Texto de Apoio
-            </Typography>
-            {questionIdentifier && (
-              <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600 }}>
-                Referenciado na Questão {questionIdentifier}
+      {/* 1. Fixed Header Section */}
+      <Box sx={{ p: { xs: 2.5, md: 3 }, pb: 1.5, flexShrink: 0 }}>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+            <MenuBookIcon sx={{ color: PALETTE_COLORS.primary, fontSize: '1.6rem' }} />
+            <Box>
+              <Typography variant="h6" sx={{ fontWeight: 800, lineHeight: 1.2 }}>
+                Texto de Apoio
               </Typography>
-            )}
+              {questionIdentifier && (
+                <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600 }}>
+                  Referenciado na Questão {questionIdentifier}
+                </Typography>
+              )}
+            </Box>
           </Box>
+          <IconButton size="small" onClick={onClose} sx={{ color: 'text.secondary' }}>
+            <CloseIcon />
+          </IconButton>
         </Box>
-        <IconButton size="small" onClick={onClose} sx={{ color: 'text.secondary' }}>
-          <CloseIcon />
-        </IconButton>
+
+        <Divider sx={{ mb: 1.5 }} />
+
+        {/* Toolbar / Actions Bar */}
+        <Paper
+          elevation={0}
+          sx={{
+            p: 1.25,
+            px: 1.5,
+            borderRadius: 2,
+            border: '1px solid',
+            borderColor: 'divider',
+            backgroundColor: isDark ? 'rgba(255, 255, 255, 0.03)' : 'rgba(0, 0, 0, 0.02)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            flexWrap: 'wrap',
+            gap: 1,
+          }}
+        >
+          <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 500 }}>
+            💡 <strong>Dica:</strong> Selecione um trecho com o mouse para destacar ou sublinhar.
+          </Typography>
+
+          {annotations.length > 0 && (
+            <Tooltip title="Remover todos os destaques e sublinhados deste texto">
+              <Button
+                size="small"
+                variant="outlined"
+                color="inherit"
+                startIcon={<DeleteOutlineIcon sx={{ fontSize: '1rem' }} />}
+                onClick={clearAllAnnotations}
+                sx={{
+                  fontSize: '0.75rem',
+                  textTransform: 'none',
+                  py: 0.25,
+                  px: 1.2,
+                  borderRadius: 1.5,
+                  borderColor: 'divider',
+                }}
+              >
+                Limpar Anotações ({annotations.length})
+              </Button>
+            </Tooltip>
+          )}
+        </Paper>
       </Box>
-
-      <Divider sx={{ mb: 2 }} />
-
-      {/* Toolbar / Actions Bar */}
-      <Paper
-        elevation={0}
-        sx={{
-          p: 1.5,
-          mb: 2.5,
-          borderRadius: 2,
-          border: '1px solid',
-          borderColor: 'divider',
-          backgroundColor: isDark ? 'rgba(255, 255, 255, 0.03)' : 'rgba(0, 0, 0, 0.02)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          flexWrap: 'wrap',
-          gap: 1,
-        }}
-      >
-        <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 500 }}>
-          💡 <strong>Dica:</strong> Selecione um trecho com o mouse para destacar ou sublinhar.
-        </Typography>
-
-        {annotations.length > 0 && (
-          <Tooltip title="Remover todos os destaques e sublinhados deste texto">
-            <Button
-              size="small"
-              variant="outlined"
-              color="inherit"
-              startIcon={<DeleteOutlineIcon sx={{ fontSize: '1rem' }} />}
-              onClick={clearAllAnnotations}
-              sx={{
-                fontSize: '0.75rem',
-                textTransform: 'none',
-                py: 0.25,
-                px: 1.2,
-                borderRadius: 1.5,
-                borderColor: 'divider',
-              }}
-            >
-              Limpar Anotações ({annotations.length})
-            </Button>
-          </Tooltip>
-        )}
-      </Paper>
 
       {/* Floating Toolbar upon text selection */}
       {floatingMenuPos && selectedRange && (
@@ -413,118 +424,138 @@ export const TextualReferenceDrawer: React.FC<TextualReferenceDrawerProps> = ({
         </Paper>
       )}
 
-      {/* Reference Title & Subtitle */}
-      {reference.title && (
-        <Typography variant="h6" sx={{ fontWeight: 800, mb: 1, color: 'text.primary' }}>
-          {reference.title}
-        </Typography>
-      )}
-
-      {reference.subtitle && (
-        <Typography
-          variant="subtitle1"
-          sx={{
-            fontStyle: 'italic',
-            fontWeight: 600,
-            color: 'text.secondary',
-            mb: 1.5,
-          }}
-        >
-          {reference.subtitle}
-        </Typography>
-      )}
-
-      {reference.caption && (
-        <Typography
-          variant="caption"
-          sx={{
-            display: 'block',
-            fontWeight: 600,
-            color: PALETTE_COLORS.secondary,
-            mb: 2,
-          }}
-        >
-          {reference.caption}
-        </Typography>
-      )}
-
-      {/* Reference Content Area */}
+      {/* 2. Scrollable Content Body */}
       <Box
-        ref={textContainerRef}
-        onMouseUp={handleMouseUp}
+        onScroll={handleScroll}
         sx={{
-          mb: 3,
-          p: 2.5,
-          borderRadius: 2,
-          border: '1px solid',
-          borderColor: 'divider',
-          backgroundColor: isDark ? 'rgba(0, 0, 0, 0.15)' : 'rgba(0, 0, 0, 0.01)',
-          minHeight: 200,
-          cursor: 'text',
+          flex: 1,
+          overflowY: 'auto',
+          px: { xs: 2.5, md: 3 },
+          py: 1,
         }}
       >
-        {renderedText}
-      </Box>
+        {/* Reference Title & Subtitle */}
+        {reference.title && (
+          <Typography variant="h6" sx={{ fontWeight: 800, mb: 0.5, color: 'text.primary' }}>
+            {reference.title}
+          </Typography>
+        )}
 
-      {/* Reference Footer: Author & Source */}
-      {(reference.author || reference.reference || reference.source) && (
-        <Paper
-          elevation={0}
+        {reference.subtitle && (
+          <Typography
+            variant="subtitle1"
+            sx={{
+              fontStyle: 'italic',
+              fontWeight: 600,
+              color: 'text.secondary',
+              mb: 1.5,
+            }}
+          >
+            {reference.subtitle}
+          </Typography>
+        )}
+
+        {reference.caption && (
+          <Typography
+            variant="caption"
+            sx={{
+              display: 'block',
+              fontWeight: 600,
+              color: PALETTE_COLORS.secondary,
+              mb: 2,
+            }}
+          >
+            {reference.caption}
+          </Typography>
+        )}
+
+        {/* Reference Content Area - fully wraps 100% of text without overflowing */}
+        <Box
+          ref={textContainerRef}
+          onMouseUp={handleMouseUp}
           sx={{
-            p: 2,
+            mb: 2.5,
+            p: 2.5,
             borderRadius: 2,
             border: '1px solid',
             borderColor: 'divider',
-            backgroundColor: isDark ? 'rgba(255, 255, 255, 0.02)' : 'rgba(0, 0, 0, 0.02)',
-            mt: 'auto',
+            backgroundColor: isDark ? 'rgba(0, 0, 0, 0.2)' : 'rgba(0, 0, 0, 0.02)',
+            cursor: 'text',
           }}
         >
-          {reference.author && (
-            <Typography variant="body2" sx={{ color: 'text.secondary', mb: 0.5 }}>
-              <strong>Autor:</strong> {reference.author}
-            </Typography>
-          )}
+          {renderedText}
+        </Box>
 
-          {(reference.reference || reference.source) && (
-            <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-              <strong>Fonte:</strong>{' '}
-              {(() => {
-                const url = reference.reference || reference.source || '';
-                if (url.startsWith('http://') || url.startsWith('https://')) {
-                  return (
-                    <a
-                      href={url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      style={{
-                        color: PALETTE_COLORS.secondary,
-                        textDecoration: 'none',
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '4px',
-                        wordBreak: 'break-all',
-                      }}
-                    >
-                      {url} <OpenInNewIcon sx={{ fontSize: '0.85rem' }} />
-                    </a>
-                  );
-                }
-                return url;
-              })()}
-            </Typography>
-          )}
-        </Paper>
-      )}
+        {/* Reference Footer: Author & Source */}
+        {(reference.author || reference.reference || reference.source) && (
+          <Paper
+            elevation={0}
+            sx={{
+              p: 2,
+              mb: 2,
+              borderRadius: 2,
+              border: '1px solid',
+              borderColor: 'divider',
+              backgroundColor: isDark ? 'rgba(255, 255, 255, 0.02)' : 'rgba(0, 0, 0, 0.02)',
+            }}
+          >
+            {reference.author && (
+              <Typography variant="body2" sx={{ color: 'text.secondary', mb: 0.5 }}>
+                <strong>Autor:</strong> {reference.author}
+              </Typography>
+            )}
 
-      {/* Bottom Close Button */}
-      <Box sx={{ mt: 3, textAlign: 'right' }}>
+            {(reference.reference || reference.source) && (
+              <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+                <strong>Fonte:</strong>{' '}
+                {(() => {
+                  const url = reference.reference || reference.source || '';
+                  if (url.startsWith('http://') || url.startsWith('https://')) {
+                    return (
+                      <a
+                        href={url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={{
+                          color: PALETTE_COLORS.secondary,
+                          textDecoration: 'none',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                          wordBreak: 'break-all',
+                        }}
+                      >
+                        {url} <OpenInNewIcon sx={{ fontSize: '0.85rem' }} />
+                      </a>
+                    );
+                  }
+                  return url;
+                })()}
+              </Typography>
+            )}
+          </Paper>
+        )}
+      </Box>
+
+      {/* 3. Docked Bottom Footer (Separated by border, never overlaps text) */}
+      <Box
+        sx={{
+          p: { xs: 2, md: 2.5 },
+          borderTop: '1px solid',
+          borderColor: 'divider',
+          backgroundColor: isDark ? '#1a1e24' : '#ffffff',
+          flexShrink: 0,
+          textAlign: 'right',
+        }}
+      >
         <Button
           variant="contained"
           onClick={onClose}
           sx={{
             fontWeight: 700,
             borderRadius: 2,
-            px: 3,
+            px: 3.5,
+            py: 1,
             backgroundColor: isDark ? PALETTE_COLORS.primary : undefined,
             color: isDark ? '#1a1e24' : undefined,
           }}
