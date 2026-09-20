@@ -35,9 +35,11 @@ import AddIcon from '@mui/icons-material/Add';
 import UploadFileIcon from '@mui/icons-material/UploadFile';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import WarningAmberIcon from '@mui/icons-material/WarningAmber';
+import MenuBookIcon from '@mui/icons-material/MenuBook';
+import EditIcon from '@mui/icons-material/Edit';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
-import { Area, Origin } from '../../types';
+import { Area, Origin, TextualReference, AvailableProvaOption } from '../../types';
 import {
   getAreas,
   getOrigins,
@@ -46,6 +48,7 @@ import {
   parseAnswerKeyPdf,
 } from '../../services/api';
 import { PALETTE_COLORS } from '../../theme/theme';
+import { useAppTheme } from '../../theme/ThemeContext';
 import { CreateOriginModal } from './CreateOriginModal';
 import { CreateAreaModal } from './CreateAreaModal';
 
@@ -65,6 +68,7 @@ interface QuestionForm {
   id: string; // temp unique client id
   identifier: string;
   enunciado: string;
+  textualReferenceIndex?: number | null;
   alternatives: QuestionAltForm[];
 }
 
@@ -104,6 +108,20 @@ export const CreateTestWizardModal: React.FC<CreateTestWizardModalProps> = ({
   const [answerKeyPdfFile, setAnswerKeyPdfFile] = useState<File | null>(null);
   const [parsingAnswerKey, setParsingAnswerKey] = useState(false);
   const [matchedCount, setMatchedCount] = useState<number | null>(null);
+  const [availableProvas, setAvailableProvas] = useState<AvailableProvaOption[]>([]);
+  const [selectedProvaId, setSelectedProvaId] = useState<string>('');
+
+  // Textual References state
+  const [textualReferences, setTextualReferences] = useState<TextualReference[]>([]);
+  const [openTextualRefDialog, setOpenTextualRefDialog] = useState(false);
+  const [editingRefIndex, setEditingRefIndex] = useState<number | null>(null);
+  const [refTitle, setRefTitle] = useState('');
+  const [refContent, setRefContent] = useState('');
+  const [refAuthor, setRefAuthor] = useState('');
+  const [refSource, setRefSource] = useState('');
+
+  const { mode } = useAppTheme();
+  const isDark = mode === 'dark';
 
   // Options
   const [origins, setOrigins] = useState<Origin[]>([]);
@@ -143,6 +161,9 @@ export const CreateTestWizardModal: React.FC<CreateTestWizardModalProps> = ({
     setCreationMode('manual');
     setExamPdfFile(null);
     setQuestions([]);
+    setTextualReferences([]);
+    setAvailableProvas([]);
+    setSelectedProvaId('');
     setAnswerKeyPdfFile(null);
     setMatchedCount(null);
     setErrorMessage(null);
@@ -175,16 +196,20 @@ export const CreateTestWizardModal: React.FC<CreateTestWizardModalProps> = ({
       setParsingExam(true);
       try {
         const parsed = await parseExamPdf(examPdfFile);
-        if (!parsed || parsed.length === 0) {
+        const parsedQuestions = parsed.questions || [];
+        if (parsedQuestions.length === 0) {
           setErrorMessage('Nenhuma questão pôde ser identificada no PDF. Verifique o arquivo ou prossiga manualmente.');
           setParsingExam(false);
           return;
         }
 
-        const formattedQuestions: QuestionForm[] = parsed.map((pq, idx) => ({
+        setTextualReferences(parsed.textualReferences || []);
+
+        const formattedQuestions: QuestionForm[] = parsedQuestions.map((pq, idx) => ({
           id: `q_${Date.now()}_${idx}`,
           identifier: pq.identifier || `${idx + 1}`,
           enunciado: pq.enunciado || '',
+          textualReferenceIndex: null,
           alternatives: (pq.alternatives && pq.alternatives.length > 0)
             ? pq.alternatives.map((alt) => ({
                 identifier: alt.identifier,
@@ -243,7 +268,7 @@ export const CreateTestWizardModal: React.FC<CreateTestWizardModalProps> = ({
   };
 
   // Update question field
-  const handleUpdateQuestion = (index: number, field: 'identifier' | 'enunciado', val: string) => {
+  const handleUpdateQuestion = (index: number, field: 'identifier' | 'enunciado' | 'textualReferenceIndex', val: any) => {
     const updated = [...questions];
     updated[index] = { ...updated[index], [field]: val };
     setQuestions(updated);
@@ -290,11 +315,17 @@ export const CreateTestWizardModal: React.FC<CreateTestWizardModalProps> = ({
   };
 
   // Parse answer key PDF
-  const handleUploadAnswerKeyPdf = async (file: File) => {
+  const handleUploadAnswerKeyPdf = async (file: File, provaToSelect?: string) => {
     setParsingAnswerKey(true);
     setErrorMessage(null);
     try {
-      const answers = await parseAnswerKeyPdf(file);
+      const res = await parseAnswerKeyPdf(file, provaToSelect || selectedProvaId || undefined);
+      const answers = res.answers || [];
+      setAvailableProvas(res.availableProvas || []);
+      if (res.selectedProva) {
+        setSelectedProvaId(res.selectedProva);
+      }
+
       if (!answers || answers.length === 0) {
         setErrorMessage('Não foi possível identificar correspondências de gabarito no PDF.');
         setParsingAnswerKey(false);
@@ -374,12 +405,23 @@ export const CreateTestWizardModal: React.FC<CreateTestWizardModalProps> = ({
         originId: originId ? Number(originId) : null,
         areaId: areaId ? Number(areaId) : null,
         description: description.trim() || undefined,
+        textualReferences: textualReferences.map((ref) => ({
+          title: ref.title.trim(),
+          content: ref.content.trim(),
+          author: ref.author?.trim() || undefined,
+          source: ref.source?.trim() || undefined,
+          mediaUrl: ref.mediaUrl?.trim() || undefined,
+        })),
         questions: questions.map((q) => ({
           identifier: q.identifier.trim(),
           enunciado: q.enunciado.trim(),
           year: Number(year),
           originId: originId ? Number(originId) : null,
           areaId: areaId ? Number(areaId) : null,
+          textualReferenceIndex:
+            q.textualReferenceIndex !== undefined && q.textualReferenceIndex !== null
+              ? Number(q.textualReferenceIndex)
+              : null,
           alternatives: q.alternatives.map((alt) => ({
             identifier: alt.identifier.trim(),
             text: alt.text.trim(),
@@ -587,6 +629,107 @@ export const CreateTestWizardModal: React.FC<CreateTestWizardModalProps> = ({
               </Alert>
             )}
 
+            {/* Gerenciamento de Textos de Apoio / Referências Textuais */}
+            <Paper variant="outlined" sx={{ p: 2, borderRadius: 2, bgcolor: isDark ? 'background.paper' : '#fbfbfb' }}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                <Stack direction="row" spacing={1} alignItems="center">
+                  <MenuBookIcon color="primary" />
+                  <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
+                    Textos de Apoio / Referências Textuais ({textualReferences.length})
+                  </Typography>
+                </Stack>
+                <Button
+                  variant="outlined"
+                  size="small"
+                  startIcon={<AddIcon />}
+                  onClick={() => {
+                    setEditingRefIndex(null);
+                    setRefTitle('');
+                    setRefAuthor('');
+                    setRefSource('');
+                    setRefContent('');
+                    setOpenTextualRefDialog(true);
+                  }}
+                >
+                  Adicionar Texto
+                </Button>
+              </Box>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
+                Textos de interpretação identificados no PDF ou cadastrados manualmente. Cada questão abaixo pode ser associada a um desses textos através do seletor.
+              </Typography>
+
+              {textualReferences.length === 0 ? (
+                <Typography variant="caption" color="text.secondary" sx={{ fontStyle: 'italic', display: 'block' }}>
+                  Nenhum texto de apoio adicionado. Se a prova possui textos longos de leitura ou interpretação, adicione-os aqui.
+                </Typography>
+              ) : (
+                <Stack spacing={1}>
+                  {textualReferences.map((ref, rIdx) => (
+                    <Paper
+                      key={rIdx}
+                      variant="outlined"
+                      sx={{
+                        p: 1.5,
+                        borderRadius: 1.5,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        bgcolor: 'background.default',
+                      }}
+                    >
+                      <Box sx={{ flex: 1, minWidth: 0, mr: 2 }}>
+                        <Typography variant="subtitle2" sx={{ fontWeight: 700 }} noWrap>
+                          {ref.title || `Texto ${rIdx + 1}`}
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary" noWrap sx={{ display: 'block' }}>
+                          {[ref.author, ref.source].filter(Boolean).join(' • ') || (ref.content.substring(0, 80) + '...')}
+                        </Typography>
+                      </Box>
+                      <Stack direction="row" spacing={0.5}>
+                        <Tooltip title="Editar Texto">
+                          <IconButton
+                            size="small"
+                            onClick={() => {
+                              setEditingRefIndex(rIdx);
+                              setRefTitle(ref.title || '');
+                              setRefAuthor(ref.author || '');
+                              setRefSource(ref.source || '');
+                              setRefContent(ref.content || '');
+                              setOpenTextualRefDialog(true);
+                            }}
+                          >
+                            <EditIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                        <Tooltip title="Excluir Texto">
+                          <IconButton
+                            size="small"
+                            color="error"
+                            onClick={() => {
+                              const updated = textualReferences.filter((_, i) => i !== rIdx);
+                              setTextualReferences(updated);
+                              setQuestions((prev) =>
+                                prev.map((q) => {
+                                  if (q.textualReferenceIndex === rIdx) {
+                                    return { ...q, textualReferenceIndex: null };
+                                  } else if (q.textualReferenceIndex !== undefined && q.textualReferenceIndex !== null && q.textualReferenceIndex > rIdx) {
+                                    return { ...q, textualReferenceIndex: q.textualReferenceIndex - 1 };
+                                  }
+                                  return q;
+                                })
+                              );
+                            }}
+                          >
+                            <DeleteOutlineIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                      </Stack>
+                    </Paper>
+                  ))}
+                </Stack>
+              )}
+            </Paper>
+
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
                 Questões da Prova ({questions.length})
@@ -625,6 +768,17 @@ export const CreateTestWizardModal: React.FC<CreateTestWizardModalProps> = ({
                       >
                         {q.enunciado ? q.enunciado.substring(0, 80) + '...' : 'Questão sem enunciado'}
                       </Typography>
+                      {q.textualReferenceIndex !== undefined && q.textualReferenceIndex !== null && textualReferences[q.textualReferenceIndex] && (
+                        <Tooltip title={`Texto de Apoio: ${textualReferences[q.textualReferenceIndex].title}`}>
+                          <Chip
+                            icon={<MenuBookIcon fontSize="small" />}
+                            label="Texto"
+                            size="small"
+                            variant="outlined"
+                            color="primary"
+                          />
+                        </Tooltip>
+                      )}
                       <Chip
                         label={`${q.alternatives.length} alts`}
                         size="small"
@@ -663,6 +817,45 @@ export const CreateTestWizardModal: React.FC<CreateTestWizardModalProps> = ({
                         fullWidth
                         size="small"
                       />
+
+                      {/* Textual Reference Selector */}
+                      {textualReferences.length > 0 && (
+                        <Box sx={{ mt: 1, mb: 1 }}>
+                          <FormControl fullWidth size="small">
+                            <InputLabel>Texto de Apoio / Referência Textual (Opcional)</InputLabel>
+                            <Select
+                              value={q.textualReferenceIndex !== undefined && q.textualReferenceIndex !== null ? q.textualReferenceIndex : ''}
+                              label="Texto de Apoio / Referência Textual (Opcional)"
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                handleUpdateQuestion(qIndex, 'textualReferenceIndex', val === '' ? null : Number(val));
+                              }}
+                            >
+                              <MenuItem value="">
+                                <em>Nenhum texto de apoio</em>
+                              </MenuItem>
+                              {textualReferences.map((ref, rIdx) => (
+                                <MenuItem key={rIdx} value={rIdx}>
+                                  {ref.title || `Texto ${rIdx + 1}`}
+                                </MenuItem>
+                              ))}
+                            </Select>
+                          </FormControl>
+                          {q.textualReferenceIndex !== undefined && q.textualReferenceIndex !== null && textualReferences[q.textualReferenceIndex] && (
+                            <Paper variant="outlined" sx={{ p: 1.5, mt: 1, bgcolor: 'action.hover', borderRadius: 1.5 }}>
+                              <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 0.5 }}>
+                                <MenuBookIcon fontSize="small" color="primary" />
+                                <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
+                                  {textualReferences[q.textualReferenceIndex].title || `Texto ${q.textualReferenceIndex + 1}`}
+                                </Typography>
+                              </Stack>
+                              <Typography variant="caption" color="text.secondary" sx={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                                {textualReferences[q.textualReferenceIndex].content}
+                              </Typography>
+                            </Paper>
+                          )}
+                        </Box>
+                      )}
 
                       <Box>
                         <Typography variant="caption" sx={{ fontWeight: 700, color: 'text.secondary', display: 'block', mb: 1 }}>
@@ -760,6 +953,34 @@ export const CreateTestWizardModal: React.FC<CreateTestWizardModalProps> = ({
                   </Alert>
                 )}
               </Stack>
+
+              {availableProvas.length > 0 && (
+                <Box sx={{ mt: 2 }}>
+                  <FormControl fullWidth size="small">
+                    <InputLabel>Caderno / Cargo Identificado no Gabarito</InputLabel>
+                    <Select
+                      value={selectedProvaId}
+                      label="Caderno / Cargo Identificado no Gabarito"
+                      onChange={(e) => {
+                        const val = e.target.value as string;
+                        setSelectedProvaId(val);
+                        if (answerKeyPdfFile) {
+                          handleUploadAnswerKeyPdf(answerKeyPdfFile, val);
+                        }
+                      }}
+                    >
+                      {availableProvas.map((p) => (
+                        <MenuItem key={p.id} value={p.id}>
+                          {p.name}
+                        </MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                  <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: 'block' }}>
+                    O gabarito possui múltiplos cadernos/cargos. Selecione o correto para associar as respostas.
+                  </Typography>
+                </Box>
+              )}
             </Paper>
 
             <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
@@ -871,6 +1092,9 @@ export const CreateTestWizardModal: React.FC<CreateTestWizardModalProps> = ({
                   </Typography>
                 )}
                 <Typography variant="body2">
+                  <strong>Textos de Apoio:</strong> {textualReferences.length} cadastrado(s)
+                </Typography>
+                <Typography variant="body2">
                   <strong>Total de Questões:</strong> {questions.length}
                 </Typography>
                 <Typography variant="body2">
@@ -894,6 +1118,15 @@ export const CreateTestWizardModal: React.FC<CreateTestWizardModalProps> = ({
                       <Typography variant="body2" sx={{ flex: 1 }} noWrap>
                         {q.enunciado ? q.enunciado.substring(0, 100) + '...' : 'Sem enunciado'}
                       </Typography>
+                      {q.textualReferenceIndex !== undefined && q.textualReferenceIndex !== null && textualReferences[q.textualReferenceIndex] && (
+                        <Chip
+                          icon={<MenuBookIcon fontSize="small" />}
+                          label={textualReferences[q.textualReferenceIndex].title || 'Texto'}
+                          size="small"
+                          variant="outlined"
+                          color="primary"
+                        />
+                      )}
                       {correct ? (
                         <Chip
                           label={`Gabarito: ${correct.identifier}`}
@@ -983,6 +1216,94 @@ export const CreateTestWizardModal: React.FC<CreateTestWizardModalProps> = ({
         setOpenCreateArea(false);
       }}
     />
+
+    <Dialog
+      open={openTextualRefDialog}
+      onClose={() => setOpenTextualRefDialog(false)}
+      maxWidth="md"
+      fullWidth
+    >
+      <DialogTitle sx={{ fontWeight: 800 }}>
+        {editingRefIndex !== null ? 'Editar Texto de Apoio' : 'Adicionar Texto de Apoio'}
+      </DialogTitle>
+      <DialogContent dividers>
+        <Stack spacing={2} sx={{ pt: 1 }}>
+          <TextField
+            label="Título do Texto (ex: Texto I - À moda brasileira)"
+            value={refTitle}
+            onChange={(e) => setRefTitle(e.target.value)}
+            fullWidth
+            required
+            size="small"
+          />
+          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
+            <TextField
+              label="Autor (opcional)"
+              value={refAuthor}
+              onChange={(e) => setRefAuthor(e.target.value)}
+              fullWidth
+              size="small"
+            />
+            <TextField
+              label="Fonte / Referência (opcional)"
+              value={refSource}
+              onChange={(e) => setRefSource(e.target.value)}
+              fullWidth
+              size="small"
+            />
+          </Stack>
+          <TextField
+            label="Conteúdo do Texto"
+            value={refContent}
+            onChange={(e) => setRefContent(e.target.value)}
+            fullWidth
+            required
+            multiline
+            rows={8}
+            placeholder="Cole ou digite o texto de apoio aqui..."
+          />
+        </Stack>
+      </DialogContent>
+      <DialogActions sx={{ p: 2 }}>
+        <Button onClick={() => setOpenTextualRefDialog(false)} sx={{ color: 'text.secondary' }}>
+          Cancelar
+        </Button>
+        <Button
+          variant="contained"
+          onClick={() => {
+            if (!refTitle.trim() || !refContent.trim()) {
+              alert('Título e Conteúdo são obrigatórios.');
+              return;
+            }
+            if (editingRefIndex !== null) {
+              const updated = [...textualReferences];
+              updated[editingRefIndex] = {
+                ...updated[editingRefIndex],
+                title: refTitle.trim(),
+                author: refAuthor.trim() || undefined,
+                source: refSource.trim() || undefined,
+                content: refContent.trim(),
+              };
+              setTextualReferences(updated);
+            } else {
+              setTextualReferences([
+                ...textualReferences,
+                {
+                  title: refTitle.trim(),
+                  author: refAuthor.trim() || undefined,
+                  source: refSource.trim() || undefined,
+                  content: refContent.trim(),
+                },
+              ]);
+            }
+            setOpenTextualRefDialog(false);
+          }}
+          sx={{ fontWeight: 700, backgroundColor: PALETTE_COLORS.primary }}
+        >
+          Salvar Texto
+        </Button>
+      </DialogActions>
+    </Dialog>
   </>
   );
 };

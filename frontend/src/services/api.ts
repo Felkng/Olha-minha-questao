@@ -21,8 +21,8 @@ import {
   UserProfile,
   UserSummary,
   QuestionBoardResponse,
-  ParsedQuestion,
-  ParsedAnswerKey,
+  ParsedExamResponse,
+  ParsedAnswerKeyResponse,
   TestWithQuestionsRequest,
 } from '../types';
 
@@ -121,6 +121,8 @@ const normalizeQuestion = (q: any): Question => ({
   subjectName: q.subjectName ?? q.subject?.name,
   testId: q.testId ?? q.test?.id,
   testName: q.testName ?? q.test?.name,
+  textualReference: q.textualReference ?? undefined,
+  textualReferenceId: q.textualReferenceId ?? q.textualReference?.id,
   difficultyLevel: q.difficultyLevel || 'SEM_DADOS',
   accuracyPercentage: q.accuracyPercentage ?? 0,
   totalAttempts: q.totalAttempts ?? 0,
@@ -199,6 +201,7 @@ export const createQuestion = async (questionData: {
   areaId: number;
   subjectId?: number;
   testId?: number;
+  textualReferenceId?: number | null;
   alternatives: { identifier: string; text: string; isCorrect?: boolean }[];
 }): Promise<Question> => {
   const response = await apiClient.post('/questions', questionData);
@@ -215,6 +218,7 @@ export const updateQuestion = async (
     areaId: number;
     subjectId?: number;
     testId?: number;
+    textualReferenceId?: number | null;
     alternatives: { identifier: string; text: string; isCorrect?: boolean }[];
   }
 ): Promise<Question> => {
@@ -381,28 +385,40 @@ export const createTestWithQuestions = async (
   return response.data;
 };
 
-export const parseExamPdf = async (file: File): Promise<ParsedQuestion[]> => {
+export const parseExamPdf = async (file: File): Promise<ParsedExamResponse> => {
   const formData = new FormData();
   formData.append('file', file);
-  const response = await apiClient.post<ParsedQuestion[]>('/tests/parse-exam-pdf', formData, {
+  const response = await apiClient.post<ParsedExamResponse>('/tests/parse-exam-pdf', formData, {
     headers: {
       'Content-Type': 'multipart/form-data',
     },
     timeout: 60000,
   });
-  return Array.isArray(response.data) ? response.data : [];
+  return {
+    questions: Array.isArray(response.data?.questions) ? response.data.questions : [],
+    textualReferences: Array.isArray(response.data?.textualReferences) ? response.data.textualReferences : [],
+    detectedTitle: response.data?.detectedTitle,
+  };
 };
 
-export const parseAnswerKeyPdf = async (file: File): Promise<ParsedAnswerKey[]> => {
+export const parseAnswerKeyPdf = async (file: File, provaName?: string): Promise<ParsedAnswerKeyResponse> => {
   const formData = new FormData();
   formData.append('file', file);
-  const response = await apiClient.post<ParsedAnswerKey[]>('/tests/parse-answer-key-pdf', formData, {
+  const params: Record<string, string> = {};
+  if (provaName) params.provaName = provaName;
+
+  const response = await apiClient.post<ParsedAnswerKeyResponse>('/tests/parse-answer-key-pdf', formData, {
+    params,
     headers: {
       'Content-Type': 'multipart/form-data',
     },
     timeout: 60000,
   });
-  return Array.isArray(response.data) ? response.data : [];
+  return {
+    answers: Array.isArray(response.data?.answers) ? response.data.answers : [],
+    availableProvas: Array.isArray(response.data?.availableProvas) ? response.data.availableProvas : [],
+    selectedProva: response.data?.selectedProva,
+  };
 };
 
 export const getTestEvaluation = async (testId: number): Promise<TestEvaluation> => {

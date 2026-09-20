@@ -60,6 +60,7 @@ export const EditQuestionModal: React.FC<EditQuestionModalProps> = ({
   const [areaId, setAreaId] = useState<number | ''>('');
   const [subjectId, setSubjectId] = useState<number | ''>('');
   const [testId, setTestId] = useState<number | ''>('');
+  const [textualReferenceId, setTextualReferenceId] = useState<number | ''>('');
 
   const [alternatives, setAlternatives] = useState<AltInput[]>([]);
   const [correctAltIndex, setCorrectAltIndex] = useState<number>(0);
@@ -80,6 +81,7 @@ export const EditQuestionModal: React.FC<EditQuestionModalProps> = ({
       setAreaId(question.areaId || '');
       setSubjectId(question.subjectId || '');
       setTestId(question.testId || '');
+      setTextualReferenceId(question.textualReferenceId || question.textualReference?.id ? Number(question.textualReferenceId || question.textualReference?.id) : '');
 
       const alts: AltInput[] = (question.alternatives || []).map((a) => ({
         id: a.id,
@@ -187,6 +189,7 @@ export const EditQuestionModal: React.FC<EditQuestionModalProps> = ({
         areaId: Number(areaId),
         subjectId: subjectId ? Number(subjectId) : undefined,
         testId: testId ? Number(testId) : undefined,
+        textualReferenceId: textualReferenceId ? Number(textualReferenceId) : null,
         alternatives: formattedAlternatives,
       });
 
@@ -315,6 +318,38 @@ export const EditQuestionModal: React.FC<EditQuestionModalProps> = ({
               </Select>
             </FormControl>
           </Stack>
+
+          {(() => {
+            const selectedTest = tests.find((t) => t.id === Number(testId));
+            const availableReferences = [...(selectedTest?.textualReferences || [])];
+            if (
+              question?.textualReference &&
+              !availableReferences.some((r) => r.id === question.textualReference?.id)
+            ) {
+              availableReferences.push(question.textualReference);
+            }
+            if (availableReferences.length === 0) return null;
+
+            return (
+              <FormControl fullWidth size="small">
+                <InputLabel>Texto de Apoio / Referência Textual (Opcional)</InputLabel>
+                <Select
+                  value={textualReferenceId}
+                  label="Texto de Apoio / Referência Textual (Opcional)"
+                  onChange={(e) => setTextualReferenceId(e.target.value as number | '')}
+                >
+                  <MenuItem value="">
+                    <em>Nenhum texto de apoio</em>
+                  </MenuItem>
+                  {availableReferences.map((ref) => (
+                    <MenuItem key={ref.id} value={ref.id}>
+                      {ref.title || `Texto #${ref.id}`}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            );
+          })()}
 
           <Paper variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
             <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>

@@ -12,6 +12,7 @@ import {
   IconButton,
   Tooltip,
   Snackbar,
+  Collapse,
 } from '@mui/material';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import HighlightOffIcon from '@mui/icons-material/HighlightOff';
@@ -21,6 +22,7 @@ import ShareOutlinedIcon from '@mui/icons-material/ShareOutlined';
 import VisibilityOutlinedIcon from '@mui/icons-material/VisibilityOutlined';
 import RestartAltIcon from '@mui/icons-material/RestartAlt';
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
+import MenuBookIcon from '@mui/icons-material/MenuBook';
 import { Link } from 'react-router-dom';
 import { DifficultyLevel, Question } from '../../types';
 import { PALETTE_COLORS } from '../../theme/theme';
@@ -59,6 +61,7 @@ export const QuestionCard: React.FC<QuestionCardProps> = ({
   const [localBookmarked, setLocalBookmarked] = useState<boolean>(false);
   const [hasAttemptedBefore, setHasAttemptedBefore] = useState<boolean>(false);
   const [copiedToastOpen, setCopiedToastOpen] = useState<boolean>(false);
+  const [showTextualReference, setShowTextualReference] = useState<boolean>(false);
 
   const isAttemptedByCurrentUser = attemptedQuestionIds.has(question.id);
 
@@ -369,6 +372,78 @@ export const QuestionCard: React.FC<QuestionCardProps> = ({
           <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600 }}>
             {accuracyPercentage.toFixed(0)}% de acerto na 1ª tentativa ({totalAttempts} {totalAttempts === 1 ? 'tentativa' : 'tentativas'})
           </Typography>
+        </Box>
+      )}
+
+      {/* Textual Reference (Texto de Apoio) */}
+      {question.textualReference && (
+        <Box
+          sx={{
+            mb: 2.5,
+            border: `1px solid ${isDark ? 'rgba(217, 183, 99, 0.3)' : 'rgba(217, 183, 99, 0.4)'}`,
+            borderRadius: '8px',
+            overflow: 'hidden',
+            backgroundColor: isDark ? 'rgba(217, 183, 99, 0.04)' : 'rgba(217, 183, 99, 0.05)',
+          }}
+        >
+          <Box
+            onClick={() => setShowTextualReference(!showTextualReference)}
+            sx={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              p: 1.25,
+              px: 2,
+              cursor: 'pointer',
+              backgroundColor: isDark ? 'rgba(217, 183, 99, 0.08)' : 'rgba(217, 183, 99, 0.1)',
+              transition: 'background-color 0.15s',
+              '&:hover': {
+                backgroundColor: isDark ? 'rgba(217, 183, 99, 0.15)' : 'rgba(217, 183, 99, 0.18)',
+              },
+            }}
+          >
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <MenuBookIcon sx={{ color: PALETTE_COLORS.primary, fontSize: '1.2rem' }} />
+              <Typography variant="subtitle2" sx={{ fontWeight: 700, color: 'text.primary' }}>
+                Texto de Apoio: {question.textualReference.title}
+              </Typography>
+            </Box>
+            <Button
+              size="small"
+              variant="text"
+              sx={{
+                color: PALETTE_COLORS.primary,
+                fontWeight: 700,
+                textTransform: 'none',
+                fontSize: '0.82rem',
+              }}
+            >
+              {showTextualReference ? 'Ocultar Texto' : 'Ver Texto'}
+            </Button>
+          </Box>
+
+          <Collapse in={showTextualReference}>
+            <Box sx={{ p: 2, pt: 1.5, borderTop: `1px solid ${isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.08)'}` }}>
+              {(question.textualReference.author || question.textualReference.source) && (
+                <Typography variant="caption" sx={{ display: 'block', color: 'text.secondary', fontStyle: 'italic', mb: 1.5 }}>
+                  {[question.textualReference.author, question.textualReference.source].filter(Boolean).join(' — ')}
+                </Typography>
+              )}
+              <Typography
+                variant="body2"
+                sx={{
+                  lineHeight: 1.75,
+                  color: 'text.primary',
+                  whiteSpace: 'pre-line',
+                  maxHeight: 350,
+                  overflowY: 'auto',
+                  pr: 1,
+                }}
+              >
+                {question.textualReference.content}
+              </Typography>
+            </Box>
+          </Collapse>
         </Box>
       )}
 

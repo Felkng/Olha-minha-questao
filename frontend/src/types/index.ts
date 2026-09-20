@@ -95,6 +95,16 @@ export interface UserProfile {
   comparison?: UserComparison;
 }
 
+export interface TextualReference {
+  id?: number | string;
+  title: string;
+  content: string;
+  author?: string;
+  source?: string;
+  mediaUrl?: string;
+  testId?: number;
+}
+
 export interface Test {
   id: number;
   name: string;
@@ -104,6 +114,7 @@ export interface Test {
   areaId?: number;
   areaName?: string;
   createdByUser?: UserSummary;
+  textualReferences?: TextualReference[];
 }
 
 export interface Question {
@@ -115,6 +126,8 @@ export interface Question {
   area?: Area;
   subject?: Subject;
   test?: Test;
+  textualReference?: TextualReference;
+  textualReferenceId?: number;
   originId?: number;
   originName?: string;
   areaId?: number;
@@ -375,9 +388,26 @@ export interface ParsedQuestion {
   alternatives: ParsedAlternative[];
 }
 
+export interface ParsedExamResponse {
+  questions: ParsedQuestion[];
+  textualReferences: TextualReference[];
+  detectedTitle?: string;
+}
+
 export interface ParsedAnswerKey {
   identifier: string;
   correctAlternative: string;
+}
+
+export interface AvailableProvaOption {
+  id: string;
+  name: string;
+}
+
+export interface ParsedAnswerKeyResponse {
+  answers: ParsedAnswerKey[];
+  availableProvas: AvailableProvaOption[];
+  selectedProva?: string;
 }
 
 export interface TestWithQuestionsRequest {
@@ -386,6 +416,13 @@ export interface TestWithQuestionsRequest {
   originId?: number | null;
   areaId?: number | null;
   description?: string;
+  textualReferences?: {
+    title: string;
+    content: string;
+    author?: string;
+    source?: string;
+    mediaUrl?: string;
+  }[];
   questions: {
     enunciado: string;
     identifier?: string;
@@ -394,6 +431,8 @@ export interface TestWithQuestionsRequest {
     areaId?: number | null;
     subjectId?: number | null;
     correctAlternativeId?: number | null;
+    textualReferenceId?: number | null;
+    textualReferenceIndex?: number | null;
     alternatives: {
       identifier: string;
       text: string;
