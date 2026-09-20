@@ -184,7 +184,7 @@ export const createQuestion = async (questionData: {
   enunciado: string;
   identifier?: string;
   year: number;
-  originId: number;
+  originId?: number;
   areaId: number;
   subjectId?: number;
   testId?: number;
@@ -263,8 +263,13 @@ export const createSubject = async (subject: { name: string; description?: strin
 };
 
 // Provas / Tests
-export const getTests = async (): Promise<Test[]> => {
-  const response = await apiClient.get<Test[]>('/tests');
+export const getTests = async (params?: {
+  originId?: number;
+  areaId?: number;
+  year?: number;
+  createdByUserId?: number;
+}): Promise<Test[]> => {
+  const response = await apiClient.get<Test[]>('/tests', { params });
   return Array.isArray(response.data) ? response.data : [];
 };
 
