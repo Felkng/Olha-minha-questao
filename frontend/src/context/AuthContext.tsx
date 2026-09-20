@@ -4,6 +4,7 @@ import { getAttemptedQuestionIds } from '../services/api';
 
 interface AuthContextType {
   user: UserSummary | null;
+  isAdmin: boolean;
   login: (user: UserSummary) => void;
   logout: () => void;
   attemptedQuestionIds: Set<number>;
@@ -73,6 +74,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     <AuthContext.Provider
       value={{
         user,
+        isAdmin: user?.role === 'ADMIN',
         login,
         logout,
         attemptedQuestionIds,
