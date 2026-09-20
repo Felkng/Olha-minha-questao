@@ -27,9 +27,9 @@ async def parse_exam(file: UploadFile = File(...)):
 
     try:
         content = await file.read()
-        questions = parse_exam_pdf(content)
-        logger.info(f"Parsed {len(questions)} questions from {file.filename}")
-        return {"questions": questions}
+        result = parse_exam_pdf(content)
+        logger.info(f"Parsed {len(result.get('questions', []))} questions and {len(result.get('textualReferences', []))} references from {file.filename}")
+        return result
     except Exception as e:
         logger.error(f"Error parsing exam PDF {file.filename}: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Erro ao processar PDF da prova: {str(e)}")
@@ -44,9 +44,9 @@ async def parse_answer_key(
 
     try:
         content = await file.read()
-        answers = parse_answer_key_pdf(content, prova_name=prova_name)
-        logger.info(f"Parsed {len(answers)} answers from {file.filename} (prova_name={prova_name})")
-        return {"answers": answers}
+        result = parse_answer_key_pdf(content, prova_name=prova_name)
+        logger.info(f"Parsed {len(result.get('answers', []))} answers from {file.filename} (prova_name={prova_name})")
+        return result
     except Exception as e:
         logger.error(f"Error parsing answer key PDF {file.filename}: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Erro ao processar PDF do gabarito: {str(e)}")
