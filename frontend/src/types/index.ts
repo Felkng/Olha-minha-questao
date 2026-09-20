@@ -57,6 +57,25 @@ export interface DailyActivity {
   count: number;
 }
 
+export interface CategoryPerformance {
+  id: number;
+  name: string;
+  totalQuestions: number;
+  correctAnswers: number;
+  accuracyPercentage: number;
+}
+
+export interface UserComparison {
+  userRank: number;
+  totalUsers: number;
+  topPercentage: number;
+  percentileRank: number;
+  userAccuracy: number;
+  globalAverageAccuracy: number;
+  userTotalResolved: number;
+  globalAverageResolved: number;
+}
+
 export interface UserProfile {
   id: number;
   name: string;
@@ -64,10 +83,16 @@ export interface UserProfile {
   role: UserRole;
   createdAt: string;
   totalResolved: number;
+  totalCorrectAnswers?: number;
+  generalAccuracyPercentage?: number;
   easyAccuracy: number;
   mediumAccuracy: number;
   hardAccuracy: number;
   dailyActivities: DailyActivity[];
+  performanceByArea?: CategoryPerformance[];
+  performanceBySubject?: CategoryPerformance[];
+  performanceByOrigin?: CategoryPerformance[];
+  comparison?: UserComparison;
 }
 
 export interface Test {

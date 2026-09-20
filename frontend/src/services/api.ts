@@ -84,10 +84,16 @@ export const getUserProfile = async (userId: number): Promise<UserProfile> => {
     role: d.role,
     createdAt: d.createdAt,
     totalResolved: d.totalResolved ?? d.totalQuestionsResolved ?? 0,
+    totalCorrectAnswers: d.totalCorrectAnswers ?? 0,
+    generalAccuracyPercentage: d.generalAccuracyPercentage ?? 0,
     easyAccuracy: d.easyAccuracy ?? d.easyAccuracyPercentage ?? 0,
     mediumAccuracy: d.mediumAccuracy ?? d.mediumAccuracyPercentage ?? 0,
     hardAccuracy: d.hardAccuracy ?? d.hardAccuracyPercentage ?? 0,
     dailyActivities: d.dailyActivities || d.dailyActivity || [],
+    performanceByArea: d.performanceByArea || [],
+    performanceBySubject: d.performanceBySubject || [],
+    performanceByOrigin: d.performanceByOrigin || [],
+    comparison: d.comparison,
   };
 };
 
