@@ -37,6 +37,7 @@ import { getTestEvaluation, submitTest } from '../services/api';
 import { PALETTE_COLORS } from '../theme/theme';
 import { useAppTheme } from '../theme/ThemeContext';
 import { TextualReferenceDrawer } from '../components/questions/TextualReferenceDrawer';
+import { TestQuestionsNavigator } from '../components/questions/TestQuestionsNavigator';
 
 export const TestEvaluationPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -699,44 +700,14 @@ export const TestEvaluationPage: React.FC = () => {
         </Alert>
       )}
 
-      {/* Questions Navigator Grid (1..N) */}
-      <Paper elevation={2} sx={{ p: 2, mb: 3, borderRadius: 2.5 }}>
-        <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 700, mb: 1.5, display: 'block' }}>
-          NAVEGADOR DE QUESTÕES
-        </Typography>
-        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-          {evaluation.questions.map((q, idx) => {
-            const isAnswered = answers[q.id] !== undefined;
-            const isCurrent = activeQuestionIndex === idx;
-
-            return (
-              <Button
-                key={q.id}
-                size="small"
-                variant={isCurrent ? 'contained' : isAnswered ? 'outlined' : 'text'}
-                onClick={() => setActiveQuestionIndex(idx)}
-                sx={{
-                  minWidth: 40,
-                  height: 38,
-                  borderRadius: 1.5,
-                  fontWeight: 700,
-                  backgroundColor: isCurrent
-                    ? PALETTE_COLORS.primary
-                    : isAnswered
-                    ? isDark
-                      ? 'rgba(217, 183, 99, 0.15)'
-                      : 'rgba(217, 183, 99, 0.12)'
-                    : undefined,
-                  color: isCurrent ? '#1a1e24' : isAnswered ? PALETTE_COLORS.primary : 'text.secondary',
-                  borderColor: isAnswered ? PALETTE_COLORS.primary : 'divider',
-                }}
-              >
-                {idx + 1}
-              </Button>
-            );
-          })}
-        </Box>
-      </Paper>
+      {/* Questions Navigator */}
+      <TestQuestionsNavigator
+        totalQuestions={evaluation.questions.length}
+        activeIndex={activeQuestionIndex}
+        isQuestionAnswered={(idx) => answers[evaluation.questions[idx].id] !== undefined}
+        onSelectQuestion={(idx) => setActiveQuestionIndex(idx)}
+        questionIdentifiers={evaluation.questions.map((q) => q.identifier)}
+      />
 
       {/* Active Question Paper */}
       {currentQuestion && (

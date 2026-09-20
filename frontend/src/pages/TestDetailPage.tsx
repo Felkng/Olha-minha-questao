@@ -9,8 +9,11 @@ import {
   CircularProgress,
   Alert,
   Snackbar,
+  ToggleButtonGroup,
+  ToggleButton,
 } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import ShareIcon from '@mui/icons-material/Share';
 import BookmarkBorderIcon from '@mui/icons-material/BookmarkBorder';
@@ -22,8 +25,10 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { Question, TestCard } from '../types';
 import { getTestById, getTestEvaluation } from '../services/api';
 import { QuestionCard } from '../components/questions/QuestionCard';
+import { TestQuestionsNavigator } from '../components/questions/TestQuestionsNavigator';
 import { SaveTestToFolderModal } from '../components/folders/SaveTestToFolderModal';
 import { PALETTE_COLORS } from '../theme/theme';
+import { useAuth } from '../context/AuthContext';
 
 interface TestDetailPageProps {
   onBookmarkQuestion?: (question: Question) => void;
@@ -34,10 +39,13 @@ export const TestDetailPage: React.FC<TestDetailPageProps> = ({
 }) => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { attemptedQuestionIds } = useAuth();
 
   const [test, setTest] = useState<TestCard | null>(null);
   const [questions, setQuestions] = useState<Question[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
+  const [activeQuestionIndex, setActiveQuestionIndex] = useState<number>(0);
+  const [viewMode, setViewMode] = useState<'single' | 'all'>('single');
 
   const [saveModalOpen, setSaveModalOpen] = useState<boolean>(false);
   const [toastOpen, setToastOpen] = useState<boolean>(false);
@@ -172,18 +180,124 @@ export const TestDetailPage: React.FC<TestDetailPageProps> = ({
         </Box>
       </Paper>
 
-      {/* Questões da Prova */}
-      <Typography variant="h5" sx={{ fontWeight: 800, mb: 3 }}>
-        Questões da Prova ({questions.length})
-      </Typography>
+      {/* View Mode Toggle and Section Title */}
+      <Box
+        sx={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          flexWrap: 'wrap',
+          gap: 2,
+          mb: 2.5,
+        }}
+      >
+        <Typography variant="h5" sx={{ fontWeight: 800 }}>
+          Questões da Prova ({questions.length})
+        </Typography>
 
-      {questions.map((q) => (
-        <QuestionCard
-          key={q.id}
-          question={q}
-          onBookmarkClick={onBookmarkQuestion}
+        {questions.length > 1 && (
+          <ToggleButtonGroup
+            size="small"
+            value={viewMode}
+            exclusive
+            onChange={(_, val) => val && setViewMode(val)}
+          >
+            <ToggleButton value="single" sx={{ px: 2, fontWeight: 700, textTransform: 'none' }}>
+              Questão a Questão (Foco)
+            </ToggleButton>
+            <ToggleButton value="all" sx={{ px: 2, fontWeight: 700, textTransform: 'none' }}>
+              Ver Todas em Lista
+            </ToggleButton>
+          </ToggleButtonGroup>
+        )}
+      </Box>
+
+      {/* Top Navigator */}
+      {questions.length > 0 && (
+        <TestQuestionsNavigator
+          totalQuestions={questions.length}
+          activeIndex={activeQuestionIndex}
+          isQuestionAnswered={(idx) => Boolean(questions[idx] && attemptedQuestionIds.has(questions[idx].id))}
+          onSelectQuestion={(idx) => {
+            setActiveQuestionIndex(idx);
+          }}
+          questionIdentifiers={questions.map((q) => q.identifier)}
         />
-      ))}
+      )}
+
+      {/* Single Question View Mode */}
+      {viewMode === 'single' && questions.length > 0 && questions[activeQuestionIndex] && (
+        <Box>
+          <QuestionCard
+            question={questions[activeQuestionIndex]}
+            onBookmarkClick={onBookmarkQuestion}
+          />
+
+          {/* Navigation Controls: Previous & Next (Free to navigate without requiring answer) */}
+          <Paper
+            elevation={2}
+            sx={{
+              p: 2,
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              borderRadius: 3,
+              border: '1px solid',
+              borderColor: 'divider',
+              mt: 2,
+            }}
+          >
+            <Button
+              variant="outlined"
+              startIcon={<ArrowBackIcon />}
+              disabled={activeQuestionIndex === 0}
+              onClick={() => {
+                setActiveQuestionIndex((prev) => Math.max(0, prev - 1));
+                window.scrollTo({ top: 250, behavior: 'smooth' });
+              }}
+              sx={{ fontWeight: 700, px: 2.5, borderRadius: 2 }}
+            >
+              Questão Anterior
+            </Button>
+
+            <Typography variant="body2" sx={{ fontWeight: 700, color: 'text.secondary' }}>
+              Questão {activeQuestionIndex + 1} de {questions.length}
+            </Typography>
+
+            <Button
+              variant="contained"
+              endIcon={<ArrowForwardIcon />}
+              disabled={activeQuestionIndex === questions.length - 1}
+              onClick={() => {
+                setActiveQuestionIndex((prev) => Math.min(questions.length - 1, prev + 1));
+                window.scrollTo({ top: 250, behavior: 'smooth' });
+              }}
+              sx={{
+                fontWeight: 700,
+                px: 2.5,
+                borderRadius: 2,
+                backgroundColor: PALETTE_COLORS.primary,
+                color: '#1a1e24',
+              }}
+            >
+              Próxima Questão
+            </Button>
+          </Paper>
+        </Box>
+      )}
+
+      {/* All Questions View Mode */}
+      {viewMode === 'all' && (
+        <Box>
+          {questions.map((q) => (
+            <QuestionCard
+              key={q.id}
+              question={q}
+              onBookmarkClick={onBookmarkQuestion}
+            />
+          ))}
+        </Box>
+      )}
 
       <SaveTestToFolderModal
         open={saveModalOpen}
