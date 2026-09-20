@@ -32,7 +32,6 @@ public class QuestionRequestDTO {
     @Min(value = 1900, message = "O ano deve ser válido")
     private Integer year;
 
-    @NotNull(message = "O ID da origem é obrigatório")
     private Long originId;
 
     @NotNull(message = "O ID da área é obrigatório")
@@ -45,6 +44,7 @@ public class QuestionRequestDTO {
     private Long correctAlternativeId;
 
     @Valid
+    @Size(min = 2, message = "A questão deve conter no mínimo 2 alternativas")
     @Builder.Default
     private List<AlternativeRequestDTO> alternatives = new ArrayList<>();
 }
