@@ -11,6 +11,7 @@ import github.felkng.olha_minha_questao.dto.test.TestResponseDTO;
 import github.felkng.olha_minha_questao.exception.ResourceNotFoundException;
 import github.felkng.olha_minha_questao.domain.entity.DifficultyLevel;
 import github.felkng.olha_minha_questao.domain.entity.Question;
+import github.felkng.olha_minha_questao.domain.entity.QuestionStatistic;
 import github.felkng.olha_minha_questao.domain.entity.TestStatistic;
 import github.felkng.olha_minha_questao.domain.repository.QuestionRepository;
 import github.felkng.olha_minha_questao.dto.question.QuestionResponseDTO;
@@ -34,10 +35,12 @@ public class TestService {
     private final TestRepository testRepository;
     private final OriginRepository originRepository;
     private final AreaRepository areaRepository;
+    private final github.felkng.olha_minha_questao.domain.repository.SubjectRepository subjectRepository;
     private final QuestionRepository questionRepository;
     private final github.felkng.olha_minha_questao.domain.repository.UserRepository userRepository;
     private final TestMapper testMapper;
     private final QuestionMapper questionMapper;
+    private final github.felkng.olha_minha_questao.mapper.AlternativeMapper alternativeMapper;
 
     @Transactional(readOnly = true)
     public List<TestCardDTO> findTestCards() {
@@ -125,8 +128,11 @@ public class TestService {
 
     @Transactional
     public TestResponseDTO create(TestRequestDTO dto, Long userId) {
-        Origin origin = originRepository.findById(dto.getOriginId())
-                .orElseThrow(() -> new ResourceNotFoundException("Origem não encontrada com o id: " + dto.getOriginId()));
+        Origin origin = null;
+        if (dto.getOriginId() != null) {
+            origin = originRepository.findById(dto.getOriginId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Origem não encontrada com o id: " + dto.getOriginId()));
+        }
 
         Area area = null;
         if (dto.getAreaId() != null) {
@@ -162,12 +168,146 @@ public class TestService {
     }
 
     @Transactional
+    public TestResponseDTO createWithQuestions(github.felkng.olha_minha_questao.dto.test.TestWithQuestionsRequestDTO dto, Long userId) {
+        if (dto.getQuestions() != null && !dto.getQuestions().isEmpty()) {
+            java.util.Set<String> seen = new java.util.HashSet<>();
+            for (var q : dto.getQuestions()) {
+                String iden = q.getIdentifier() != null ? q.getIdentifier().trim().toLowerCase() : "";
+                if (!iden.isEmpty()) {
+                    if (!seen.add(iden)) {
+                        throw new IllegalArgumentException("Identificador duplicado encontrado nas questões da prova: " + q.getIdentifier());
+                    }
+                }
+            }
+        }
+
+        Origin origin = null;
+        if (dto.getOriginId() != null) {
+            origin = originRepository.findById(dto.getOriginId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Origem não encontrada com o id: " + dto.getOriginId()));
+        }
+
+        Area area = null;
+        if (dto.getAreaId() != null) {
+            area = areaRepository.findById(dto.getAreaId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Área não encontrada com o id: " + dto.getAreaId()));
+        }
+
+        github.felkng.olha_minha_questao.domain.entity.User user = null;
+        if (userId != null) {
+            user = userRepository.findById(userId).orElse(null);
+        }
+
+        Test test = Test.builder()
+                .name(dto.getName())
+                .year(dto.getYear())
+                .origin(origin)
+                .area(area)
+                .createdByUser(user)
+                .build();
+
+        Test savedTest = testRepository.save(test);
+
+        if (dto.getQuestions() != null) {
+            for (var qDto : dto.getQuestions()) {
+                if (qDto.getAlternatives() == null || qDto.getAlternatives().size() < 2) {
+                    throw new IllegalArgumentException("Cada questão deve conter no mínimo 2 alternativas.");
+                }
+
+                Area qArea = area;
+                if (qDto.getAreaId() != null) {
+                    qArea = areaRepository.findById(qDto.getAreaId()).orElse(area);
+                }
+
+                github.felkng.olha_minha_questao.domain.entity.Subject qSubject = null;
+                if (qDto.getSubjectId() != null) {
+                    qSubject = subjectRepository.findById(qDto.getSubjectId()).orElse(null);
+                }
+
+                Question question = Question.builder()
+                        .enunciado(qDto.getEnunciado())
+                        .identifier(qDto.getIdentifier())
+                        .year(qDto.getYear() != null ? qDto.getYear() : savedTest.getYear())
+                        .origin(origin)
+                        .area(qArea)
+                        .subject(qSubject)
+                        .test(savedTest)
+                        .createdByUser(user)
+                        .alternatives(new java.util.ArrayList<>())
+                        .build();
+
+                final Question fQuestion = question;
+                List<github.felkng.olha_minha_questao.domain.entity.Alternative> alternatives = qDto.getAlternatives().stream()
+                        .map(altDto -> {
+                            github.felkng.olha_minha_questao.domain.entity.Alternative alt = alternativeMapper.toEntity(altDto);
+                            alt.setQuestion(fQuestion);
+                            return alt;
+                        })
+                        .toList();
+                question.getAlternatives().addAll(alternatives);
+
+                Question savedQuestion = questionRepository.save(question);
+
+                github.felkng.olha_minha_questao.domain.entity.Alternative correct = null;
+                if (qDto.getCorrectAlternativeId() != null) {
+                    correct = savedQuestion.getAlternatives().stream()
+                            .filter(a -> qDto.getCorrectAlternativeId().equals(a.getId()))
+                            .findFirst()
+                            .orElse(null);
+                }
+                if (correct == null) {
+                    correct = savedQuestion.getAlternatives().stream()
+                            .filter(a -> Boolean.TRUE.equals(a.getIsCorrect()))
+                            .findFirst()
+                            .orElse(null);
+                }
+
+                if (correct != null) {
+                    savedQuestion.setCorrectAlternative(correct);
+                }
+
+                if (savedQuestion.getStatistic() == null) {
+                    QuestionStatistic stat = QuestionStatistic.builder()
+                            .question(savedQuestion)
+                            .questionId(savedQuestion.getId())
+                            .totalAttempts(0L)
+                            .firstAttempts(0L)
+                            .firstAttemptCorrect(0L)
+                            .firstAttemptAccuracy(0.0)
+                            .difficultyLevel(DifficultyLevel.SEM_DADOS)
+                            .build();
+                    savedQuestion.setStatistic(stat);
+                }
+
+                questionRepository.save(savedQuestion);
+            }
+        }
+
+        if (savedTest.getStatistic() == null) {
+            TestStatistic stat = TestStatistic.builder()
+                    .test(savedTest)
+                    .testId(savedTest.getId())
+                    .totalAttempts(0L)
+                    .averageScore(0.0)
+                    .difficultyLevel(DifficultyLevel.SEM_DADOS)
+                    .build();
+            savedTest.setStatistic(stat);
+            savedTest = testRepository.save(savedTest);
+        }
+
+        return testMapper.toDTO(savedTest);
+    }
+
+    @Transactional
     public TestResponseDTO update(Long id, TestRequestDTO dto) {
         Test test = testRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Prova não encontrada com o id: " + id));
 
-        Origin origin = originRepository.findById(dto.getOriginId())
-                .orElseThrow(() -> new ResourceNotFoundException("Origem não encontrada com o id: " + dto.getOriginId()));
+        Origin origin = null;
+        if (dto.getOriginId() != null) {
+            origin = originRepository.findById(dto.getOriginId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Origem não encontrada com o id: " + dto.getOriginId()));
+        }
 
         Area area = null;
         if (dto.getAreaId() != null) {

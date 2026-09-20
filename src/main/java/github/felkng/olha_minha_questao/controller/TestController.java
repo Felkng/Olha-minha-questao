@@ -26,6 +26,7 @@ public class TestController {
 
     private final TestService testService;
     private final github.felkng.olha_minha_questao.service.StatisticsService statisticsService;
+    private final github.felkng.olha_minha_questao.service.ExamParserService examParserService;
 
     @GetMapping
     public ResponseEntity<List<TestResponseDTO>> findAll(
@@ -64,6 +65,26 @@ public class TestController {
             @org.springframework.web.bind.annotation.RequestHeader(name = "X-User-Id", required = false) Long userId) {
         TestResponseDTO created = testService.create(dto, userId);
         return ResponseEntity.status(HttpStatus.CREATED).body(created);
+    }
+
+    @PostMapping("/with-questions")
+    public ResponseEntity<TestResponseDTO> createWithQuestions(
+            @Valid @RequestBody github.felkng.olha_minha_questao.dto.test.TestWithQuestionsRequestDTO dto,
+            @org.springframework.web.bind.annotation.RequestHeader(name = "X-User-Id", required = false) Long userId) {
+        TestResponseDTO created = testService.createWithQuestions(dto, userId);
+        return ResponseEntity.status(HttpStatus.CREATED).body(created);
+    }
+
+    @PostMapping(value = "/parse-exam-pdf", consumes = org.springframework.http.MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<List<github.felkng.olha_minha_questao.dto.parser.ParsedQuestionDTO>> parseExamPdf(
+            @RequestParam("file") org.springframework.web.multipart.MultipartFile file) {
+        return ResponseEntity.ok(examParserService.parseExamPdf(file));
+    }
+
+    @PostMapping(value = "/parse-answer-key-pdf", consumes = org.springframework.http.MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<List<github.felkng.olha_minha_questao.dto.parser.ParsedAnswerKeyDTO>> parseAnswerKeyPdf(
+            @RequestParam("file") org.springframework.web.multipart.MultipartFile file) {
+        return ResponseEntity.ok(examParserService.parseAnswerKeyPdf(file));
     }
 
     @PutMapping("/{id}")

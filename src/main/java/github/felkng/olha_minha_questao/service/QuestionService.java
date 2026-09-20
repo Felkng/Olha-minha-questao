@@ -217,8 +217,11 @@ public class QuestionService {
             }
         }
 
-        Area area = areaRepository.findById(dto.getAreaId())
-                .orElseThrow(() -> new ResourceNotFoundException("Área não encontrada com o id: " + dto.getAreaId()));
+        Area area = null;
+        if (dto.getAreaId() != null) {
+            area = areaRepository.findById(dto.getAreaId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Área não encontrada com o id: " + dto.getAreaId()));
+        }
 
         Subject subject = null;
         if (dto.getSubjectId() != null) {
@@ -312,8 +315,11 @@ public class QuestionService {
                     .orElseThrow(() -> new ResourceNotFoundException("Origem não encontrada com o id: " + dto.getOriginId()));
         }
 
-        Area area = areaRepository.findById(dto.getAreaId())
-                .orElseThrow(() -> new ResourceNotFoundException("Área não encontrada com o id: " + dto.getAreaId()));
+        Area area = null;
+        if (dto.getAreaId() != null) {
+            area = areaRepository.findById(dto.getAreaId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Área não encontrada com o id: " + dto.getAreaId()));
+        }
 
         Subject subject = null;
         if (dto.getSubjectId() != null) {
