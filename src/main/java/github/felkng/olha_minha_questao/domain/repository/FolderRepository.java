@@ -11,4 +11,6 @@ import java.util.List;
 public interface FolderRepository extends JpaRepository<Folder, Long> {
     List<Folder> findAllByOrderByNameAsc();
     List<Folder> findByFolderTypeOrderByNameAsc(FolderType folderType);
+    List<Folder> findByCreatedByUserIdOrderByNameAsc(Long userId);
+    List<Folder> findByCreatedByUserIdAndFolderTypeOrderByNameAsc(Long userId, FolderType folderType);
 }

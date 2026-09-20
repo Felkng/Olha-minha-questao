@@ -300,8 +300,25 @@ public class TestService {
 
     @Transactional
     public TestResponseDTO update(Long id, TestRequestDTO dto) {
+        return update(id, dto, null);
+    }
+
+    @Transactional
+    public TestResponseDTO update(Long id, TestRequestDTO dto, Long userId) {
         Test test = testRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Prova não encontrada com o id: " + id));
+
+        if (userId != null) {
+            github.felkng.olha_minha_questao.domain.entity.User user = userRepository.findById(userId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado com o id: " + userId));
+            if (user.getRole() != github.felkng.olha_minha_questao.domain.entity.UserRole.ADMIN) {
+                if (test.getCreatedByUser() == null || !test.getCreatedByUser().getId().equals(user.getId())) {
+                    throw new org.springframework.web.server.ResponseStatusException(
+                            org.springframework.http.HttpStatus.FORBIDDEN,
+                            "Você não tem permissão para editar esta prova.");
+                }
+            }
+        }
 
         Origin origin = null;
         if (dto.getOriginId() != null) {
@@ -325,9 +342,26 @@ public class TestService {
 
     @Transactional
     public void delete(Long id) {
-        if (!testRepository.existsById(id)) {
-            throw new ResourceNotFoundException("Prova não encontrada com o id: " + id);
+        delete(id, null);
+    }
+
+    @Transactional
+    public void delete(Long id, Long userId) {
+        Test test = testRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Prova não encontrada com o id: " + id));
+
+        if (userId != null) {
+            github.felkng.olha_minha_questao.domain.entity.User user = userRepository.findById(userId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado com o id: " + userId));
+            if (user.getRole() != github.felkng.olha_minha_questao.domain.entity.UserRole.ADMIN) {
+                if (test.getCreatedByUser() == null || !test.getCreatedByUser().getId().equals(user.getId())) {
+                    throw new org.springframework.web.server.ResponseStatusException(
+                            org.springframework.http.HttpStatus.FORBIDDEN,
+                            "Você não tem permissão para excluir esta prova.");
+                }
+            }
         }
-        testRepository.deleteById(id);
+
+        testRepository.delete(test);
     }
 }

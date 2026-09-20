@@ -57,13 +57,18 @@ public class OriginController {
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<OriginResponseDTO> update(@PathVariable Long id, @Valid @RequestBody OriginRequestDTO dto) {
-        return ResponseEntity.ok(originService.update(id, dto));
+    public ResponseEntity<OriginResponseDTO> update(
+            @PathVariable Long id,
+            @Valid @RequestBody OriginRequestDTO dto,
+            @org.springframework.web.bind.annotation.RequestHeader(name = "X-User-Id", required = false) Long userId) {
+        return ResponseEntity.ok(originService.update(id, dto, userId));
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> delete(@PathVariable Long id) {
-        originService.delete(id);
+    public ResponseEntity<Void> delete(
+            @PathVariable Long id,
+            @org.springframework.web.bind.annotation.RequestHeader(name = "X-User-Id", required = false) Long userId) {
+        originService.delete(id, userId);
         return ResponseEntity.noContent().build();
     }
 }

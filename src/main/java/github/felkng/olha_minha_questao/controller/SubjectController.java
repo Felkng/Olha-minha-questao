@@ -47,13 +47,18 @@ public class SubjectController {
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<SubjectResponseDTO> update(@PathVariable Long id, @Valid @RequestBody SubjectRequestDTO dto) {
-        return ResponseEntity.ok(subjectService.update(id, dto));
+    public ResponseEntity<SubjectResponseDTO> update(
+            @PathVariable Long id,
+            @Valid @RequestBody SubjectRequestDTO dto,
+            @org.springframework.web.bind.annotation.RequestHeader(name = "X-User-Id", required = false) Long userId) {
+        return ResponseEntity.ok(subjectService.update(id, dto, userId));
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> delete(@PathVariable Long id) {
-        subjectService.delete(id);
+    public ResponseEntity<Void> delete(
+            @PathVariable Long id,
+            @org.springframework.web.bind.annotation.RequestHeader(name = "X-User-Id", required = false) Long userId) {
+        subjectService.delete(id, userId);
         return ResponseEntity.noContent().build();
     }
 }

@@ -19,6 +19,7 @@ public class AreaService {
     private final AreaRepository areaRepository;
     private final github.felkng.olha_minha_questao.domain.repository.QuestionRepository questionRepository;
     private final github.felkng.olha_minha_questao.domain.repository.TestRepository testRepository;
+    private final github.felkng.olha_minha_questao.domain.repository.UserRepository userRepository;
     private final AreaMapper areaMapper;
 
     @Transactional(readOnly = true)
@@ -61,6 +62,21 @@ public class AreaService {
 
     @Transactional
     public AreaResponseDTO update(Long id, AreaRequestDTO dto) {
+        return update(id, dto, null);
+    }
+
+    @Transactional
+    public AreaResponseDTO update(Long id, AreaRequestDTO dto, Long userId) {
+        if (userId != null) {
+            github.felkng.olha_minha_questao.domain.entity.User user = userRepository.findById(userId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado com o id: " + userId));
+            if (user.getRole() != github.felkng.olha_minha_questao.domain.entity.UserRole.ADMIN) {
+                throw new org.springframework.web.server.ResponseStatusException(
+                        org.springframework.http.HttpStatus.FORBIDDEN,
+                        "Apenas administradores podem atualizar áreas.");
+            }
+        }
+
         Area area = areaRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Área não encontrada com o id: " + id));
 
@@ -77,6 +93,21 @@ public class AreaService {
 
     @Transactional
     public void delete(Long id) {
+        delete(id, null);
+    }
+
+    @Transactional
+    public void delete(Long id, Long userId) {
+        if (userId != null) {
+            github.felkng.olha_minha_questao.domain.entity.User user = userRepository.findById(userId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado com o id: " + userId));
+            if (user.getRole() != github.felkng.olha_minha_questao.domain.entity.UserRole.ADMIN) {
+                throw new org.springframework.web.server.ResponseStatusException(
+                        org.springframework.http.HttpStatus.FORBIDDEN,
+                        "Apenas administradores podem excluir áreas.");
+            }
+        }
+
         if (!areaRepository.existsById(id)) {
             throw new ResourceNotFoundException("Área não encontrada com o id: " + id);
         }

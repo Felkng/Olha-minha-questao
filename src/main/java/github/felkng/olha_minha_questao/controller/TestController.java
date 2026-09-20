@@ -89,13 +89,18 @@ public class TestController {
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<TestResponseDTO> update(@PathVariable Long id, @Valid @RequestBody TestRequestDTO dto) {
-        return ResponseEntity.ok(testService.update(id, dto));
+    public ResponseEntity<TestResponseDTO> update(
+            @PathVariable Long id,
+            @Valid @RequestBody TestRequestDTO dto,
+            @org.springframework.web.bind.annotation.RequestHeader(name = "X-User-Id", required = false) Long userId) {
+        return ResponseEntity.ok(testService.update(id, dto, userId));
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> delete(@PathVariable Long id) {
-        testService.delete(id);
+    public ResponseEntity<Void> delete(
+            @PathVariable Long id,
+            @org.springframework.web.bind.annotation.RequestHeader(name = "X-User-Id", required = false) Long userId) {
+        testService.delete(id, userId);
         return ResponseEntity.noContent().build();
     }
 }

@@ -31,8 +31,10 @@ public class FolderController {
     private final FolderService folderService;
 
     @GetMapping
-    public ResponseEntity<List<FolderResponseDTO>> findAll(@RequestParam(required = false) FolderType type) {
-        return ResponseEntity.ok(folderService.findAll(type));
+    public ResponseEntity<List<FolderResponseDTO>> findAll(
+            @RequestParam(required = false) FolderType type,
+            @RequestParam(required = false) Long createdByUserId) {
+        return ResponseEntity.ok(folderService.findAll(type, createdByUserId));
     }
 
     @GetMapping("/{id}")

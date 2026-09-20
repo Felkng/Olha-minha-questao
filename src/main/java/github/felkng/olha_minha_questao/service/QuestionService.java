@@ -56,8 +56,17 @@ public class QuestionService {
     @Transactional(readOnly = true)
     public Page<QuestionResponseDTO> findAll(Long originId, Long areaId, Long testId, Integer year,
                                              String difficulty, String search, String sort, Pageable pageable) {
+        return findAll(originId, areaId, testId, year, difficulty, search, sort, null, pageable);
+    }
+
+    @Transactional(readOnly = true)
+    public Page<QuestionResponseDTO> findAll(Long originId, Long areaId, Long testId, Integer year,
+                                             String difficulty, String search, String sort, Long createdByUserId, Pageable pageable) {
         Specification<Question> spec = (root, query, cb) -> {
             List<Predicate> predicates = new ArrayList<>();
+            if (createdByUserId != null) {
+                predicates.add(cb.equal(root.get("createdByUser").get("id"), createdByUserId));
+            }
             if (originId != null) {
                 predicates.add(cb.equal(root.get("origin").get("id"), originId));
             }
@@ -302,8 +311,25 @@ public class QuestionService {
 
     @Transactional
     public QuestionResponseDTO update(Long id, QuestionRequestDTO dto) {
+        return update(id, dto, null);
+    }
+
+    @Transactional
+    public QuestionResponseDTO update(Long id, QuestionRequestDTO dto, Long userId) {
         Question question = questionRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Questão não encontrada com o id: " + id));
+
+        if (userId != null) {
+            User user = userRepository.findById(userId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado com o id: " + userId));
+            if (user.getRole() != github.felkng.olha_minha_questao.domain.entity.UserRole.ADMIN) {
+                if (question.getCreatedByUser() == null || !question.getCreatedByUser().getId().equals(user.getId())) {
+                    throw new org.springframework.web.server.ResponseStatusException(
+                            org.springframework.http.HttpStatus.FORBIDDEN,
+                            "Você não tem permissão para editar esta questão.");
+                }
+            }
+        }
 
         if (dto.getAlternatives() != null && dto.getAlternatives().size() < 2) {
             throw new IllegalArgumentException("A questão deve conter no mínimo 2 alternativas.");
@@ -340,6 +366,7 @@ public class QuestionService {
         question.setTest(test);
 
         if (dto.getAlternatives() != null) {
+            question.setCorrectAlternative(null);
             question.getAlternatives().clear();
             for (var altDto : dto.getAlternatives()) {
                 Alternative alt = alternativeMapper.toEntity(altDto);
@@ -372,9 +399,26 @@ public class QuestionService {
 
     @Transactional
     public void delete(Long id) {
-        if (!questionRepository.existsById(id)) {
-            throw new ResourceNotFoundException("Questão não encontrada com o id: " + id);
+        delete(id, null);
+    }
+
+    @Transactional
+    public void delete(Long id, Long userId) {
+        Question question = questionRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Questão não encontrada com o id: " + id));
+
+        if (userId != null) {
+            User user = userRepository.findById(userId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado com o id: " + userId));
+            if (user.getRole() != github.felkng.olha_minha_questao.domain.entity.UserRole.ADMIN) {
+                if (question.getCreatedByUser() == null || !question.getCreatedByUser().getId().equals(user.getId())) {
+                    throw new org.springframework.web.server.ResponseStatusException(
+                            org.springframework.http.HttpStatus.FORBIDDEN,
+                            "Você não tem permissão para excluir esta questão.");
+                }
+            }
         }
-        questionRepository.deleteById(id);
+
+        questionRepository.delete(question);
     }
 }

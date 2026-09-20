@@ -55,13 +55,18 @@ public class AreaController {
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<AreaResponseDTO> update(@PathVariable Long id, @Valid @RequestBody AreaRequestDTO dto) {
-        return ResponseEntity.ok(areaService.update(id, dto));
+    public ResponseEntity<AreaResponseDTO> update(
+            @PathVariable Long id,
+            @Valid @RequestBody AreaRequestDTO dto,
+            @org.springframework.web.bind.annotation.RequestHeader(name = "X-User-Id", required = false) Long userId) {
+        return ResponseEntity.ok(areaService.update(id, dto, userId));
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> delete(@PathVariable Long id) {
-        areaService.delete(id);
+    public ResponseEntity<Void> delete(
+            @PathVariable Long id,
+            @org.springframework.web.bind.annotation.RequestHeader(name = "X-User-Id", required = false) Long userId) {
+        areaService.delete(id, userId);
         return ResponseEntity.noContent().build();
     }
 }

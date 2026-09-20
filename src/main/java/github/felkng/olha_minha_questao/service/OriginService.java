@@ -67,6 +67,21 @@ public class OriginService {
 
     @Transactional
     public OriginResponseDTO update(Long id, OriginRequestDTO dto) {
+        return update(id, dto, null);
+    }
+
+    @Transactional
+    public OriginResponseDTO update(Long id, OriginRequestDTO dto, Long userId) {
+        if (userId != null) {
+            github.felkng.olha_minha_questao.domain.entity.User user = userRepository.findById(userId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado com o id: " + userId));
+            if (user.getRole() != github.felkng.olha_minha_questao.domain.entity.UserRole.ADMIN) {
+                throw new org.springframework.web.server.ResponseStatusException(
+                        org.springframework.http.HttpStatus.FORBIDDEN,
+                        "Apenas administradores podem atualizar bancas.");
+            }
+        }
+
         Origin origin = originRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Origem não encontrada com o id: " + id));
 
@@ -83,6 +98,21 @@ public class OriginService {
 
     @Transactional
     public void delete(Long id) {
+        delete(id, null);
+    }
+
+    @Transactional
+    public void delete(Long id, Long userId) {
+        if (userId != null) {
+            github.felkng.olha_minha_questao.domain.entity.User user = userRepository.findById(userId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado com o id: " + userId));
+            if (user.getRole() != github.felkng.olha_minha_questao.domain.entity.UserRole.ADMIN) {
+                throw new org.springframework.web.server.ResponseStatusException(
+                        org.springframework.http.HttpStatus.FORBIDDEN,
+                        "Apenas administradores podem excluir bancas.");
+            }
+        }
+
         if (!originRepository.existsById(id)) {
             throw new ResourceNotFoundException("Origem não encontrada com o id: " + id);
         }

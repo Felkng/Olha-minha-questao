@@ -44,8 +44,9 @@ public class QuestionController {
             @RequestParam(required = false) String difficulty,
             @RequestParam(required = false) String search,
             @RequestParam(required = false) String sort,
+            @RequestParam(required = false) Long createdByUserId,
             @PageableDefault(size = 20) Pageable pageable) {
-        return ResponseEntity.ok(questionService.findAll(originId, areaId, testId, year, difficulty, search, sort, pageable));
+        return ResponseEntity.ok(questionService.findAll(originId, areaId, testId, year, difficulty, search, sort, createdByUserId, pageable));
     }
 
     @PostMapping("/{id}/attempts")
@@ -88,13 +89,18 @@ public class QuestionController {
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<QuestionResponseDTO> update(@PathVariable Long id, @Valid @RequestBody QuestionRequestDTO dto) {
-        return ResponseEntity.ok(questionService.update(id, dto));
+    public ResponseEntity<QuestionResponseDTO> update(
+            @PathVariable Long id,
+            @Valid @RequestBody QuestionRequestDTO dto,
+            @RequestHeader(value = "X-User-Id", required = false) Long userId) {
+        return ResponseEntity.ok(questionService.update(id, dto, userId));
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> delete(@PathVariable Long id) {
-        questionService.delete(id);
+    public ResponseEntity<Void> delete(
+            @PathVariable Long id,
+            @RequestHeader(value = "X-User-Id", required = false) Long userId) {
+        questionService.delete(id, userId);
         return ResponseEntity.noContent().build();
     }
 }

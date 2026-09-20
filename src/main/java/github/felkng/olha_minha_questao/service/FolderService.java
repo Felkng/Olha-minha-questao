@@ -44,12 +44,26 @@ public class FolderService {
 
     @Transactional(readOnly = true)
     public List<FolderResponseDTO> findAll(FolderType type) {
-        if (type != null) {
-            return folderRepository.findByFolderTypeOrderByNameAsc(type).stream()
-                    .map(folderMapper::toDTO)
-                    .toList();
+        return findAll(type, null);
+    }
+
+    @Transactional(readOnly = true)
+    public List<FolderResponseDTO> findAll(FolderType type, Long createdByUserId) {
+        List<Folder> folders;
+        if (createdByUserId != null) {
+            if (type != null) {
+                folders = folderRepository.findByCreatedByUserIdAndFolderTypeOrderByNameAsc(createdByUserId, type);
+            } else {
+                folders = folderRepository.findByCreatedByUserIdOrderByNameAsc(createdByUserId);
+            }
+        } else {
+            if (type != null) {
+                folders = folderRepository.findByFolderTypeOrderByNameAsc(type);
+            } else {
+                folders = folderRepository.findAllByOrderByNameAsc();
+            }
         }
-        return folderRepository.findAllByOrderByNameAsc().stream()
+        return folders.stream()
                 .map(folderMapper::toDTO)
                 .toList();
     }
