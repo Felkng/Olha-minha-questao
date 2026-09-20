@@ -25,7 +25,6 @@ public class TestRequestDTO {
     @Min(value = 1900, message = "O ano deve ser válido")
     private Integer year;
 
-    @NotNull(message = "O ID da origem é obrigatório")
     private Long originId;
 
     private Long areaId;

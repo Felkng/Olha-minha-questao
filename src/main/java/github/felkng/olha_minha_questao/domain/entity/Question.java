@@ -26,7 +26,9 @@ import java.util.ArrayList;
 import java.util.List;
 
 @Entity
-@Table(name = "question")
+@Table(name = "question", uniqueConstraints = {
+        @jakarta.persistence.UniqueConstraint(name = "uq_question_test_year_identifier", columnNames = {"test_id", "year", "identifier"})
+})
 @Getter
 @Setter
 @NoArgsConstructor
@@ -52,7 +54,7 @@ public class Question {
     private Origin origin;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "area_id", nullable = false)
+    @JoinColumn(name = "area_id")
     private Area area;
 
     @ManyToOne(fetch = FetchType.LAZY)

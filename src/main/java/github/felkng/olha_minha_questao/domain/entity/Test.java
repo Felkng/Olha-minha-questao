@@ -41,7 +41,7 @@ public class Test {
     private Integer year;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "origin_id", nullable = false)
+    @JoinColumn(name = "origin_id")
     private Origin origin;
 
     @ManyToOne(fetch = FetchType.LAZY)

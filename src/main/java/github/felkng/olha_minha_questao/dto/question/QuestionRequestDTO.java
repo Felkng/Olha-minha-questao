@@ -34,7 +34,6 @@ public class QuestionRequestDTO {
 
     private Long originId;
 
-    @NotNull(message = "O ID da área é obrigatório")
     private Long areaId;
 
     private Long subjectId;
