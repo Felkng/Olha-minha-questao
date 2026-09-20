@@ -1,4 +1,4 @@
-MVN = ./mvnw
+MVN = cd backend && ./mvnw
 
 .PHONY: build up down logs status seed \
         clean compile test package package-all run \
@@ -32,7 +32,7 @@ status:
 
 # Popula o banco de dados com dados iniciais (seed)
 seed:
-	docker compose exec -T db psql -U postgres -d olha_minha_questao < src/main/resources/db/seed.sql
+	docker compose exec -T db psql -U postgres -d olha_minha_questao < backend/src/main/resources/db/seed.sql
 
 
 # ==========================================

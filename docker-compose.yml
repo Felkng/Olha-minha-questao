@@ -19,7 +19,7 @@ services:
 
   worker:
     build:
-      context: ./worker
+      context: ./pdfReaderWorker
       dockerfile: Dockerfile
     container_name: olha_minha_questao_worker
     ports:
@@ -28,7 +28,7 @@ services:
 
   app:
     build:
-      context: .
+      context: ./backend
       dockerfile: Dockerfile
     container_name: olha_minha_questao_app
     depends_on:

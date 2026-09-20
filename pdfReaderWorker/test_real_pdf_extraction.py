@@ -10,8 +10,8 @@ class TestRealPdfExtraction(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        cls.exam_pdf_path = os.path.join(base_dir, 'src', 'test', 'prova_pdf', 'analise_de_sistema_seguranca_cibernetica_e_da_informacao.pdf')
-        cls.answer_key_pdf_path = os.path.join(base_dir, 'src', 'test', 'prova_pdf', 'gabarito (1).pdf')
+        cls.exam_pdf_path = os.path.join(base_dir, 'backend', 'src', 'test', 'prova_pdf', 'analise_de_sistema_seguranca_cibernetica_e_da_informacao.pdf')
+        cls.answer_key_pdf_path = os.path.join(base_dir, 'backend', 'src', 'test', 'prova_pdf', 'gabarito (1).pdf')
 
         if not os.path.exists(cls.exam_pdf_path):
             raise FileNotFoundError(f"Arquivo da prova não encontrado em: {cls.exam_pdf_path}")
