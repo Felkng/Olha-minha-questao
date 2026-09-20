@@ -123,35 +123,58 @@ public class StatisticsService {
         Test test = testRepository.findById(testId)
                 .orElseThrow(() -> new ResourceNotFoundException("Prova não encontrada com o id: " + testId));
 
-        List<TestSubmissionResponseDTO.QuestionResultDTO> detailedResults = new ArrayList<>();
-        int correctCount = 0;
+        List<Question> testQuestions = questionRepository.findByTestId(testId);
 
-        if (dto.getAnswers() != null && !dto.getAnswers().isEmpty()) {
+        // Mapeia respostas enviadas pelo usuário
+        java.util.Map<Long, Long> answersMap = new java.util.HashMap<>();
+        java.util.Map<Long, Integer> timeSpentMap = new java.util.HashMap<>();
+        if (dto.getAnswers() != null) {
             for (TestSubmissionRequestDTO.QuestionAnswerDTO answer : dto.getAnswers()) {
-                QuestionAttemptRequestDTO attemptRequest = QuestionAttemptRequestDTO.builder()
-                        .selectedAlternativeId(answer.getSelectedAlternativeId())
-                        .timeSpentSeconds(answer.getTimeSpentSeconds())
-                        .sessionId(dto.getSessionId())
-                        .isFirstAttempt(true)
-                        .build();
-
-                QuestionAttemptResponseDTO attemptResponse = registerQuestionAttempt(answer.getQuestionId(), attemptRequest);
-
-                if (Boolean.TRUE.equals(attemptResponse.getIsCorrect())) {
-                    correctCount++;
+                if (answer.getQuestionId() != null) {
+                    answersMap.put(answer.getQuestionId(), answer.getSelectedAlternativeId());
+                    timeSpentMap.put(answer.getQuestionId(), answer.getTimeSpentSeconds());
                 }
-
-                detailedResults.add(TestSubmissionResponseDTO.QuestionResultDTO.builder()
-                        .questionId(answer.getQuestionId())
-                        .selectedAlternativeId(answer.getSelectedAlternativeId())
-                        .correctAlternativeId(attemptResponse.getCorrectAlternativeId())
-                        .isCorrect(attemptResponse.getIsCorrect())
-                        .difficultyLevel(attemptResponse.getDifficultyLevel())
-                        .build());
             }
         }
 
-        int totalQuestions = dto.getAnswers() != null ? dto.getAnswers().size() : 0;
+        List<TestSubmissionResponseDTO.QuestionResultDTO> detailedResults = new ArrayList<>();
+        int correctCount = 0;
+
+        // Itera sobre todas as questões da prova
+        List<Question> questionsToProcess = !testQuestions.isEmpty() ? testQuestions :
+                (dto.getAnswers() != null ? dto.getAnswers().stream()
+                        .map(a -> questionRepository.findById(a.getQuestionId()).orElse(null))
+                        .filter(java.util.Objects::nonNull)
+                        .toList() : List.of());
+
+        for (Question question : questionsToProcess) {
+            Long selectedAltId = answersMap.get(question.getId());
+            Integer qTimeSpent = timeSpentMap.getOrDefault(question.getId(), 0);
+
+            QuestionAttemptRequestDTO attemptRequest = QuestionAttemptRequestDTO.builder()
+                    .selectedAlternativeId(selectedAltId)
+                    .timeSpentSeconds(qTimeSpent)
+                    .sessionId(dto.getSessionId())
+                    .isFirstAttempt(true)
+                    .build();
+
+            QuestionAttemptResponseDTO attemptResponse = registerQuestionAttempt(question.getId(), attemptRequest);
+
+            if (Boolean.TRUE.equals(attemptResponse.getIsCorrect())) {
+                correctCount++;
+            }
+
+            detailedResults.add(TestSubmissionResponseDTO.QuestionResultDTO.builder()
+                    .questionId(question.getId())
+                    .selectedAlternativeId(selectedAltId)
+                    .correctAlternativeId(attemptResponse.getCorrectAlternativeId())
+                    .isCorrect(attemptResponse.getIsCorrect())
+                    .difficultyLevel(attemptResponse.getDifficultyLevel())
+                    .build());
+        }
+
+        int totalQuestions = !questionsToProcess.isEmpty() ? questionsToProcess.size() :
+                (dto.getAnswers() != null ? dto.getAnswers().size() : 0);
         double scorePercentage = totalQuestions > 0 ? (correctCount * 100.0) / totalQuestions : 0.0;
         scorePercentage = Math.round(scorePercentage * 100.0) / 100.0;
 
