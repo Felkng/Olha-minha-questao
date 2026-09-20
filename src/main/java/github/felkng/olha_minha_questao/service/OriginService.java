@@ -19,6 +19,7 @@ public class OriginService {
     private final OriginRepository originRepository;
     private final github.felkng.olha_minha_questao.domain.repository.QuestionRepository questionRepository;
     private final github.felkng.olha_minha_questao.domain.repository.TestRepository testRepository;
+    private final github.felkng.olha_minha_questao.domain.repository.UserRepository userRepository;
     private final OriginMapper originMapper;
 
     @Transactional(readOnly = true)
@@ -51,6 +52,20 @@ public class OriginService {
 
     @Transactional
     public OriginResponseDTO create(OriginRequestDTO dto) {
+        return create(dto, null);
+    }
+
+    @Transactional
+    public OriginResponseDTO create(OriginRequestDTO dto, Long userId) {
+        if (userId != null) {
+            github.felkng.olha_minha_questao.domain.entity.User user = userRepository.findById(userId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado com o id: " + userId));
+            if (user.getRole() != github.felkng.olha_minha_questao.domain.entity.UserRole.ADMIN) {
+                throw new org.springframework.web.server.ResponseStatusException(
+                        org.springframework.http.HttpStatus.FORBIDDEN,
+                        "Apenas administradores podem cadastrar bancas examinadoras.");
+            }
+        }
         if (originRepository.existsByNameIgnoreCase(dto.getName())) {
             throw new IllegalArgumentException("Já existe uma origem cadastrada com o nome: " + dto.getName());
         }

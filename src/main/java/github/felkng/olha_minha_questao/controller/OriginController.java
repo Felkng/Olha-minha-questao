@@ -49,8 +49,10 @@ public class OriginController {
     }
 
     @PostMapping
-    public ResponseEntity<OriginResponseDTO> create(@Valid @RequestBody OriginRequestDTO dto) {
-        OriginResponseDTO created = originService.create(dto);
+    public ResponseEntity<OriginResponseDTO> create(
+            @Valid @RequestBody OriginRequestDTO dto,
+            @org.springframework.web.bind.annotation.RequestHeader(name = "X-User-Id", required = false) Long userId) {
+        OriginResponseDTO created = originService.create(dto, userId);
         return ResponseEntity.status(HttpStatus.CREATED).body(created);
     }
 
