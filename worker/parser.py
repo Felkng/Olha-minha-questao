@@ -244,19 +244,40 @@ def extract_textual_references_from_pdf(pdf: pdfplumber.PDF) -> List[Dict[str, A
         else:
             title = section_prefix if section_prefix else f"Texto {idx + 1}"
 
-        # Check the end lines for bibliographic citations (Author / Source)
+        # Check for Subtitle: a secondary heading line before paragraph text
+        subtitle = ""
+        if start_idx < len(block):
+            cand = block[start_idx]
+            if not re.match(r'^\d+\s+[A-ZÀ-Ú]', cand) and len(cand) < 90 and not re.match(r'^[A-Z\s]{4,}$', cand):
+                # Could be a subtitle
+                subtitle = cand
+                start_idx += 1
+
+        # Check the end lines for bibliographic citations (Author / Source / Reference URL)
         end_idx = len(block)
         citation_lines = []
         while end_idx > start_idx and len(citation_lines) < 4:
             cand = block[end_idx - 1]
-            if re.search(r'(?i)(?:dispon[íi]vel\s+em|available\s+at|retrieved\s+on|fragmento\s+adaptado|adaptad[oa]|rio\s+de\s+janeiro|s[ãa]o\s+paulo|ed\.|p\.\d+|\.com|\.org)', cand) or re.match(r'^[A-ZÀ-Ú\s,]{4,}\.', cand):
+            if re.search(r'(?i)(?:dispon[íi]vel\s+em|available\s+at|retrieved\s+on|fragmento\s+adaptado|adaptad[oa]|rio\s+de\s+janeiro|s[ãa]o\s+paulo|ed\.|p\.\d+|\.com|\.org|https?://)', cand) or re.match(r'^[A-ZÀ-Ú\s,]{4,}\.', cand):
                 citation_lines.insert(0, cand)
                 end_idx -= 1
             else:
                 break
 
+        reference = ""
         if citation_lines:
             full_citation = " ".join(citation_lines).strip()
+            # Extract URL if present
+            url_match = re.search(r'(https?://[^\s<>"]+|www\.[^\s<>"]+)', full_citation)
+            if url_match:
+                reference = url_match.group(1).rstrip('.,;')
+            else:
+                m_disp = re.search(r'(?i)dispon[íi]vel\s+em[:\s]+<?([^\s>]+)>?', full_citation)
+                if m_disp:
+                    reference = m_disp.group(1).rstrip('.,;')
+                else:
+                    reference = full_citation
+
             # If citation has Author. Work, try splitting
             m_auth = re.match(r'^([A-ZÀ-Ú\s,]{4,}\.)\s*(.*)$', full_citation)
             if m_auth:
@@ -265,15 +286,27 @@ def extract_textual_references_from_pdf(pdf: pdfplumber.PDF) -> List[Dict[str, A
             else:
                 source = full_citation
 
-        # The rest is the content
+        # The rest is the content, but check if there is a caption (Legenda)
         body_lines = block[start_idx:end_idx]
-        content = "\n".join(body_lines)
+        caption = ""
+        filtered_body: List[str] = []
+        for bline in body_lines:
+            m_cap = re.match(r'(?i)^(?:legenda|figura\s*\d*|tabela\s*\d*|quadro\s*\d*)[:\.\-\s]+(.+)$', bline)
+            if m_cap:
+                caption = bline.strip()
+            else:
+                filtered_body.append(bline)
+
+        content = "\n".join(filtered_body)
 
         references.append({
             "id": f"ref_{idx + 1}",
-            "title": clean_text(title),
-            "content": clean_text(content),
+            "title": clean_text(title) or None,
+            "subtitle": clean_text(subtitle) or None,
+            "content": clean_text(content) or None,
             "author": clean_text(author) or None,
+            "reference": clean_text(reference) or None,
+            "caption": clean_text(caption) or None,
             "source": clean_text(source) or None,
         })
 
