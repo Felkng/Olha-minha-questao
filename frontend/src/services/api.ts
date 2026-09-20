@@ -135,6 +135,7 @@ export const getQuestions = async (params?: {
   difficulty?: string;
   search?: string;
   sort?: string;
+  createdByUserId?: number | '';
   page?: number;
   size?: number;
 }): Promise<PageResponse<Question>> => {
@@ -150,6 +151,7 @@ export const getQuestions = async (params?: {
     if (params?.difficulty) queryParams.difficulty = params.difficulty;
     if (params?.search) queryParams.search = params.search;
     if (params?.sort && params.sort !== 'recent') queryParams.sort = params.sort;
+    if (params?.createdByUserId) queryParams.createdByUserId = params.createdByUserId;
 
     const response = await apiClient.get('/questions', { params: queryParams });
     const data = response.data;
@@ -203,6 +205,27 @@ export const createQuestion = async (questionData: {
   return normalizeQuestion(response.data);
 };
 
+export const updateQuestion = async (
+  id: number,
+  questionData: {
+    enunciado: string;
+    identifier?: string;
+    year: number;
+    originId?: number;
+    areaId: number;
+    subjectId?: number;
+    testId?: number;
+    alternatives: { identifier: string; text: string; isCorrect?: boolean }[];
+  }
+): Promise<Question> => {
+  const response = await apiClient.put(`/questions/${id}`, questionData);
+  return normalizeQuestion(response.data);
+};
+
+export const deleteQuestion = async (id: number): Promise<void> => {
+  await apiClient.delete(`/questions/${id}`);
+};
+
 export const submitQuestionAttempt = async (
   questionId: number,
   attempt: QuestionAttemptRequest
@@ -227,6 +250,15 @@ export const createOrigin = async (origin: { name: string; description?: string 
   return response.data;
 };
 
+export const updateOrigin = async (id: number, origin: { name: string; description?: string }): Promise<Origin> => {
+  const response = await apiClient.put<Origin>(`/origins/${id}`, origin);
+  return response.data;
+};
+
+export const deleteOrigin = async (id: number): Promise<void> => {
+  await apiClient.delete(`/origins/${id}`);
+};
+
 export const getOriginQuestions = async (originId: number): Promise<Question[]> => {
   const response = await apiClient.get(`/origins/${originId}/questions`, { params: { size: 100 } });
   const rawList: any[] = response.data?.content || (Array.isArray(response.data) ? response.data : []);
@@ -249,6 +281,15 @@ export const createArea = async (area: { name: string; description?: string }): 
   return response.data;
 };
 
+export const updateArea = async (id: number, area: { name: string; description?: string }): Promise<Area> => {
+  const response = await apiClient.put<Area>(`/areas/${id}`, area);
+  return response.data;
+};
+
+export const deleteArea = async (id: number): Promise<void> => {
+  await apiClient.delete(`/areas/${id}`);
+};
+
 export const getAreaQuestions = async (areaId: number): Promise<Question[]> => {
   const response = await apiClient.get(`/areas/${areaId}/questions`, { params: { size: 100 } });
   const rawList: any[] = response.data?.content || (Array.isArray(response.data) ? response.data : []);
@@ -269,6 +310,18 @@ export const getSubjectsByArea = async (areaId: number): Promise<Subject[]> => {
 export const createSubject = async (subject: { name: string; description?: string; areaId: number }): Promise<Subject> => {
   const response = await apiClient.post<Subject>('/subjects', subject);
   return response.data;
+};
+
+export const updateSubject = async (
+  id: number,
+  subject: { name: string; description?: string; areaId: number }
+): Promise<Subject> => {
+  const response = await apiClient.put<Subject>(`/subjects/${id}`, subject);
+  return response.data;
+};
+
+export const deleteSubject = async (id: number): Promise<void> => {
+  await apiClient.delete(`/subjects/${id}`);
 };
 
 // Provas / Tests
@@ -301,6 +354,24 @@ export const createTest = async (testData: {
 }): Promise<Test> => {
   const response = await apiClient.post<Test>('/tests', testData);
   return response.data;
+};
+
+export const updateTest = async (
+  id: number,
+  testData: {
+    name: string;
+    year: number;
+    originId?: number;
+    areaId?: number;
+    description?: string;
+  }
+): Promise<Test> => {
+  const response = await apiClient.put<Test>(`/tests/${id}`, testData);
+  return response.data;
+};
+
+export const deleteTest = async (id: number): Promise<void> => {
+  await apiClient.delete(`/tests/${id}`);
 };
 
 export const createTestWithQuestions = async (
@@ -351,9 +422,12 @@ export const submitTest = async (
 };
 
 // Pastas & Salvamentos (Questões & Provas)
-export const getFolders = async (type?: FolderType): Promise<Folder[]> => {
+export const getFolders = async (type?: FolderType, createdByUserId?: number): Promise<Folder[]> => {
   try {
-    const response = await apiClient.get<Folder[]>('/folders', { params: type ? { type } : {} });
+    const params: Record<string, any> = {};
+    if (type) params.type = type;
+    if (createdByUserId) params.createdByUserId = createdByUserId;
+    const response = await apiClient.get<Folder[]>('/folders', { params });
     return Array.isArray(response.data) ? response.data : [];
   } catch (err) {
     console.warn('API /folders error:', err);
