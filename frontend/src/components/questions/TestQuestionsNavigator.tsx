@@ -7,7 +7,6 @@ import {
   Chip,
   Tooltip,
 } from '@mui/material';
-import CheckIcon from '@mui/icons-material/Check';
 import { PALETTE_COLORS } from '../../theme/theme';
 import { useAppTheme } from '../../theme/ThemeContext';
 
@@ -191,17 +190,6 @@ export const TestQuestionsNavigator: React.FC<TestQuestionsNavigatorProps> = ({
                 }}
               >
                 {idx + 1}
-                {isAnswered && !isCurrent && (
-                  <CheckIcon
-                    sx={{
-                      fontSize: '0.75rem',
-                      position: 'absolute',
-                      top: 2,
-                      right: 2,
-                      color: PALETTE_COLORS.success,
-                    }}
-                  />
-                )}
               </Button>
             </Tooltip>
           );
