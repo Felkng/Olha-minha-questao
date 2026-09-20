@@ -22,12 +22,25 @@ public class UserProfileDTO {
     private Instant createdAt;
 
     private long totalQuestionsResolved;
+    private long totalCorrectAnswers;
+    private double generalAccuracyPercentage;
     private double easyAccuracyPercentage;
     private double mediumAccuracyPercentage;
     private double hardAccuracyPercentage;
 
     @Builder.Default
     private List<DailyActivityDTO> dailyActivity = new ArrayList<>();
+
+    @Builder.Default
+    private List<CategoryPerformanceDTO> performanceByArea = new ArrayList<>();
+
+    @Builder.Default
+    private List<CategoryPerformanceDTO> performanceBySubject = new ArrayList<>();
+
+    @Builder.Default
+    private List<CategoryPerformanceDTO> performanceByOrigin = new ArrayList<>();
+
+    private UserComparisonDTO comparison;
 
     public long getTotalResolved() {
         return totalQuestionsResolved;
