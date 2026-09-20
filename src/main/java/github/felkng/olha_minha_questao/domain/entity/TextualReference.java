@@ -1,6 +1,5 @@
 package github.felkng.olha_minha_questao.domain.entity;
 
-import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
@@ -9,7 +8,6 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
-import jakarta.persistence.OneToOne;
 import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -22,43 +20,36 @@ import org.hibernate.annotations.UpdateTimestamp;
 import java.time.Instant;
 
 @Entity
-@Table(name = "test")
+@Table(name = "textual_reference")
 @Getter
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class Test {
+public class TextualReference {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
     @Column(nullable = false)
-    private String name;
+    private String title;
 
-    @Column(nullable = false)
-    private Integer year;
+    @Column(nullable = false, columnDefinition = "TEXT")
+    private String content;
+
+    @Column(length = 255)
+    private String author;
+
+    @Column(length = 500)
+    private String source;
+
+    @Column(length = 1000)
+    private String mediaUrl;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "origin_id")
-    private Origin origin;
-
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "area_id")
-    private Area area;
-
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "created_by_user_id")
-    private User createdByUser;
-
-    @OneToOne(mappedBy = "test", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    private TestStatistic statistic;
-
-    @jakarta.persistence.OneToMany(mappedBy = "test", cascade = CascadeType.ALL, orphanRemoval = true)
-    @jakarta.persistence.OrderBy("id ASC")
-    @Builder.Default
-    private java.util.List<TextualReference> textualReferences = new java.util.ArrayList<>();
+    @JoinColumn(name = "test_id")
+    private Test test;
 
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)

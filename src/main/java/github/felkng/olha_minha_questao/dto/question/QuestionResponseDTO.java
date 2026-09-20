@@ -30,6 +30,7 @@ public class QuestionResponseDTO {
     private AreaResponseDTO area;
     private SubjectResponseDTO subject;
     private TestResponseDTO test;
+    private github.felkng.olha_minha_questao.dto.reference.TextualReferenceResponseDTO textualReference;
     private UserSummaryDTO createdByUser;
     @Builder.Default
     private List<AlternativeResponseDTO> alternatives = new ArrayList<>();

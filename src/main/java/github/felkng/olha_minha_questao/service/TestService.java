@@ -38,9 +38,11 @@ public class TestService {
     private final github.felkng.olha_minha_questao.domain.repository.SubjectRepository subjectRepository;
     private final QuestionRepository questionRepository;
     private final github.felkng.olha_minha_questao.domain.repository.UserRepository userRepository;
+    private final github.felkng.olha_minha_questao.domain.repository.TextualReferenceRepository textualReferenceRepository;
     private final TestMapper testMapper;
     private final QuestionMapper questionMapper;
     private final github.felkng.olha_minha_questao.mapper.AlternativeMapper alternativeMapper;
+    private final github.felkng.olha_minha_questao.mapper.TextualReferenceMapper textualReferenceMapper;
 
     @Transactional(readOnly = true)
     public List<TestCardDTO> findTestCards() {
@@ -208,6 +210,16 @@ public class TestService {
 
         Test savedTest = testRepository.save(test);
 
+        List<github.felkng.olha_minha_questao.domain.entity.TextualReference> savedReferences = new java.util.ArrayList<>();
+        if (dto.getTextualReferences() != null && !dto.getTextualReferences().isEmpty()) {
+            for (var refDto : dto.getTextualReferences()) {
+                github.felkng.olha_minha_questao.domain.entity.TextualReference ref = textualReferenceMapper.toEntity(refDto);
+                ref.setTest(savedTest);
+                savedReferences.add(textualReferenceRepository.save(ref));
+            }
+            savedTest.getTextualReferences().addAll(savedReferences);
+        }
+
         if (dto.getQuestions() != null) {
             for (var qDto : dto.getQuestions()) {
                 if (qDto.getAlternatives() == null || qDto.getAlternatives().size() < 2) {
@@ -224,6 +236,13 @@ public class TestService {
                     qSubject = subjectRepository.findById(qDto.getSubjectId()).orElse(null);
                 }
 
+                github.felkng.olha_minha_questao.domain.entity.TextualReference qRef = null;
+                if (qDto.getTextualReferenceIndex() != null && qDto.getTextualReferenceIndex() >= 0 && qDto.getTextualReferenceIndex() < savedReferences.size()) {
+                    qRef = savedReferences.get(qDto.getTextualReferenceIndex());
+                } else if (qDto.getTextualReferenceId() != null) {
+                    qRef = textualReferenceRepository.findById(qDto.getTextualReferenceId()).orElse(null);
+                }
+
                 Question question = Question.builder()
                         .enunciado(qDto.getEnunciado())
                         .identifier(qDto.getIdentifier())
@@ -232,6 +251,7 @@ public class TestService {
                         .area(qArea)
                         .subject(qSubject)
                         .test(savedTest)
+                        .textualReference(qRef)
                         .createdByUser(user)
                         .alternatives(new java.util.ArrayList<>())
                         .build();

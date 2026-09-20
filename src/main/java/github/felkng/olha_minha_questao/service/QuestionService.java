@@ -45,6 +45,7 @@ public class QuestionService {
     private final SubjectRepository subjectRepository;
     private final TestRepository testRepository;
     private final UserRepository userRepository;
+    private final github.felkng.olha_minha_questao.domain.repository.TextualReferenceRepository textualReferenceRepository;
     private final QuestionMapper questionMapper;
     private final AlternativeMapper alternativeMapper;
 
@@ -253,11 +254,18 @@ public class QuestionService {
             }
         }
 
+        github.felkng.olha_minha_questao.domain.entity.TextualReference textualReference = null;
+        if (dto.getTextualReferenceId() != null) {
+            textualReference = textualReferenceRepository.findById(dto.getTextualReferenceId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Referência textual não encontrada com o id: " + dto.getTextualReferenceId()));
+        }
+
         Question question = questionMapper.toEntity(dto);
         question.setOrigin(origin);
         question.setArea(area);
         question.setSubject(subject);
         question.setTest(test);
+        question.setTextualReference(textualReference);
         question.setCreatedByUser(creator);
 
         if (dto.getAlternatives() != null && !dto.getAlternatives().isEmpty()) {
@@ -359,11 +367,18 @@ public class QuestionService {
                     .orElseThrow(() -> new ResourceNotFoundException("Prova não encontrada com o id: " + dto.getTestId()));
         }
 
+        github.felkng.olha_minha_questao.domain.entity.TextualReference textualReference = null;
+        if (dto.getTextualReferenceId() != null && dto.getTextualReferenceId() > 0) {
+            textualReference = textualReferenceRepository.findById(dto.getTextualReferenceId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Referência textual não encontrada com o id: " + dto.getTextualReferenceId()));
+        }
+
         questionMapper.updateEntityFromDTO(dto, question);
         question.setOrigin(origin);
         question.setArea(area);
         question.setSubject(subject);
         question.setTest(test);
+        question.setTextualReference(textualReference);
 
         if (dto.getAlternatives() != null) {
             question.setCorrectAlternative(null);

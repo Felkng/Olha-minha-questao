@@ -40,6 +40,10 @@ public class QuestionRequestDTO {
 
     private Long testId;
 
+    private Long textualReferenceId;
+
+    private Integer textualReferenceIndex;
+
     private Long correctAlternativeId;
 
     @Valid

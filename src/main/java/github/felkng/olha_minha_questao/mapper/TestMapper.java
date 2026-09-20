@@ -7,7 +7,7 @@ import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 import org.mapstruct.MappingTarget;
 
-@Mapper(componentModel = "spring", uses = {UserMapper.class})
+@Mapper(componentModel = "spring", uses = {UserMapper.class, TextualReferenceMapper.class})
 public interface TestMapper {
 
     @Mapping(target = "id", ignore = true)
@@ -15,6 +15,7 @@ public interface TestMapper {
     @Mapping(target = "area", ignore = true)
     @Mapping(target = "createdByUser", ignore = true)
     @Mapping(target = "statistic", ignore = true)
+    @Mapping(target = "textualReferences", ignore = true)
     @Mapping(target = "createdAt", ignore = true)
     @Mapping(target = "updatedAt", ignore = true)
     Test toEntity(TestRequestDTO dto);
@@ -30,6 +31,7 @@ public interface TestMapper {
     @Mapping(target = "area", ignore = true)
     @Mapping(target = "createdByUser", ignore = true)
     @Mapping(target = "statistic", ignore = true)
+    @Mapping(target = "textualReferences", ignore = true)
     @Mapping(target = "createdAt", ignore = true)
     @Mapping(target = "updatedAt", ignore = true)
     void updateEntityFromDTO(TestRequestDTO dto, @MappingTarget Test entity);

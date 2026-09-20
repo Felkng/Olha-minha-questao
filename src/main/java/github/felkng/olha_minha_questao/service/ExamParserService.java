@@ -39,7 +39,7 @@ public class ExamParserService {
                 .build();
     }
 
-    public List<ParsedQuestionDTO> parseExamPdf(MultipartFile file) {
+    public github.felkng.olha_minha_questao.dto.parser.ParsedExamResponseDTO parseExamPdf(MultipartFile file) {
         if (file == null || file.isEmpty()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Arquivo PDF não fornecido ou vazio.");
         }
@@ -54,17 +54,17 @@ public class ExamParserService {
             };
             body.add("file", resource);
 
-            Map<String, List<ParsedQuestionDTO>> response = restClient.post()
+            github.felkng.olha_minha_questao.dto.parser.ParsedExamResponseDTO response = restClient.post()
                     .uri("/parse-exam-pdf")
                     .contentType(MediaType.MULTIPART_FORM_DATA)
                     .body(body)
                     .retrieve()
-                    .body(new ParameterizedTypeReference<Map<String, List<ParsedQuestionDTO>>>() {});
+                    .body(github.felkng.olha_minha_questao.dto.parser.ParsedExamResponseDTO.class);
 
-            if (response != null && response.containsKey("questions")) {
-                return response.get("questions");
+            if (response != null) {
+                return response;
             }
-            return Collections.emptyList();
+            return new github.felkng.olha_minha_questao.dto.parser.ParsedExamResponseDTO();
         } catch (IOException e) {
             log.error("Erro ao ler bytes do arquivo PDF da prova", e);
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Erro ao processar o arquivo PDF enviado.");
@@ -74,11 +74,11 @@ public class ExamParserService {
         }
     }
 
-    public List<ParsedAnswerKeyDTO> parseAnswerKeyPdf(MultipartFile file) {
+    public github.felkng.olha_minha_questao.dto.parser.ParsedAnswerKeyResponseDTO parseAnswerKeyPdf(MultipartFile file) {
         return parseAnswerKeyPdf(file, null);
     }
 
-    public List<ParsedAnswerKeyDTO> parseAnswerKeyPdf(MultipartFile file, String provaName) {
+    public github.felkng.olha_minha_questao.dto.parser.ParsedAnswerKeyResponseDTO parseAnswerKeyPdf(MultipartFile file, String provaName) {
         if (file == null || file.isEmpty()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Arquivo PDF de gabarito não fornecido ou vazio.");
         }
@@ -98,17 +98,17 @@ public class ExamParserService {
                 uri += "?prova_name=" + java.net.URLEncoder.encode(provaName, java.nio.charset.StandardCharsets.UTF_8);
             }
 
-            Map<String, List<ParsedAnswerKeyDTO>> response = restClient.post()
+            github.felkng.olha_minha_questao.dto.parser.ParsedAnswerKeyResponseDTO response = restClient.post()
                     .uri(uri)
                     .contentType(MediaType.MULTIPART_FORM_DATA)
                     .body(body)
                     .retrieve()
-                    .body(new ParameterizedTypeReference<Map<String, List<ParsedAnswerKeyDTO>>>() {});
+                    .body(github.felkng.olha_minha_questao.dto.parser.ParsedAnswerKeyResponseDTO.class);
 
-            if (response != null && response.containsKey("answers")) {
-                return response.get("answers");
+            if (response != null) {
+                return response;
             }
-            return Collections.emptyList();
+            return new github.felkng.olha_minha_questao.dto.parser.ParsedAnswerKeyResponseDTO();
         } catch (IOException e) {
             log.error("Erro ao ler bytes do arquivo PDF do gabarito", e);
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Erro ao processar o arquivo PDF do gabarito.");

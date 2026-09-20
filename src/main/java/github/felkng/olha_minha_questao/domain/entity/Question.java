@@ -69,6 +69,10 @@ public class Question {
     @JoinColumn(name = "created_by_user_id")
     private User createdByUser;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "textual_reference_id")
+    private TextualReference textualReference;
+
     @OneToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "correct_alternative_id")
     private Alternative correctAlternative;

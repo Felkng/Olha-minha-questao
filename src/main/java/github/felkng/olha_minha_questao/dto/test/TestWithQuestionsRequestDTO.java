@@ -38,5 +38,9 @@ public class TestWithQuestionsRequestDTO {
 
     @Valid
     @Builder.Default
+    private List<github.felkng.olha_minha_questao.dto.reference.TextualReferenceRequestDTO> textualReferences = new ArrayList<>();
+
+    @Valid
+    @Builder.Default
     private List<QuestionRequestDTO> questions = new ArrayList<>();
 }

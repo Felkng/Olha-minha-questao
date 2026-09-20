@@ -23,6 +23,8 @@ public class TestResponseDTO {
     private Long areaId;
     private String areaName;
     private UserSummaryDTO createdByUser;
+    @Builder.Default
+    private java.util.List<github.felkng.olha_minha_questao.dto.reference.TextualReferenceResponseDTO> textualReferences = new java.util.ArrayList<>();
     private Instant createdAt;
     private Instant updatedAt;
 }
