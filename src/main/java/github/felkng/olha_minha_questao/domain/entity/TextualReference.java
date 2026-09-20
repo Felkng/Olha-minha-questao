@@ -32,14 +32,23 @@ public class TextualReference {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false)
+    @Column(length = 255)
     private String title;
 
-    @Column(nullable = false, columnDefinition = "TEXT")
+    @Column(length = 500)
+    private String subtitle;
+
+    @Column(columnDefinition = "TEXT")
     private String content;
 
     @Column(length = 255)
     private String author;
+
+    @Column(length = 1000)
+    private String reference;
+
+    @Column(length = 1000)
+    private String caption;
 
     @Column(length = 500)
     private String source;

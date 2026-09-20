@@ -14,8 +14,11 @@ import lombok.Setter;
 public class ParsedTextualReferenceDTO {
     private String id;
     private String title;
+    private String subtitle;
     private String content;
     private String author;
+    private String reference;
+    private String caption;
     private String source;
     private String mediaUrl;
 }
