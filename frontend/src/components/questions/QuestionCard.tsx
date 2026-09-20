@@ -23,6 +23,7 @@ import VisibilityOutlinedIcon from '@mui/icons-material/VisibilityOutlined';
 import RestartAltIcon from '@mui/icons-material/RestartAlt';
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import MenuBookIcon from '@mui/icons-material/MenuBook';
+import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import { Link } from 'react-router-dom';
 import { DifficultyLevel, Question } from '../../types';
 import { PALETTE_COLORS } from '../../theme/theme';
@@ -402,10 +403,10 @@ export const QuestionCard: React.FC<QuestionCardProps> = ({
               },
             }}
           >
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
               <MenuBookIcon sx={{ color: PALETTE_COLORS.primary, fontSize: '1.2rem' }} />
               <Typography variant="subtitle2" sx={{ fontWeight: 700, color: 'text.primary' }}>
-                Texto de Apoio: {question.textualReference.title}
+                Texto de Apoio: {question.textualReference.title || question.textualReference.subtitle || 'Referência Textual'}
               </Typography>
             </Box>
             <Button
@@ -424,24 +425,107 @@ export const QuestionCard: React.FC<QuestionCardProps> = ({
 
           <Collapse in={showTextualReference}>
             <Box sx={{ p: 2, pt: 1.5, borderTop: `1px solid ${isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.08)'}` }}>
-              {(question.textualReference.author || question.textualReference.source) && (
-                <Typography variant="caption" sx={{ display: 'block', color: 'text.secondary', fontStyle: 'italic', mb: 1.5 }}>
-                  {[question.textualReference.author, question.textualReference.source].filter(Boolean).join(' — ')}
+              {question.textualReference.subtitle && (
+                <Typography
+                  variant="subtitle2"
+                  sx={{
+                    fontStyle: 'italic',
+                    fontWeight: 600,
+                    color: 'text.secondary',
+                    mb: 1,
+                  }}
+                >
+                  {question.textualReference.subtitle}
                 </Typography>
               )}
-              <Typography
-                variant="body2"
-                sx={{
-                  lineHeight: 1.75,
-                  color: 'text.primary',
-                  whiteSpace: 'pre-line',
-                  maxHeight: 350,
-                  overflowY: 'auto',
-                  pr: 1,
-                }}
-              >
-                {question.textualReference.content}
-              </Typography>
+
+              {question.textualReference.caption && (
+                <Typography
+                  variant="caption"
+                  sx={{
+                    display: 'block',
+                    fontWeight: 600,
+                    color: PALETTE_COLORS.secondary,
+                    mb: 1.5,
+                  }}
+                >
+                  {question.textualReference.caption}
+                </Typography>
+              )}
+
+              {question.textualReference.content && (
+                <Typography
+                  variant="body2"
+                  sx={{
+                    lineHeight: 1.75,
+                    color: 'text.primary',
+                    whiteSpace: 'pre-line',
+                    maxHeight: 380,
+                    overflowY: 'auto',
+                    pr: 1,
+                    mb: 1.5,
+                  }}
+                >
+                  {question.textualReference.content}
+                </Typography>
+              )}
+
+              {/* Author & Reference / Source Link */}
+              {(question.textualReference.author || question.textualReference.reference || question.textualReference.source) && (
+                <Stack
+                  direction="row"
+                  spacing={1}
+                  alignItems="center"
+                  flexWrap="wrap"
+                  sx={{
+                    mt: 1,
+                    pt: 1,
+                    borderTop: `1px dashed ${isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.08)'}`,
+                  }}
+                >
+                  {question.textualReference.author && (
+                    <Typography variant="caption" sx={{ color: 'text.secondary', fontStyle: 'italic' }}>
+                      Autor: <strong>{question.textualReference.author}</strong>
+                    </Typography>
+                  )}
+
+                  {(question.textualReference.reference || question.textualReference.source) && (() => {
+                    const refUrl = question.textualReference.reference || question.textualReference.source || '';
+                    const isUrl = refUrl.startsWith('http://') || refUrl.startsWith('https://') || refUrl.startsWith('www.');
+                    const fullUrl = refUrl.startsWith('www.') ? `https://${refUrl}` : refUrl;
+
+                    return isUrl ? (
+                      <Stack direction="row" spacing={0.5} alignItems="center">
+                        <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                          Fonte / Referência:
+                        </Typography>
+                        <Typography
+                          component="a"
+                          href={fullUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          variant="caption"
+                          sx={{
+                            color: PALETTE_COLORS.primary,
+                            textDecoration: 'underline',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: 0.3,
+                            fontWeight: 600,
+                          }}
+                        >
+                          {refUrl.length > 50 ? refUrl.substring(0, 50) + '...' : refUrl}
+                          <OpenInNewIcon sx={{ fontSize: '0.85rem' }} />
+                        </Typography>
+                      </Stack>
+                    ) : (
+                      <Typography variant="caption" sx={{ color: 'text.secondary', fontStyle: 'italic' }}>
+                        Fonte: {refUrl}
+                      </Typography>
+                    );
+                  })()}
+                </Stack>
+              )}
             </Box>
           </Collapse>
         </Box>

@@ -28,6 +28,8 @@ import {
   AccordionDetails,
   Chip,
   Tooltip,
+  Drawer,
+  Divider,
 } from '@mui/material';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
@@ -39,6 +41,9 @@ import MenuBookIcon from '@mui/icons-material/MenuBook';
 import EditIcon from '@mui/icons-material/Edit';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
+import VisibilityOutlinedIcon from '@mui/icons-material/VisibilityOutlined';
+import OpenInNewIcon from '@mui/icons-material/OpenInNew';
+import CloseIcon from '@mui/icons-material/Close';
 import { Area, Origin, TextualReference, AvailableProvaOption } from '../../types';
 import {
   getAreas,
@@ -115,10 +120,13 @@ export const CreateTestWizardModal: React.FC<CreateTestWizardModalProps> = ({
   const [textualReferences, setTextualReferences] = useState<TextualReference[]>([]);
   const [openTextualRefDialog, setOpenTextualRefDialog] = useState(false);
   const [editingRefIndex, setEditingRefIndex] = useState<number | null>(null);
+  const [viewingRef, setViewingRef] = useState<TextualReference | null>(null);
   const [refTitle, setRefTitle] = useState('');
-  const [refContent, setRefContent] = useState('');
+  const [refSubtitle, setRefSubtitle] = useState('');
   const [refAuthor, setRefAuthor] = useState('');
-  const [refSource, setRefSource] = useState('');
+  const [refReference, setRefReference] = useState('');
+  const [refCaption, setRefCaption] = useState('');
+  const [refContent, setRefContent] = useState('');
 
   const { mode } = useAppTheme();
   const isDark = mode === 'dark';
@@ -162,6 +170,7 @@ export const CreateTestWizardModal: React.FC<CreateTestWizardModalProps> = ({
     setExamPdfFile(null);
     setQuestions([]);
     setTextualReferences([]);
+    setViewingRef(null);
     setAvailableProvas([]);
     setSelectedProvaId('');
     setAnswerKeyPdfFile(null);
@@ -406,10 +415,13 @@ export const CreateTestWizardModal: React.FC<CreateTestWizardModalProps> = ({
         areaId: areaId ? Number(areaId) : null,
         description: description.trim() || undefined,
         textualReferences: textualReferences.map((ref) => ({
-          title: ref.title.trim(),
-          content: ref.content.trim(),
+          title: ref.title?.trim() || undefined,
+          subtitle: ref.subtitle?.trim() || undefined,
+          content: ref.content?.trim() || undefined,
           author: ref.author?.trim() || undefined,
-          source: ref.source?.trim() || undefined,
+          reference: ref.reference?.trim() || ref.source?.trim() || undefined,
+          caption: ref.caption?.trim() || undefined,
+          source: ref.source?.trim() || ref.reference?.trim() || undefined,
           mediaUrl: ref.mediaUrl?.trim() || undefined,
         })),
         questions: questions.map((q) => ({
@@ -645,8 +657,10 @@ export const CreateTestWizardModal: React.FC<CreateTestWizardModalProps> = ({
                   onClick={() => {
                     setEditingRefIndex(null);
                     setRefTitle('');
+                    setRefSubtitle('');
                     setRefAuthor('');
-                    setRefSource('');
+                    setRefReference('');
+                    setRefCaption('');
                     setRefContent('');
                     setOpenTextualRefDialog(true);
                   }}
@@ -665,66 +679,148 @@ export const CreateTestWizardModal: React.FC<CreateTestWizardModalProps> = ({
               ) : (
                 <Stack spacing={1}>
                   {textualReferences.map((ref, rIdx) => (
-                    <Paper
+                    <Accordion
                       key={rIdx}
-                      variant="outlined"
+                      disableGutters
                       sx={{
-                        p: 1.5,
-                        borderRadius: 1.5,
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
+                        border: '1px solid',
+                        borderColor: 'divider',
+                        borderRadius: '8px !important',
+                        mb: 1,
+                        '&:before': { display: 'none' },
                         bgcolor: 'background.default',
                       }}
                     >
-                      <Box sx={{ flex: 1, minWidth: 0, mr: 2 }}>
-                        <Typography variant="subtitle2" sx={{ fontWeight: 700 }} noWrap>
-                          {ref.title || `Texto ${rIdx + 1}`}
-                        </Typography>
-                        <Typography variant="caption" color="text.secondary" noWrap sx={{ display: 'block' }}>
-                          {[ref.author, ref.source].filter(Boolean).join(' • ') || (ref.content.substring(0, 80) + '...')}
-                        </Typography>
-                      </Box>
-                      <Stack direction="row" spacing={0.5}>
-                        <Tooltip title="Editar Texto">
-                          <IconButton
-                            size="small"
-                            onClick={() => {
-                              setEditingRefIndex(rIdx);
-                              setRefTitle(ref.title || '');
-                              setRefAuthor(ref.author || '');
-                              setRefSource(ref.source || '');
-                              setRefContent(ref.content || '');
-                              setOpenTextualRefDialog(true);
-                            }}
-                          >
-                            <EditIcon fontSize="small" />
-                          </IconButton>
-                        </Tooltip>
-                        <Tooltip title="Excluir Texto">
-                          <IconButton
-                            size="small"
-                            color="error"
-                            onClick={() => {
-                              const updated = textualReferences.filter((_, i) => i !== rIdx);
-                              setTextualReferences(updated);
-                              setQuestions((prev) =>
-                                prev.map((q) => {
-                                  if (q.textualReferenceIndex === rIdx) {
-                                    return { ...q, textualReferenceIndex: null };
-                                  } else if (q.textualReferenceIndex !== undefined && q.textualReferenceIndex !== null && q.textualReferenceIndex > rIdx) {
-                                    return { ...q, textualReferenceIndex: q.textualReferenceIndex - 1 };
-                                  }
-                                  return q;
-                                })
-                              );
-                            }}
-                          >
-                            <DeleteOutlineIcon fontSize="small" />
-                          </IconButton>
-                        </Tooltip>
-                      </Stack>
-                    </Paper>
+                      <AccordionSummary
+                        expandIcon={<ExpandMoreIcon />}
+                        sx={{
+                          minHeight: 52,
+                          '& .MuiAccordionSummary-content': { my: 0.5, alignItems: 'center' },
+                        }}
+                      >
+                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', pr: 1 }}>
+                          <Box sx={{ flex: 1, minWidth: 0, mr: 2 }}>
+                            <Typography variant="subtitle2" sx={{ fontWeight: 700 }} noWrap>
+                              {ref.title || ref.subtitle || `Texto ${rIdx + 1}`}
+                            </Typography>
+                            {ref.subtitle && ref.title && (
+                              <Typography variant="caption" sx={{ fontStyle: 'italic', display: 'block', color: 'text.secondary' }} noWrap>
+                                {ref.subtitle}
+                              </Typography>
+                            )}
+                            <Typography variant="caption" color="text.secondary" noWrap sx={{ display: 'block' }}>
+                              {[
+                                ref.author,
+                                ref.reference || ref.source,
+                                ref.caption ? `Legenda: ${ref.caption}` : null,
+                              ]
+                                .filter(Boolean)
+                                .join(' • ') || (ref.content ? ref.content.substring(0, 80) + '...' : 'Sem conteúdo adicional')}
+                            </Typography>
+                          </Box>
+
+                          <Stack direction="row" spacing={0.5} onClick={(e) => e.stopPropagation()}>
+                            <Tooltip title="Visualizar em Drawer Lateral">
+                              <IconButton
+                                size="small"
+                                color="primary"
+                                onClick={() => setViewingRef(ref)}
+                              >
+                                <VisibilityOutlinedIcon fontSize="small" />
+                              </IconButton>
+                            </Tooltip>
+                            <Tooltip title="Editar Referência">
+                              <IconButton
+                                size="small"
+                                onClick={() => {
+                                  setEditingRefIndex(rIdx);
+                                  setRefTitle(ref.title || '');
+                                  setRefSubtitle(ref.subtitle || '');
+                                  setRefAuthor(ref.author || '');
+                                  setRefReference(ref.reference || ref.source || '');
+                                  setRefCaption(ref.caption || '');
+                                  setRefContent(ref.content || '');
+                                  setOpenTextualRefDialog(true);
+                                }}
+                              >
+                                <EditIcon fontSize="small" />
+                              </IconButton>
+                            </Tooltip>
+                            <Tooltip title="Excluir Referência">
+                              <IconButton
+                                size="small"
+                                color="error"
+                                onClick={() => {
+                                  const updated = textualReferences.filter((_, i) => i !== rIdx);
+                                  setTextualReferences(updated);
+                                  setQuestions((prev) =>
+                                    prev.map((q) => {
+                                      if (q.textualReferenceIndex === rIdx) {
+                                        return { ...q, textualReferenceIndex: null };
+                                      } else if (q.textualReferenceIndex !== undefined && q.textualReferenceIndex !== null && q.textualReferenceIndex > rIdx) {
+                                        return { ...q, textualReferenceIndex: q.textualReferenceIndex - 1 };
+                                      }
+                                      return q;
+                                    })
+                                  );
+                                }}
+                              >
+                                <DeleteOutlineIcon fontSize="small" />
+                              </IconButton>
+                            </Tooltip>
+                          </Stack>
+                        </Box>
+                      </AccordionSummary>
+
+                      <AccordionDetails sx={{ pt: 1, pb: 2, px: 2, borderTop: '1px solid', borderColor: 'divider' }}>
+                        {ref.subtitle && (
+                          <Typography variant="subtitle2" sx={{ fontStyle: 'italic', fontWeight: 600, color: 'text.secondary', mb: 1 }}>
+                            {ref.subtitle}
+                          </Typography>
+                        )}
+
+                        {ref.caption && (
+                          <Typography variant="caption" sx={{ display: 'block', fontWeight: 600, color: PALETTE_COLORS.secondary, mb: 1 }}>
+                            {ref.caption}
+                          </Typography>
+                        )}
+
+                        {ref.content && (
+                          <Paper variant="outlined" sx={{ p: 2, bgcolor: isDark ? 'rgba(0,0,0,0.2)' : '#fff', borderRadius: 1.5, maxHeight: 300, overflowY: 'auto' }}>
+                            <Typography variant="body2" sx={{ whiteSpace: 'pre-line', lineHeight: 1.7 }}>
+                              {ref.content}
+                            </Typography>
+                          </Paper>
+                        )}
+
+                        {(ref.author || ref.reference || ref.source) && (
+                          <Box sx={{ mt: 1.5, pt: 1, borderTop: '1px dashed', borderColor: 'divider' }}>
+                            {ref.author && (
+                              <Typography variant="caption" sx={{ display: 'block', color: 'text.secondary' }}>
+                                <strong>Autor:</strong> {ref.author}
+                              </Typography>
+                            )}
+                            {(ref.reference || ref.source) && (
+                              <Typography variant="caption" sx={{ display: 'block', color: 'text.secondary', mt: 0.5 }}>
+                                <strong>Fonte / Referência:</strong>{' '}
+                                {(() => {
+                                  const url = ref.reference || ref.source || '';
+                                  const isUrl = url.startsWith('http://') || url.startsWith('https://') || url.startsWith('www.');
+                                  const fullUrl = url.startsWith('www.') ? `https://${url}` : url;
+                                  return isUrl ? (
+                                    <a href={fullUrl} target="_blank" rel="noopener noreferrer" style={{ color: PALETTE_COLORS.primary, textDecoration: 'underline' }}>
+                                      {url}
+                                    </a>
+                                  ) : (
+                                    url
+                                  );
+                                })()}
+                              </Typography>
+                            )}
+                          </Box>
+                        )}
+                      </AccordionDetails>
+                    </Accordion>
                   ))}
                 </Stack>
               )}
@@ -747,43 +843,162 @@ export const CreateTestWizardModal: React.FC<CreateTestWizardModalProps> = ({
             {questions.map((q, qIndex) => {
               const isDuplicate = duplicates.includes((q.identifier || '').trim().toLowerCase());
               return (
-                <Accordion key={q.id} defaultExpanded={qIndex === 0} sx={{ border: isDuplicate ? '1px solid #f44336' : '1px solid #e0e0e0', borderRadius: '8px !important', mb: 1.5 }}>
-                  <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                    <Stack direction="row" spacing={1.5} alignItems="center" sx={{ width: '100%', pr: 2 }}>
+                <Accordion
+                  key={q.id}
+                  disableGutters
+                  sx={{
+                    border: isDuplicate ? '1px solid #f44336' : '1px solid',
+                    borderColor: isDuplicate ? 'error.main' : 'divider',
+                    borderRadius: '8px !important',
+                    mb: 1.5,
+                    '&:before': { display: 'none' },
+                  }}
+                >
+                  <AccordionSummary
+                    expandIcon={<ExpandMoreIcon />}
+                    sx={{
+                      minHeight: 52,
+                      height: 52,
+                      '&.Mui-expanded': { minHeight: 52, height: 52 },
+                      px: 2,
+                      '& .MuiAccordionSummary-content': {
+                        m: 0,
+                        alignItems: 'center',
+                        overflow: 'hidden',
+                      },
+                      '& .MuiAccordionSummary-content.Mui-expanded': {
+                        m: 0,
+                      },
+                    }}
+                  >
+                    <Box
+                      sx={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        width: '100%',
+                        gap: 1.5,
+                        overflow: 'hidden',
+                      }}
+                    >
+                      {/* Fixed width question identifier chip */}
                       <Chip
                         label={`#${q.identifier || qIndex + 1}`}
                         color={isDuplicate ? 'error' : 'primary'}
                         size="small"
-                        sx={{ fontWeight: 700 }}
+                        sx={{
+                          fontWeight: 700,
+                          minWidth: 50,
+                          maxWidth: 65,
+                          height: 28,
+                          justifyContent: 'center',
+                          flexShrink: 0,
+                        }}
                       />
+
+                      {/* Truncated Enunciado */}
                       <Typography
                         variant="body2"
                         sx={{
                           flex: 1,
+                          minWidth: 0,
                           overflow: 'hidden',
                           textOverflow: 'ellipsis',
                           whiteSpace: 'nowrap',
                           color: 'text.primary',
                         }}
                       >
-                        {q.enunciado ? q.enunciado.substring(0, 80) + '...' : 'Questão sem enunciado'}
+                        {q.enunciado ? q.enunciado.substring(0, 100) + '...' : 'Questão sem enunciado'}
                       </Typography>
-                      {q.textualReferenceIndex !== undefined && q.textualReferenceIndex !== null && textualReferences[q.textualReferenceIndex] && (
-                        <Tooltip title={`Texto de Apoio: ${textualReferences[q.textualReferenceIndex].title}`}>
-                          <Chip
-                            icon={<MenuBookIcon fontSize="small" />}
-                            label="Texto"
-                            size="small"
-                            variant="outlined"
-                            color="primary"
-                          />
-                        </Tooltip>
+
+                      {/* Quick Textual Reference Selector in Header */}
+                      {textualReferences.length > 0 && (
+                        <Box
+                          onClick={(e) => e.stopPropagation()}
+                          sx={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 0.5 }}
+                        >
+                          <FormControl size="small" sx={{ minWidth: 140, maxWidth: 200 }}>
+                            <Select
+                              value={q.textualReferenceIndex !== undefined && q.textualReferenceIndex !== null ? q.textualReferenceIndex : ''}
+                              displayEmpty
+                              size="small"
+                              sx={{
+                                height: 30,
+                                fontSize: '0.78rem',
+                                borderRadius: '8px',
+                                bgcolor: q.textualReferenceIndex != null
+                                  ? (isDark ? 'rgba(217, 183, 99, 0.15)' : 'rgba(217, 183, 99, 0.2)')
+                                  : 'action.hover',
+                                fontWeight: q.textualReferenceIndex != null ? 700 : 500,
+                                '& .MuiSelect-select': {
+                                  py: 0.5,
+                                  pr: '24px !important',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: 0.5,
+                                },
+                              }}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                handleUpdateQuestion(qIndex, 'textualReferenceIndex', val === '' ? null : Number(val));
+                              }}
+                              renderValue={(selected) => {
+                                if (typeof selected !== 'number') {
+                                  return (
+                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, color: 'text.secondary' }}>
+                                      <MenuBookIcon sx={{ fontSize: '0.95rem' }} />
+                                      <span style={{ fontSize: '0.75rem' }}>+ Texto</span>
+                                    </Box>
+                                  );
+                                }
+                                const ref = textualReferences[selected];
+                                return (
+                                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, color: PALETTE_COLORS.primary }}>
+                                    <MenuBookIcon sx={{ fontSize: '0.95rem' }} />
+                                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 120 }}>
+                                      {ref?.title || ref?.subtitle || `Texto ${Number(selected) + 1}`}
+                                    </span>
+                                  </Box>
+                                );
+                              }}
+                            >
+                              <MenuItem value="" sx={{ fontSize: '0.8rem' }}>
+                                <em>Nenhum texto de apoio</em>
+                              </MenuItem>
+                              {textualReferences.map((ref, rIdx) => (
+                                <MenuItem key={rIdx} value={rIdx} sx={{ fontSize: '0.8rem' }}>
+                                  {ref.title || ref.subtitle || `Texto ${rIdx + 1}`}
+                                </MenuItem>
+                              ))}
+                            </Select>
+                          </FormControl>
+
+                          {q.textualReferenceIndex !== undefined && q.textualReferenceIndex !== null && textualReferences[q.textualReferenceIndex] && (
+                            <Tooltip title="Visualizar texto de apoio">
+                              <IconButton
+                                size="small"
+                                color="primary"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setViewingRef(textualReferences[q.textualReferenceIndex!]);
+                                }}
+                                sx={{ p: 0.5 }}
+                              >
+                                <VisibilityOutlinedIcon sx={{ fontSize: '1.1rem' }} />
+                              </IconButton>
+                            </Tooltip>
+                          )}
+                        </Box>
                       )}
+
+                      {/* Alternatives count chip */}
                       <Chip
                         label={`${q.alternatives.length} alts`}
                         size="small"
                         variant="outlined"
+                        sx={{ flexShrink: 0, minWidth: 60, height: 24 }}
                       />
+
+                      {/* Delete question button */}
                       <IconButton
                         size="small"
                         color="error"
@@ -791,10 +1006,11 @@ export const CreateTestWizardModal: React.FC<CreateTestWizardModalProps> = ({
                           e.stopPropagation();
                           handleRemoveQuestion(qIndex);
                         }}
+                        sx={{ flexShrink: 0, p: 0.5 }}
                       >
                         <DeleteOutlineIcon fontSize="small" />
                       </IconButton>
-                    </Stack>
+                    </Box>
                   </AccordionSummary>
                   <AccordionDetails>
                     <Stack spacing={2}>
@@ -1224,40 +1440,57 @@ export const CreateTestWizardModal: React.FC<CreateTestWizardModalProps> = ({
       fullWidth
     >
       <DialogTitle sx={{ fontWeight: 800 }}>
-        {editingRefIndex !== null ? 'Editar Texto de Apoio' : 'Adicionar Texto de Apoio'}
+        {editingRefIndex !== null ? 'Editar Referência Textual' : 'Adicionar Referência Textual'}
       </DialogTitle>
       <DialogContent dividers>
         <Stack spacing={2} sx={{ pt: 1 }}>
           <TextField
-            label="Título do Texto (ex: Texto I - À moda brasileira)"
+            label="Título (opcional)"
+            placeholder="ex: Texto I - À moda brasileira"
             value={refTitle}
             onChange={(e) => setRefTitle(e.target.value)}
             fullWidth
-            required
+            size="small"
+          />
+          <TextField
+            label="Subtítulo (opcional)"
+            placeholder="ex: Crônica sobre costumes e linguagem"
+            value={refSubtitle}
+            onChange={(e) => setRefSubtitle(e.target.value)}
+            fullWidth
             size="small"
           />
           <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
             <TextField
               label="Autor (opcional)"
+              placeholder="ex: TELLES, Lygia Fagundes"
               value={refAuthor}
               onChange={(e) => setRefAuthor(e.target.value)}
               fullWidth
               size="small"
             />
             <TextField
-              label="Fonte / Referência (opcional)"
-              value={refSource}
-              onChange={(e) => setRefSource(e.target.value)}
+              label="Referência / URL (opcional)"
+              placeholder="ex: https://site.com/artigo ou Fonte bibliográfica"
+              value={refReference}
+              onChange={(e) => setRefReference(e.target.value)}
               fullWidth
               size="small"
             />
           </Stack>
           <TextField
-            label="Conteúdo do Texto"
+            label="Legenda (opcional)"
+            placeholder="ex: Figura 1: Emissões de metano detectadas por satélite"
+            value={refCaption}
+            onChange={(e) => setRefCaption(e.target.value)}
+            fullWidth
+            size="small"
+          />
+          <TextField
+            label="Conteúdo do Texto (opcional)"
             value={refContent}
             onChange={(e) => setRefContent(e.target.value)}
             fullWidth
-            required
             multiline
             rows={8}
             placeholder="Cole ou digite o texto de apoio aqui..."
@@ -1271,39 +1504,156 @@ export const CreateTestWizardModal: React.FC<CreateTestWizardModalProps> = ({
         <Button
           variant="contained"
           onClick={() => {
-            if (!refTitle.trim() || !refContent.trim()) {
-              alert('Título e Conteúdo são obrigatórios.');
+            if (
+              !refTitle.trim() &&
+              !refSubtitle.trim() &&
+              !refAuthor.trim() &&
+              !refReference.trim() &&
+              !refCaption.trim() &&
+              !refContent.trim()
+            ) {
+              alert('Preencha ao menos um dos campos da referência textual.');
               return;
             }
+
+            const refData: TextualReference = {
+              title: refTitle.trim() || undefined,
+              subtitle: refSubtitle.trim() || undefined,
+              author: refAuthor.trim() || undefined,
+              reference: refReference.trim() || undefined,
+              caption: refCaption.trim() || undefined,
+              content: refContent.trim() || undefined,
+              source: refReference.trim() || undefined,
+            };
+
             if (editingRefIndex !== null) {
               const updated = [...textualReferences];
               updated[editingRefIndex] = {
                 ...updated[editingRefIndex],
-                title: refTitle.trim(),
-                author: refAuthor.trim() || undefined,
-                source: refSource.trim() || undefined,
-                content: refContent.trim(),
+                ...refData,
               };
               setTextualReferences(updated);
             } else {
-              setTextualReferences([
-                ...textualReferences,
-                {
-                  title: refTitle.trim(),
-                  author: refAuthor.trim() || undefined,
-                  source: refSource.trim() || undefined,
-                  content: refContent.trim(),
-                },
-              ]);
+              setTextualReferences([...textualReferences, refData]);
             }
             setOpenTextualRefDialog(false);
           }}
           sx={{ fontWeight: 700, backgroundColor: PALETTE_COLORS.primary }}
         >
-          Salvar Texto
+          Salvar Referência
         </Button>
       </DialogActions>
     </Dialog>
+
+    <Drawer
+      anchor="right"
+      open={Boolean(viewingRef)}
+      onClose={() => setViewingRef(null)}
+      PaperProps={{
+        sx: {
+          width: { xs: '100%', sm: 540 },
+          p: 3,
+          bgcolor: 'background.paper',
+        },
+      }}
+    >
+      {viewingRef && (
+        <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
+            <Stack direction="row" spacing={1} alignItems="center">
+              <MenuBookIcon color="primary" />
+              <Typography variant="h6" sx={{ fontWeight: 800 }}>
+                Texto de Apoio
+              </Typography>
+            </Stack>
+            <IconButton size="small" onClick={() => setViewingRef(null)}>
+              <CloseIcon />
+            </IconButton>
+          </Box>
+
+          <Divider sx={{ mb: 2 }} />
+
+          <Box sx={{ flex: 1, overflowY: 'auto', pr: 1 }}>
+            <Typography variant="subtitle1" sx={{ fontWeight: 800, color: 'text.primary', mb: 0.5 }}>
+              {viewingRef.title || viewingRef.subtitle || 'Sem título'}
+            </Typography>
+
+            {viewingRef.subtitle && viewingRef.title && (
+              <Typography variant="subtitle2" sx={{ fontStyle: 'italic', color: 'text.secondary', mb: 1.5 }}>
+                {viewingRef.subtitle}
+              </Typography>
+            )}
+
+            {viewingRef.caption && (
+              <Typography variant="caption" sx={{ display: 'block', fontWeight: 600, color: PALETTE_COLORS.secondary, mb: 1.5 }}>
+                {viewingRef.caption}
+              </Typography>
+            )}
+
+            {viewingRef.content ? (
+              <Paper variant="outlined" sx={{ p: 2, bgcolor: isDark ? 'rgba(0,0,0,0.2)' : '#fafafa', borderRadius: 2, mb: 2 }}>
+                <Typography variant="body2" sx={{ whiteSpace: 'pre-line', lineHeight: 1.8 }}>
+                  {viewingRef.content}
+                </Typography>
+              </Paper>
+            ) : (
+              <Typography variant="body2" color="text.secondary" sx={{ fontStyle: 'italic', mb: 2 }}>
+                Nenhum conteúdo textual informado.
+              </Typography>
+            )}
+
+            {(viewingRef.author || viewingRef.reference || viewingRef.source) && (
+              <Box sx={{ pt: 1.5, borderTop: '1px dashed', borderColor: 'divider' }}>
+                {viewingRef.author && (
+                  <Typography variant="body2" sx={{ mb: 0.5 }}>
+                    <strong>Autor:</strong> {viewingRef.author}
+                  </Typography>
+                )}
+                {(viewingRef.reference || viewingRef.source) && (
+                  <Typography variant="body2">
+                    <strong>Fonte / Referência:</strong>{' '}
+                    {(() => {
+                      const url = viewingRef.reference || viewingRef.source || '';
+                      const isUrl = url.startsWith('http://') || url.startsWith('https://') || url.startsWith('www.');
+                      const fullUrl = url.startsWith('www.') ? `https://${url}` : url;
+                      return isUrl ? (
+                        <a
+                          href={fullUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          style={{
+                            color: PALETTE_COLORS.primary,
+                            textDecoration: 'underline',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: 4,
+                          }}
+                        >
+                          {url}
+                          <OpenInNewIcon sx={{ fontSize: '0.9rem' }} />
+                        </a>
+                      ) : (
+                        url
+                      );
+                    })()}
+                  </Typography>
+                )}
+              </Box>
+            )}
+          </Box>
+
+          <Box sx={{ pt: 2, borderTop: '1px solid', borderColor: 'divider', textAlign: 'right' }}>
+            <Button
+              variant="contained"
+              onClick={() => setViewingRef(null)}
+              sx={{ fontWeight: 700, backgroundColor: PALETTE_COLORS.primary }}
+            >
+              Fechar Leitura
+            </Button>
+          </Box>
+        </Box>
+      )}
+    </Drawer>
   </>
   );
 };

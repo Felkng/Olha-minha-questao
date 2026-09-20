@@ -343,7 +343,7 @@ export const EditQuestionModal: React.FC<EditQuestionModalProps> = ({
                   </MenuItem>
                   {availableReferences.map((ref) => (
                     <MenuItem key={ref.id} value={ref.id}>
-                      {ref.title || `Texto #${ref.id}`}
+                      {ref.title || ref.subtitle || `Texto #${ref.id}`}
                     </MenuItem>
                   ))}
                 </Select>

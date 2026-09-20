@@ -97,9 +97,12 @@ export interface UserProfile {
 
 export interface TextualReference {
   id?: number | string;
-  title: string;
-  content: string;
+  title?: string;
+  subtitle?: string;
   author?: string;
+  reference?: string; // URL de onde foi tirado ou citação
+  caption?: string;   // Legenda
+  content?: string;
   source?: string;
   mediaUrl?: string;
   testId?: number;
@@ -417,9 +420,12 @@ export interface TestWithQuestionsRequest {
   areaId?: number | null;
   description?: string;
   textualReferences?: {
-    title: string;
-    content: string;
+    title?: string;
+    subtitle?: string;
+    content?: string;
     author?: string;
+    reference?: string;
+    caption?: string;
     source?: string;
     mediaUrl?: string;
   }[];
