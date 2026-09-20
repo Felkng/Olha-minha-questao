@@ -102,6 +102,10 @@ class QuestionServiceTest {
                 .year(2024)
                 .originId(99999L)
                 .areaId(99999L)
+                .alternatives(List.of(
+                        AlternativeRequestDTO.builder().identifier("A").text("Opção A").isCorrect(true).build(),
+                        AlternativeRequestDTO.builder().identifier("B").text("Opção B").isCorrect(false).build()
+                ))
                 .build();
 
         assertThatThrownBy(() -> questionService.create(request))
@@ -115,12 +119,17 @@ class QuestionServiceTest {
         AreaResponseDTO areaBio = areaService.create(AreaRequestDTO.builder().name("Biologia_QS_TEST").build());
         AreaResponseDTO areaMat = areaService.create(AreaRequestDTO.builder().name("Matemática_QS_TEST").build());
 
+        List<AlternativeRequestDTO> alts = List.of(
+                AlternativeRequestDTO.builder().identifier("A").text("Alt A").isCorrect(true).build(),
+                AlternativeRequestDTO.builder().identifier("B").text("Alt B").isCorrect(false).build()
+        );
+
         questionService.create(QuestionRequestDTO.builder()
-                .enunciado("Questão Bio 1").year(2024).originId(origin.getId()).areaId(areaBio.getId()).build());
+                .enunciado("Questão Bio 1").year(2024).originId(origin.getId()).areaId(areaBio.getId()).alternatives(alts).build());
         questionService.create(QuestionRequestDTO.builder()
-                .enunciado("Questão Bio 2").year(2024).originId(origin.getId()).areaId(areaBio.getId()).build());
+                .enunciado("Questão Bio 2").year(2024).originId(origin.getId()).areaId(areaBio.getId()).alternatives(alts).build());
         questionService.create(QuestionRequestDTO.builder()
-                .enunciado("Questão Mat 1").year(2023).originId(origin.getId()).areaId(areaMat.getId()).build());
+                .enunciado("Questão Mat 1").year(2023).originId(origin.getId()).areaId(areaMat.getId()).alternatives(alts).build());
         entityManager.flush();
 
         Page<QuestionResponseDTO> bioPage = questionService.findAll(origin.getId(), areaBio.getId(), null, null, PageRequest.of(0, 10));
@@ -143,7 +152,8 @@ class QuestionServiceTest {
                 .originId(origin.getId())
                 .areaId(area.getId())
                 .alternatives(List.of(
-                        AlternativeRequestDTO.builder().identifier("A").text("Opção 1").isCorrect(false).build()
+                        AlternativeRequestDTO.builder().identifier("A").text("Opção 1").isCorrect(false).build(),
+                        AlternativeRequestDTO.builder().identifier("B").text("Opção 2").isCorrect(true).build()
                 ))
                 .build());
         entityManager.flush();
@@ -202,8 +212,13 @@ class QuestionServiceTest {
         OriginResponseDTO origin = originService.create(OriginRequestDTO.builder().name("SORT_ORIGIN").build());
         AreaResponseDTO area = areaService.create(AreaRequestDTO.builder().name("SORT_AREA").build());
 
-        questionService.create(QuestionRequestDTO.builder().enunciado("Q1").year(2022).originId(origin.getId()).areaId(area.getId()).build());
-        questionService.create(QuestionRequestDTO.builder().enunciado("Q2").year(2024).originId(origin.getId()).areaId(area.getId()).build());
+        List<AlternativeRequestDTO> alts = List.of(
+                AlternativeRequestDTO.builder().identifier("A").text("Alt A").isCorrect(true).build(),
+                AlternativeRequestDTO.builder().identifier("B").text("Alt B").isCorrect(false).build()
+        );
+
+        questionService.create(QuestionRequestDTO.builder().enunciado("Q1").year(2022).originId(origin.getId()).areaId(area.getId()).alternatives(alts).build());
+        questionService.create(QuestionRequestDTO.builder().enunciado("Q2").year(2024).originId(origin.getId()).areaId(area.getId()).alternatives(alts).build());
         entityManager.flush();
 
         // 1. sort = "recent" with PageRequest containing "recent" sort
@@ -228,5 +243,26 @@ class QuestionServiceTest {
         );
         assertThat(searchPage.getContent()).hasSize(1);
         assertThat(searchPage.getContent().get(0).getEnunciado()).isEqualTo("Q1");
+    }
+
+    @Test
+    @DisplayName("Deve permitir criar questão sem origem (banca nula)")
+    void testCreateQuestionWithoutOrigin() {
+        AreaResponseDTO area = areaService.create(AreaRequestDTO.builder().name("Física_SEM_BANCA").build());
+
+        QuestionResponseDTO created = questionService.create(QuestionRequestDTO.builder()
+                .enunciado("Questão avulsa sem banca")
+                .year(2025)
+                .areaId(area.getId())
+                .originId(null)
+                .alternatives(List.of(
+                        AlternativeRequestDTO.builder().identifier("A").text("Opção A").isCorrect(true).build(),
+                        AlternativeRequestDTO.builder().identifier("B").text("Opção B").isCorrect(false).build()
+                ))
+                .build());
+
+        assertThat(created).isNotNull();
+        assertThat(created.getOrigin()).isNull();
+        assertThat(created.getArea().getName()).isEqualTo("Física_SEM_BANCA");
     }
 }
