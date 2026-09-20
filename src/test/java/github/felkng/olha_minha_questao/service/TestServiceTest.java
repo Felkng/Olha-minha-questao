@@ -133,4 +133,88 @@ class TestServiceTest {
         assertThatThrownBy(() -> testService.findById(created.getId()))
                 .isInstanceOf(ResourceNotFoundException.class);
     }
+
+    @Test
+    @DisplayName("Deve criar prova com questões em transação atômica (wizard)")
+    void testCreateWithQuestions_Success() {
+        OriginResponseDTO origin = originService.create(OriginRequestDTO.builder().name("WIZARD_TEST").build());
+        AreaResponseDTO area = areaService.create(AreaRequestDTO.builder().name("Exatas_WIZARD").build());
+        entityManager.flush();
+
+        var q1Alts = List.of(
+                github.felkng.olha_minha_questao.dto.alternative.AlternativeRequestDTO.builder().identifier("A").text("Alt 1A").isCorrect(false).build(),
+                github.felkng.olha_minha_questao.dto.alternative.AlternativeRequestDTO.builder().identifier("B").text("Alt 1B").isCorrect(true).build()
+        );
+
+        var q2Alts = List.of(
+                github.felkng.olha_minha_questao.dto.alternative.AlternativeRequestDTO.builder().identifier("A").text("Alt 2A").isCorrect(true).build(),
+                github.felkng.olha_minha_questao.dto.alternative.AlternativeRequestDTO.builder().identifier("B").text("Alt 2B").isCorrect(false).build()
+        );
+
+        var q1 = github.felkng.olha_minha_questao.dto.question.QuestionRequestDTO.builder()
+                .identifier("1")
+                .enunciado("Enunciado 1")
+                .year(2024)
+                .alternatives(q1Alts)
+                .build();
+
+        var q2 = github.felkng.olha_minha_questao.dto.question.QuestionRequestDTO.builder()
+                .identifier("2")
+                .enunciado("Enunciado 2")
+                .year(2024)
+                .alternatives(q2Alts)
+                .build();
+
+        var request = github.felkng.olha_minha_questao.dto.test.TestWithQuestionsRequestDTO.builder()
+                .name("Prova Wizard Completa")
+                .year(2024)
+                .originId(origin.getId())
+                .areaId(area.getId())
+                .questions(List.of(q1, q2))
+                .build();
+
+        TestResponseDTO created = testService.createWithQuestions(request, null);
+        entityManager.flush();
+
+        assertThat(created.getId()).isNotNull();
+        assertThat(created.getName()).isEqualTo("Prova Wizard Completa");
+
+        var evaluation = testService.getTestEvaluation(created.getId());
+        assertThat(evaluation.getQuestions()).hasSize(2);
+        assertThat(evaluation.getQuestions().get(0).getIdentifier()).isEqualTo("1");
+        assertThat(evaluation.getQuestions().get(1).getIdentifier()).isEqualTo("2");
+    }
+
+    @Test
+    @DisplayName("Deve lançar exceção ao criar prova com identificadores de questão duplicados")
+    void testCreateWithQuestions_DuplicateIdentifiers_ThrowsException() {
+        var q1Alts = List.of(
+                github.felkng.olha_minha_questao.dto.alternative.AlternativeRequestDTO.builder().identifier("A").text("Alt 1A").build(),
+                github.felkng.olha_minha_questao.dto.alternative.AlternativeRequestDTO.builder().identifier("B").text("Alt 1B").build()
+        );
+
+        var q1 = github.felkng.olha_minha_questao.dto.question.QuestionRequestDTO.builder()
+                .identifier("01")
+                .enunciado("Enunciado 1")
+                .year(2024)
+                .alternatives(q1Alts)
+                .build();
+
+        var q2 = github.felkng.olha_minha_questao.dto.question.QuestionRequestDTO.builder()
+                .identifier("01")
+                .enunciado("Enunciado 2")
+                .year(2024)
+                .alternatives(q1Alts)
+                .build();
+
+        var request = github.felkng.olha_minha_questao.dto.test.TestWithQuestionsRequestDTO.builder()
+                .name("Prova com Duplicatas")
+                .year(2024)
+                .questions(List.of(q1, q2))
+                .build();
+
+        assertThatThrownBy(() -> testService.createWithQuestions(request, null))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Identificador duplicado");
+    }
 }
