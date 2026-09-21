@@ -44,6 +44,15 @@ class StatisticsServiceTest {
     @Autowired
     private TestService testService;
 
+    @Autowired
+    private github.felkng.olha_minha_questao.domain.repository.UserRepository userRepository;
+
+    @Autowired
+    private github.felkng.olha_minha_questao.domain.repository.QuestionAttemptRepository questionAttemptRepository;
+
+    @Autowired
+    private github.felkng.olha_minha_questao.domain.repository.TestAttemptRepository testAttemptRepository;
+
     private OriginResponseDTO testOrigin;
     private AreaResponseDTO testArea;
     private TestResponseDTO testEntity;
@@ -228,5 +237,57 @@ class StatisticsServiceTest {
         assertThat(response.getScorePercentage()).isEqualTo(50.0);
         assertThat(response.getDifficultyLevel()).isEqualTo(DifficultyLevel.MEDIA);
         assertThat(response.getDetailedResults()).hasSize(2);
+    }
+
+    @Test
+    @DisplayName("Deve associar userId à TestAttempt e QuestionAttempts, e não criar QuestionAttempt para questões não respondidas")
+    void testSubmitTestAttemptWithUserIdAndPartialAnswers() {
+        github.felkng.olha_minha_questao.domain.entity.User user = userRepository.save(
+                github.felkng.olha_minha_questao.domain.entity.User.builder()
+                        .name("Test User Statistics")
+                        .email("stat_user_" + System.currentTimeMillis() + "@test.com")
+                        .passwordHash("hashed")
+                        .role(github.felkng.olha_minha_questao.domain.entity.UserRole.GENERAL)
+                        .build()
+        );
+
+        QuestionResponseDTO q1 = createQuestionWithTwoAlternatives();
+        QuestionResponseDTO q2 = createQuestionWithTwoAlternatives();
+
+        // O usuário responde apenas a q1 (acertando), deixando q2 em branco
+        TestSubmissionRequestDTO request = TestSubmissionRequestDTO.builder()
+                .sessionId("test-eval-session-user")
+                .userId(user.getId())
+                .timeSpentSeconds(90)
+                .answers(List.of(
+                        TestSubmissionRequestDTO.QuestionAnswerDTO.builder()
+                                .questionId(q1.getId())
+                                .selectedAlternativeId(q1.getCorrectAlternativeId())
+                                .timeSpentSeconds(45)
+                                .build()
+                        // q2 não está na lista de respostas (em branco)
+                ))
+                .build();
+
+        TestSubmissionResponseDTO response = statisticsService.submitTestAttempt(testEntity.getId(), request, user.getId());
+
+        // Total 2 questões na prova, 1 correta, 50% de acerto no exame
+        assertThat(response.getTotalQuestions()).isEqualTo(2);
+        assertThat(response.getCorrectAnswers()).isEqualTo(1);
+        assertThat(response.getScorePercentage()).isEqualTo(50.0);
+        assertThat(response.getDetailedResults()).hasSize(2);
+
+        // Verifica que TestAttempt foi salva com o usuário correto
+        List<github.felkng.olha_minha_questao.domain.entity.TestAttempt> testAttempts = testAttemptRepository.findByUserId(user.getId());
+        assertThat(testAttempts).hasSize(1);
+        assertThat(testAttempts.get(0).getUser().getId()).isEqualTo(user.getId());
+        assertThat(testAttempts.get(0).getCorrectAnswers()).isEqualTo(1);
+
+        // Verifica que APENAS q1 gerou QuestionAttempt (q2 deixada em branco NÃO gerou tentativa phantom)
+        List<github.felkng.olha_minha_questao.domain.entity.QuestionAttempt> userAttempts = questionAttemptRepository.findByUserId(user.getId());
+        assertThat(userAttempts).hasSize(1);
+        assertThat(userAttempts.get(0).getQuestion().getId()).isEqualTo(q1.getId());
+        assertThat(userAttempts.get(0).getUser().getId()).isEqualTo(user.getId());
+        assertThat(userAttempts.get(0).getIsCorrect()).isTrue();
     }
 }

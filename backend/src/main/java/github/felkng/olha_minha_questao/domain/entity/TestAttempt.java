@@ -35,6 +35,10 @@ public class TestAttempt {
     @JoinColumn(name = "test_id", nullable = false)
     private Test test;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id")
+    private User user;
+
     @Column(name = "total_questions", nullable = false)
     private Integer totalQuestions;
 

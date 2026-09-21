@@ -12,6 +12,7 @@ import java.util.List;
 @AllArgsConstructor
 @Builder
 public class TestSubmissionRequestDTO {
+    private Long userId;
     private Integer timeSpentSeconds;
     private String sessionId;
     private List<QuestionAnswerDTO> answers;

@@ -38,12 +38,14 @@ import { PALETTE_COLORS } from '../theme/theme';
 import { useAppTheme } from '../theme/ThemeContext';
 import { TextualReferenceDrawer } from '../components/questions/TextualReferenceDrawer';
 import { TestQuestionsNavigator } from '../components/questions/TestQuestionsNavigator';
+import { useAuth } from '../context/AuthContext';
 
 export const TestEvaluationPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { mode } = useAppTheme();
   const isDark = mode === 'dark';
+  const { user } = useAuth();
 
   const [evaluation, setEvaluation] = useState<TestEvaluation | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
@@ -150,13 +152,17 @@ export const TestEvaluationPage: React.FC = () => {
     setSubmitting(true);
 
     try {
-      const formattedAnswers = evaluation.questions.map((q) => ({
-        questionId: q.id,
-        selectedAlternativeId: answers[q.id],
-        timeSpentSeconds: Math.round(timeSpent / Math.max(evaluation.questions.length, 1)),
-      }));
+      // Apenas envia respostas que o usuário de fato selecionou
+      const formattedAnswers = evaluation.questions
+        .filter((q) => answers[q.id] !== undefined)
+        .map((q) => ({
+          questionId: q.id,
+          selectedAlternativeId: answers[q.id],
+          timeSpentSeconds: Math.round(timeSpent / Math.max(evaluation.questions.length, 1)),
+        }));
 
       const response = await submitTest(evaluation.id, {
+        ...(user?.id ? { userId: user.id } : {}),
         timeSpentSeconds: timeSpent,
         sessionId: `session-test-${Date.now()}`,
         answers: formattedAnswers,

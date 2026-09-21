@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -50,8 +51,10 @@ public class TestController {
     @PostMapping("/{id}/submit")
     public ResponseEntity<github.felkng.olha_minha_questao.dto.test.TestSubmissionResponseDTO> submitTest(
             @PathVariable Long id,
-            @RequestBody github.felkng.olha_minha_questao.dto.test.TestSubmissionRequestDTO dto) {
-        return ResponseEntity.ok(statisticsService.submitTestAttempt(id, dto));
+            @RequestBody github.felkng.olha_minha_questao.dto.test.TestSubmissionRequestDTO dto,
+            @RequestHeader(value = "X-User-Id", required = false) Long userIdHeader) {
+        Long userId = dto.getUserId() != null ? dto.getUserId() : userIdHeader;
+        return ResponseEntity.ok(statisticsService.submitTestAttempt(id, dto, userId));
     }
 
     @GetMapping("/{id}")

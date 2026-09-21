@@ -83,16 +83,25 @@ public class StatisticsService {
                 .build();
         questionAttemptRepository.save(attempt);
 
-        QuestionStatistic statistic = questionStatisticRepository.findById(questionId)
-                .orElseGet(() -> QuestionStatistic.builder()
-                        .question(question)
-                        .questionId(questionId)
-                        .totalAttempts(0L)
-                        .firstAttempts(0L)
-                        .firstAttemptCorrect(0L)
-                        .firstAttemptAccuracy(0.0)
-                        .difficultyLevel(DifficultyLevel.SEM_DADOS)
-                        .build());
+        QuestionStatistic statistic = question.getStatistic();
+        if (statistic == null) {
+            statistic = questionStatisticRepository.findById(questionId)
+                    .orElseGet(() -> {
+                        QuestionStatistic newStat = QuestionStatistic.builder()
+                                .question(question)
+                                .questionId(question.getId())
+                                .totalAttempts(0L)
+                                .firstAttempts(0L)
+                                .firstAttemptCorrect(0L)
+                                .firstAttemptAccuracy(0.0)
+                                .difficultyLevel(DifficultyLevel.SEM_DADOS)
+                                .build();
+                        question.setStatistic(newStat);
+                        return newStat;
+                    });
+        }
+        statistic.setQuestion(question);
+        statistic.setQuestionId(question.getId());
 
         statistic.setTotalAttempts(statistic.getTotalAttempts() + 1);
 
@@ -120,8 +129,15 @@ public class StatisticsService {
 
     @Transactional
     public TestSubmissionResponseDTO submitTestAttempt(Long testId, TestSubmissionRequestDTO dto) {
+        return submitTestAttempt(testId, dto, dto != null ? dto.getUserId() : null);
+    }
+
+    @Transactional
+    public TestSubmissionResponseDTO submitTestAttempt(Long testId, TestSubmissionRequestDTO dto, Long userId) {
         Test test = testRepository.findById(testId)
                 .orElseThrow(() -> new ResourceNotFoundException("Prova não encontrada com o id: " + testId));
+
+        User user = (userId != null) ? userRepository.findById(userId).orElse(null) : null;
 
         List<Question> testQuestions = questionRepository.findByTestId(testId);
 
@@ -151,26 +167,39 @@ public class StatisticsService {
             Long selectedAltId = answersMap.get(question.getId());
             Integer qTimeSpent = timeSpentMap.getOrDefault(question.getId(), 0);
 
-            QuestionAttemptRequestDTO attemptRequest = QuestionAttemptRequestDTO.builder()
-                    .selectedAlternativeId(selectedAltId)
-                    .timeSpentSeconds(qTimeSpent)
-                    .sessionId(dto.getSessionId())
-                    .isFirstAttempt(true)
-                    .build();
+            if (selectedAltId != null) {
+                QuestionAttemptRequestDTO attemptRequest = QuestionAttemptRequestDTO.builder()
+                        .selectedAlternativeId(selectedAltId)
+                        .timeSpentSeconds(qTimeSpent)
+                        .sessionId(dto.getSessionId())
+                        .userId(userId)
+                        .build();
 
-            QuestionAttemptResponseDTO attemptResponse = registerQuestionAttempt(question.getId(), attemptRequest);
+                QuestionAttemptResponseDTO attemptResponse = registerQuestionAttempt(question.getId(), attemptRequest);
 
-            if (Boolean.TRUE.equals(attemptResponse.getIsCorrect())) {
-                correctCount++;
+                if (Boolean.TRUE.equals(attemptResponse.getIsCorrect())) {
+                    correctCount++;
+                }
+
+                detailedResults.add(TestSubmissionResponseDTO.QuestionResultDTO.builder()
+                        .questionId(question.getId())
+                        .selectedAlternativeId(selectedAltId)
+                        .correctAlternativeId(attemptResponse.getCorrectAlternativeId())
+                        .isCorrect(attemptResponse.getIsCorrect())
+                        .difficultyLevel(attemptResponse.getDifficultyLevel())
+                        .build());
+            } else {
+                Long correctAltId = question.getCorrectAlternative() != null ? question.getCorrectAlternative().getId() : null;
+                DifficultyLevel diffLevel = question.getStatistic() != null ? question.getStatistic().getDifficultyLevel() : DifficultyLevel.SEM_DADOS;
+
+                detailedResults.add(TestSubmissionResponseDTO.QuestionResultDTO.builder()
+                        .questionId(question.getId())
+                        .selectedAlternativeId(null)
+                        .correctAlternativeId(correctAltId)
+                        .isCorrect(false)
+                        .difficultyLevel(diffLevel)
+                        .build());
             }
-
-            detailedResults.add(TestSubmissionResponseDTO.QuestionResultDTO.builder()
-                    .questionId(question.getId())
-                    .selectedAlternativeId(selectedAltId)
-                    .correctAlternativeId(attemptResponse.getCorrectAlternativeId())
-                    .isCorrect(attemptResponse.getIsCorrect())
-                    .difficultyLevel(attemptResponse.getDifficultyLevel())
-                    .build());
         }
 
         int totalQuestions = !questionsToProcess.isEmpty() ? questionsToProcess.size() :
@@ -180,6 +209,7 @@ public class StatisticsService {
 
         TestAttempt testAttempt = TestAttempt.builder()
                 .test(test)
+                .user(user)
                 .totalQuestions(totalQuestions)
                 .correctAnswers(correctCount)
                 .scorePercentage(scorePercentage)
@@ -189,13 +219,18 @@ public class StatisticsService {
         testAttemptRepository.save(testAttempt);
 
         TestStatistic statistic = testStatisticRepository.findById(testId)
-                .orElseGet(() -> TestStatistic.builder()
-                        .test(test)
-                        .testId(testId)
-                        .totalAttempts(0L)
-                        .averageScore(0.0)
-                        .difficultyLevel(DifficultyLevel.SEM_DADOS)
-                        .build());
+                .orElseGet(() -> {
+                    TestStatistic newStat = TestStatistic.builder()
+                            .test(test)
+                            .testId(test.getId())
+                            .totalAttempts(0L)
+                            .averageScore(0.0)
+                            .difficultyLevel(DifficultyLevel.SEM_DADOS)
+                            .build();
+                    return newStat;
+                });
+        statistic.setTest(test);
+        statistic.setTestId(test.getId());
 
         long previousAttempts = statistic.getTotalAttempts();
         long newTotalAttempts = previousAttempts + 1;

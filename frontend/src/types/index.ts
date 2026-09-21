@@ -251,6 +251,7 @@ export interface QuestionAttemptResponse {
 }
 
 export interface TestSubmissionRequest {
+  userId?: number;
   timeSpentSeconds: number;
   sessionId?: string;
   answers: {
