@@ -57,7 +57,8 @@ export const Navbar: React.FC = () => {
     if (p.startsWith('/provas')) return 'provas';
     if (p.startsWith('/bancas')) return 'bancas';
     if (p.startsWith('/areas')) return 'areas';
-    return 'questoes';
+    if (p.startsWith('/questoes')) return 'questoes';
+    return '';
   };
 
   const activeTab = getActiveTab();
@@ -84,7 +85,7 @@ export const Navbar: React.FC = () => {
               userSelect: 'none',
               mr: { xs: 1, md: 3 },
             }}
-            onClick={() => navigate('/questoes')}
+            onClick={() => navigate('/')}
           >
             <Box
               sx={{

@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.time.Instant;
 import java.util.List;
 
 @Repository
@@ -18,4 +19,7 @@ public interface QuestionAttemptRepository extends JpaRepository<QuestionAttempt
 
     @Query("SELECT DATE(qa.createdAt), COUNT(qa) FROM QuestionAttempt qa WHERE qa.user.id = :userId GROUP BY DATE(qa.createdAt)")
     List<Object[]> findDailyAttemptCountsByUserId(@Param("userId") Long userId);
+
+    @Query("SELECT COUNT(DISTINCT qa.user.id) FROM QuestionAttempt qa WHERE qa.user IS NOT NULL AND qa.createdAt >= :since")
+    long countDistinctActiveUsersSince(@Param("since") Instant since);
 }

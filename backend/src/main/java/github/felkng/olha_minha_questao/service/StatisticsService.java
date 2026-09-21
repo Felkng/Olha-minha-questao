@@ -9,6 +9,8 @@ import github.felkng.olha_minha_questao.domain.entity.Test;
 import github.felkng.olha_minha_questao.domain.entity.TestAttempt;
 import github.felkng.olha_minha_questao.domain.entity.TestStatistic;
 import github.felkng.olha_minha_questao.domain.entity.User;
+import github.felkng.olha_minha_questao.domain.repository.AreaRepository;
+import github.felkng.olha_minha_questao.domain.repository.OriginRepository;
 import github.felkng.olha_minha_questao.domain.repository.QuestionAttemptRepository;
 import github.felkng.olha_minha_questao.domain.repository.QuestionRepository;
 import github.felkng.olha_minha_questao.domain.repository.QuestionStatisticRepository;
@@ -18,6 +20,7 @@ import github.felkng.olha_minha_questao.domain.repository.TestStatisticRepositor
 import github.felkng.olha_minha_questao.domain.repository.UserRepository;
 import github.felkng.olha_minha_questao.dto.question.QuestionAttemptRequestDTO;
 import github.felkng.olha_minha_questao.dto.question.QuestionAttemptResponseDTO;
+import github.felkng.olha_minha_questao.dto.statistics.PlatformSummaryDTO;
 import github.felkng.olha_minha_questao.dto.test.TestSubmissionRequestDTO;
 import github.felkng.olha_minha_questao.dto.test.TestSubmissionResponseDTO;
 import github.felkng.olha_minha_questao.exception.ResourceNotFoundException;
@@ -25,6 +28,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -39,6 +43,8 @@ public class StatisticsService {
     private final TestAttemptRepository testAttemptRepository;
     private final TestStatisticRepository testStatisticRepository;
     private final UserRepository userRepository;
+    private final OriginRepository originRepository;
+    private final AreaRepository areaRepository;
 
     @Transactional
     public QuestionAttemptResponseDTO registerQuestionAttempt(Long questionId, QuestionAttemptRequestDTO dto) {
@@ -370,6 +376,26 @@ public class StatisticsService {
                 .timeSpentSeconds(attempt.getTimeSpentSeconds())
                 .sessionId(attempt.getSessionId())
                 .createdAt(attempt.getCreatedAt())
+                .build();
+    }
+
+    @Transactional(readOnly = true)
+    public PlatformSummaryDTO getPlatformSummary() {
+        long totalQuestions = questionRepository.count();
+        long totalTests = testRepository.count();
+        java.time.Instant fiveDaysAgo = java.time.Instant.now().minus(5, java.time.temporal.ChronoUnit.DAYS);
+        long activeUsers = questionAttemptRepository.countDistinctActiveUsersSince(fiveDaysAgo);
+        long totalOrigins = originRepository.count();
+        long totalAreas = areaRepository.count();
+        long totalAttempts = questionAttemptRepository.count();
+
+        return PlatformSummaryDTO.builder()
+                .totalQuestions(totalQuestions)
+                .totalTests(totalTests)
+                .activeUsersLast5Days(activeUsers)
+                .totalOrigins(totalOrigins)
+                .totalAreas(totalAreas)
+                .totalAttempts(totalAttempts)
                 .build();
     }
 }

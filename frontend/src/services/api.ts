@@ -26,6 +26,7 @@ import {
   TestWithQuestionsRequest,
   TestAttemptSummary,
   TestAttemptDetail,
+  PlatformSummary,
 } from '../types';
 
 const apiClient = axios.create({
@@ -460,6 +461,12 @@ export const getTestAttemptDetail = async (
   attemptId: number
 ): Promise<TestAttemptDetail> => {
   const response = await apiClient.get<TestAttemptDetail>(`/tests/attempts/${attemptId}`);
+  return response.data;
+};
+
+// Estatísticas Públicas da Plataforma (Landing Page)
+export const getPlatformSummary = async (): Promise<PlatformSummary> => {
+  const response = await apiClient.get<PlatformSummary>('/statistics/summary');
   return response.data;
 };
 

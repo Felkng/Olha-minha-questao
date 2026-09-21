@@ -278,6 +278,15 @@ export interface TestSubmissionResponse {
   }[];
 }
 
+export interface PlatformSummary {
+  totalQuestions: number;
+  totalTests: number;
+  activeUsersLast5Days: number;
+  totalAttempts: number;
+  totalOrigins: number;
+  totalAreas: number;
+}
+
 export interface TestAttemptSummary {
   id: number;
   testId: number;

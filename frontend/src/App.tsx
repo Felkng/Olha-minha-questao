@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { MainLayout } from './layouts/MainLayout';
+import { LandingPage } from './pages/LandingPage';
 import { QuestionsPage } from './pages/QuestionsPage';
 import { QuestionDetailPage } from './pages/QuestionDetailPage';
 import { TestsPage } from './pages/TestsPage';
@@ -31,7 +32,7 @@ export const App: React.FC = () => {
       <BrowserRouter>
         <MainLayout>
           <Routes>
-            <Route path="/" element={<Navigate to="/questoes" replace />} />
+            <Route path="/" element={<LandingPage />} />
             <Route
               path="/questoes"
               element={<QuestionsPage onBookmarkClick={handleOpenSaveModal} />}
