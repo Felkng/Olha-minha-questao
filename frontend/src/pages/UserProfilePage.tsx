@@ -1224,7 +1224,7 @@ export const UserProfilePage: React.FC = () => {
                   onClick={() => setOpenCreateTestWizard(true)}
                   sx={{ fontWeight: 700, backgroundColor: PALETTE_COLORS.primary, color: '#1a1e24' }}
                 >
-                  Nova Prova (Wizard)
+                  Nova Prova
                 </Button>
               </Box>
 
