@@ -138,39 +138,60 @@ export const TestsPage: React.FC = () => {
       </Box>
 
       {/* Barra de Pesquisa */}
-      <Box sx={{ mb: 3.5, display: 'flex', gap: 2, alignItems: 'center', flexWrap: 'wrap' }}>
-        <TextField
-          placeholder="Pesquisar prova por nome, banca, área ou ano..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          size="small"
-          sx={{
-            flex: { xs: '1 1 100%', sm: '0 1 480px' },
-            '& .MuiOutlinedInput-root': {
-              borderRadius: 2,
-            },
-          }}
-          InputProps={{
-            startAdornment: (
-              <InputAdornment position="start">
-                <SearchIcon sx={{ color: PALETTE_COLORS.primary }} />
-              </InputAdornment>
-            ),
-            endAdornment: searchTerm ? (
-              <InputAdornment position="end">
-                <IconButton size="small" onClick={() => setSearchTerm('')} edge="end">
-                  <ClearIcon fontSize="small" />
-                </IconButton>
-              </InputAdornment>
-            ) : null,
-          }}
-        />
+      <Paper
+        elevation={0}
+        sx={{
+          p: { xs: 2, md: 2.5 },
+          mb: 3.5,
+          borderRadius: 3,
+          border: '1px solid',
+          borderColor: 'divider',
+          backgroundColor: 'background.paper',
+        }}
+      >
+        <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', width: '100%' }}>
+          <TextField
+            fullWidth
+            placeholder="Pesquisar prova por nome, banca, área ou ano..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            sx={{
+              '& .MuiOutlinedInput-root': {
+                borderRadius: 2,
+                backgroundColor: isDark ? 'rgba(255, 255, 255, 0.03)' : 'rgba(0, 0, 0, 0.02)',
+              },
+            }}
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <SearchIcon sx={{ color: PALETTE_COLORS.primary, fontSize: '1.4rem' }} />
+                </InputAdornment>
+              ),
+              endAdornment: searchTerm ? (
+                <InputAdornment position="end">
+                  <IconButton size="small" onClick={() => setSearchTerm('')} edge="end">
+                    <ClearIcon fontSize="small" />
+                  </IconButton>
+                </InputAdornment>
+              ) : null,
+            }}
+          />
+        </Box>
         {searchTerm && (
-          <Typography variant="body2" sx={{ color: 'text.secondary', fontWeight: 600 }}>
-            {filteredTests.length} {filteredTests.length === 1 ? 'prova encontrada' : 'provas encontradas'}
-          </Typography>
+          <Box sx={{ mt: 1.5, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Typography variant="body2" sx={{ color: 'text.secondary', fontWeight: 600 }}>
+              {filteredTests.length} {filteredTests.length === 1 ? 'prova encontrada' : 'provas encontradas'}
+            </Typography>
+            <Button
+              size="small"
+              onClick={() => setSearchTerm('')}
+              sx={{ color: 'text.secondary', textTransform: 'none', fontWeight: 600 }}
+            >
+              Limpar busca
+            </Button>
+          </Box>
         )}
-      </Box>
+      </Paper>
 
       {tests.length === 0 ? (
         <Alert severity="info" sx={{ borderRadius: 2 }}>
