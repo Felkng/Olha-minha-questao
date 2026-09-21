@@ -21,9 +21,12 @@ import MenuBookOutlinedIcon from '@mui/icons-material/MenuBookOutlined';
 import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
 import AccountBalanceIcon from '@mui/icons-material/AccountBalance';
 import CategoryIcon from '@mui/icons-material/Category';
+import HistoryIcon from '@mui/icons-material/History';
+import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
+import TimerOutlinedIcon from '@mui/icons-material/TimerOutlined';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
-import { Question, Test } from '../types';
-import { getTestById, getTestEvaluation } from '../services/api';
+import { Question, Test, TestAttemptSummary } from '../types';
+import { getTestById, getTestEvaluation, getTestAttempts } from '../services/api';
 import { QuestionCard } from '../components/questions/QuestionCard';
 import { QuestionWhiteboard } from '../components/whiteboard/QuestionWhiteboard';
 import { TestQuestionsNavigator } from '../components/questions/TestQuestionsNavigator';
@@ -41,13 +44,14 @@ export const TestDetailPage: React.FC<TestDetailPageProps> = ({
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const { attemptedQuestionIds } = useAuth();
+  const { user, attemptedQuestionIds } = useAuth();
 
   const initialQ = Number(searchParams.get('q'));
   const initialMode = searchParams.get('mode') as 'single' | 'all' | null;
 
   const [test, setTest] = useState<Test | null>(null);
   const [questions, setQuestions] = useState<Question[]>([]);
+  const [attempts, setAttempts] = useState<TestAttemptSummary[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [activeQuestionIndex, setActiveQuestionIndex] = useState<number>(
     initialQ > 0 ? initialQ - 1 : 0
@@ -63,17 +67,20 @@ export const TestDetailPage: React.FC<TestDetailPageProps> = ({
     if (id) {
       loadTest(Number(id));
     }
-  }, [id]);
+  }, [id, user?.id]);
 
   const loadTest = async (tId: number) => {
     setLoading(true);
     try {
-      const [testData, evalData] = await Promise.all([
+      const userId = user?.id || 1;
+      const [testData, evalData, attemptsData] = await Promise.all([
         getTestById(tId),
         getTestEvaluation(tId),
+        getTestAttempts(tId, userId).catch(() => []),
       ]);
       setTest(testData);
       setQuestions(evalData.questions || []);
+      setAttempts(attemptsData || []);
     } catch (err) {
       console.error('Erro ao carregar dados da prova:', err);
     } finally {
@@ -219,6 +226,97 @@ export const TestDetailPage: React.FC<TestDetailPageProps> = ({
           </Stack>
         </Box>
       </Paper>
+
+      {/* Seção de Tentativas Anteriores no Simulado */}
+      {attempts.length > 0 && (
+        <Paper
+          elevation={2}
+          sx={{
+            p: 3,
+            borderRadius: 3,
+            mb: 4,
+            border: '1px solid',
+            borderColor: 'divider',
+          }}
+        >
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+            <HistoryIcon sx={{ color: PALETTE_COLORS.primary }} />
+            <Typography variant="h6" sx={{ fontWeight: 800 }}>
+              Suas Tentativas Anteriores neste Simulado ({attempts.length})
+            </Typography>
+          </Box>
+          <Stack spacing={1.5}>
+            {attempts.map((att) => {
+              const formattedDate = att.createdAt
+                ? new Date(att.createdAt).toLocaleDateString('pt-BR', {
+                    day: '2-digit',
+                    month: '2-digit',
+                    year: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                  })
+                : 'Data não informada';
+              const min = Math.floor(att.timeSpentSeconds / 60);
+              const sec = att.timeSpentSeconds % 60;
+              const formattedTime = `${String(min).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
+              const isPassed = att.scorePercentage >= 60;
+
+              return (
+                <Paper
+                  key={att.id}
+                  variant="outlined"
+                  sx={{
+                    p: 2,
+                    borderRadius: 2,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    flexWrap: 'wrap',
+                    gap: 2,
+                    backgroundColor: 'rgba(255, 255, 255, 0.02)',
+                  }}
+                >
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
+                    <Chip
+                      icon={<CheckCircleOutlineIcon fontSize="small" />}
+                      label={`${Math.round(att.scorePercentage)}% (${att.correctAnswers}/${att.totalQuestions})`}
+                      color={isPassed ? 'success' : 'warning'}
+                      sx={{ fontWeight: 800 }}
+                    />
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, color: 'text.secondary' }}>
+                      <TimerOutlinedIcon fontSize="small" />
+                      <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                        {formattedTime}
+                      </Typography>
+                    </Box>
+                    <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+                      {formattedDate}
+                    </Typography>
+                  </Box>
+
+                  <Button
+                    variant="outlined"
+                    size="small"
+                    onClick={() => navigate(`/provas/${test.id}/tentativas/${att.id}`)}
+                    sx={{
+                      fontWeight: 700,
+                      borderRadius: 2,
+                      borderColor: PALETTE_COLORS.primary,
+                      color: PALETTE_COLORS.primary,
+                      '&:hover': {
+                        borderColor: PALETTE_COLORS.primary,
+                        backgroundColor: 'rgba(217, 183, 99, 0.1)',
+                      },
+                    }}
+                  >
+                    Rever Gabarito
+                  </Button>
+                </Paper>
+              );
+            })}
+          </Stack>
+        </Paper>
+      )}
 
       {/* View Mode Toggle and Section Title */}
       <Box

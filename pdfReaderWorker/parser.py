@@ -3,9 +3,25 @@ import io
 import pdfplumber
 from typing import List, Dict, Any, Optional, Tuple
 
+def sanitize_text_noise(text: str) -> str:
+    if not text:
+        return ""
+    # Remove reversed/spaced watermarks like O H N U C S A R, R A S C U N H O
+    text = re.sub(r'(?i)\bO\s*H\s*N\s*U\s*C\s*S\s*A\s*R\b', '', text)
+    text = re.sub(r'(?i)\bR\s*A\s*S\s*C\s*U\s*N\s*H\s*O\b', '', text)
+    text = re.sub(r'(?i)\bG\s*A\s*B\s*A\s*R\s*I\s*T\s*O\b', '', text)
+    text = re.sub(r'(?i)\bD\s*E\s*S\s*T\s*A\s*Q\s*U\s*E\b', '', text)
+    text = re.sub(r'(?i)\bF\s*O\s*L\s*H\s*A\s+D\s*E\s+R\s*E\s*S\s*P\s*O\s*S\s*T\s*A\s*S?\b', '', text)
+    text = re.sub(r'(?i)\bP[ÁA]GINA\s+\d+\s+DE\s+\d+\b', '', text)
+    text = re.sub(r'(?i)pcimarkpci[a-z0-9_]*', '', text)
+    # Clean up whitespace
+    text = re.sub(r'[ \t]+', ' ', text)
+    return text.strip()
+
 def clean_text(text: str) -> str:
     if not text:
         return ""
+    text = sanitize_text_noise(text)
     # Normalize multiple whitespace
     text = re.sub(r'[ \t]+', ' ', text)
     # Remove excessive blank lines
@@ -142,6 +158,12 @@ def parse_column_text(text: str) -> List[Dict[str, Any]]:
         if len(current_q["alternatives"]) >= 2:
             raw_questions.append(current_q)
 
+    # Sanitize noise from enunciados and alternatives
+    for q in raw_questions:
+        q["enunciado"] = sanitize_text_noise(q.get("enunciado", ""))
+        for alt in q.get("alternatives", []):
+            alt["text"] = sanitize_text_noise(alt.get("text", ""))
+
     return raw_questions
 
 def extract_textual_references_from_pdf(pdf: pdfplumber.PDF) -> List[Dict[str, Any]]:
@@ -177,6 +199,11 @@ def extract_textual_references_from_pdf(pdf: pdfplumber.PDF) -> List[Dict[str, A
                 pass
         all_streams.append(text)
 
+    passage_header_pattern = re.compile(
+        r'^(?:L[ÍI]NGUA\s+INGLESA|L[ÍI]NGUA\s+PORTUGUESA|L[ÍI]NGUA\s+ESPANHOLA|TEXTO\s+[I|V|X|\d]+|TEXTO\s+PARA\s+AS\s+QUEST[ÕO]ES|LEIA\s+O\s+TEXTO|TEXTO\s+\d+|INGL[ÊE]S|PORTUGU[ÊE]S|REDA[ÇC][ÃA]O|CONHECIMENTOS\s+B[ÁA]SICOS|CONHECIMENTOS\s+ESPEC[ÍI]FICOS)\b',
+        re.I
+    )
+
     raw_blocks: List[List[str]] = []
     current_block: List[str] = []
     in_question = False
@@ -186,6 +213,11 @@ def extract_textual_references_from_pdf(pdf: pdfplumber.PDF) -> List[Dict[str, A
             line_s = line.strip()
             if not line_s or noise_pattern.match(line_s):
                 continue
+            
+            line_s = sanitize_text_noise(line_s)
+            if not line_s:
+                continue
+
             is_q = bool(
                 q_pattern_explicit.match(line_s) or 
                 q_pattern_numbered.match(line_s) or 
@@ -193,19 +225,19 @@ def extract_textual_references_from_pdf(pdf: pdfplumber.PDF) -> List[Dict[str, A
             )
             if is_q:
                 in_question = True
-                if len(current_block) >= 6:
+                if len(current_block) >= 5:
                     raw_blocks.append(current_block)
                 current_block = []
             else:
                 if not in_question:
                     current_block.append(line_s)
                 else:
-                    # Check if a new language / reading passage section starts
-                    if re.match(r'^(?:L[ÍI]NGUA\s+INGLESA|L[ÍI]NGUA\s+PORTUGUESA|TEXTO\s+[I|V|X|\d]+)\b', line_s, re.I):
+                    # Check if a new reading passage or language section starts
+                    if passage_header_pattern.match(line_s):
                         in_question = False
                         current_block = [line_s]
 
-    if len(current_block) >= 6:
+    if len(current_block) >= 5:
         raw_blocks.append(current_block)
 
     references: List[Dict[str, Any]] = []
@@ -248,8 +280,10 @@ def extract_textual_references_from_pdf(pdf: pdfplumber.PDF) -> List[Dict[str, A
         subtitle = ""
         if start_idx < len(block):
             cand = block[start_idx]
-            if not re.match(r'^\d+\s+[A-ZÀ-Ú]', cand) and len(cand) < 90 and not re.match(r'^[A-Z\s]{4,}$', cand):
-                # Could be a subtitle
+            if (not re.match(r'^\d+\s+[A-ZÀ-Ú]', cand) 
+                    and len(cand) < 60 
+                    and not cand.endswith('.') 
+                    and not re.match(r'^(?:par[áa]grafo|texto|cap[íi]tulo|o\s+|a\s+|os\s+|as\s+|um\s+|uma\s+)\b', cand, re.I)):
                 subtitle = cand
                 start_idx += 1
 
@@ -343,24 +377,22 @@ def parse_exam_pdf(pdf_bytes: bytes) -> Dict[str, Any]:
             if re.search(r'(?i)LEIA ATENTAMENTE AS INSTRU[ÇC][ÕO]ES', p_text):
                 continue
 
-            width, height = p.width, p.height
-            words = p.extract_words()
-            if not words:
-                continue
+            width, height = getattr(p, 'width', 0), getattr(p, 'height', 0)
+            words = p.extract_words() if hasattr(p, 'extract_words') else []
+            if words and width > 0:
+                midpoint = width / 2
+                left_words = [w for w in words if w['x1'] <= midpoint + 20]
+                right_words = [w for w in words if w['x0'] >= midpoint - 20]
 
-            midpoint = width / 2
-            left_words = [w for w in words if w['x1'] <= midpoint + 20]
-            right_words = [w for w in words if w['x0'] >= midpoint - 20]
-
-            if len(left_words) > 15 and len(right_words) > 15:
-                try:
-                    left_crop = p.crop((0, 0, midpoint, height))
-                    right_crop = p.crop((midpoint, 0, width, height))
-                    all_questions.extend(parse_column_text(left_crop.extract_text() or ""))
-                    all_questions.extend(parse_column_text(right_crop.extract_text() or ""))
-                    continue
-                except Exception:
-                    pass
+                if len(left_words) > 15 and len(right_words) > 15:
+                    try:
+                        left_crop = p.crop((0, 0, midpoint, height))
+                        right_crop = p.crop((midpoint, 0, width, height))
+                        all_questions.extend(parse_column_text(left_crop.extract_text() or ""))
+                        all_questions.extend(parse_column_text(right_crop.extract_text() or ""))
+                        continue
+                    except Exception:
+                        pass
 
             all_questions.extend(parse_column_text(p_text))
 

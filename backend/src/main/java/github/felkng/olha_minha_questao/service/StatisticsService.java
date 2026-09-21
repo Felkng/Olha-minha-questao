@@ -270,4 +270,106 @@ public class StatisticsService {
                 .detailedResults(detailedResults)
                 .build();
     }
+
+    @Transactional(readOnly = true)
+    public List<github.felkng.olha_minha_questao.dto.test.TestAttemptSummaryDTO> getUserTestAttempts(Long userId) {
+        List<TestAttempt> attempts = testAttemptRepository.findByUserIdOrderByCreatedAtDesc(userId);
+        return attempts.stream().map(this::toSummaryDTO).toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<github.felkng.olha_minha_questao.dto.test.TestAttemptSummaryDTO> getTestAttempts(Long testId, Long userId) {
+        List<TestAttempt> attempts;
+        if (userId != null) {
+            attempts = testAttemptRepository.findByTestIdAndUserIdOrderByCreatedAtDesc(testId, userId);
+        } else {
+            attempts = testAttemptRepository.findByTestId(testId);
+        }
+        return attempts.stream().map(this::toSummaryDTO).toList();
+    }
+
+    @Transactional(readOnly = true)
+    public github.felkng.olha_minha_questao.dto.test.TestAttemptDetailDTO getTestAttemptDetail(Long attemptId) {
+        TestAttempt attempt = testAttemptRepository.findById(attemptId)
+                .orElseThrow(() -> new ResourceNotFoundException("Tentativa de simulado não encontrada com o id: " + attemptId));
+
+        Test test = attempt.getTest();
+        List<Question> questions = questionRepository.findByTestIdOrderByIdAsc(test.getId());
+
+        List<QuestionAttempt> questionAttempts = attempt.getSessionId() != null && !attempt.getSessionId().isBlank()
+                ? questionAttemptRepository.findBySessionId(attempt.getSessionId())
+                : List.of();
+
+        java.util.Map<Long, QuestionAttempt> qaMap = new java.util.HashMap<>();
+        for (QuestionAttempt qa : questionAttempts) {
+            if (qa.getQuestion() != null) {
+                qaMap.put(qa.getQuestion().getId(), qa);
+            }
+        }
+
+        List<TestSubmissionResponseDTO.QuestionResultDTO> detailedResults = new ArrayList<>();
+        for (Question q : questions) {
+            QuestionAttempt qa = qaMap.get(q.getId());
+
+            Long selectedAltId = qa != null && qa.getSelectedAlternative() != null ? qa.getSelectedAlternative().getId() : null;
+            boolean isCorrect = qa != null && Boolean.TRUE.equals(qa.getIsCorrect());
+
+            Long correctAltId = null;
+            if (q.getCorrectAlternative() != null && q.getCorrectAlternative().getId() != null) {
+                correctAltId = q.getCorrectAlternative().getId();
+            } else if (q.getAlternatives() != null) {
+                correctAltId = q.getAlternatives().stream()
+                        .filter(a -> Boolean.TRUE.equals(a.getIsCorrect()))
+                        .map(Alternative::getId)
+                        .findFirst()
+                        .orElse(null);
+            }
+
+            DifficultyLevel diffLevel = q.getStatistic() != null ? q.getStatistic().getDifficultyLevel() : DifficultyLevel.SEM_DADOS;
+
+            detailedResults.add(TestSubmissionResponseDTO.QuestionResultDTO.builder()
+                    .questionId(q.getId())
+                    .selectedAlternativeId(selectedAltId)
+                    .correctAlternativeId(correctAltId)
+                    .isCorrect(isCorrect)
+                    .difficultyLevel(diffLevel)
+                    .build());
+        }
+
+        return github.felkng.olha_minha_questao.dto.test.TestAttemptDetailDTO.builder()
+                .id(attempt.getId())
+                .testId(test.getId())
+                .testName(test.getName())
+                .testYear(test.getYear())
+                .originName(test.getOrigin() != null ? test.getOrigin().getName() : null)
+                .areaName(test.getArea() != null ? test.getArea().getName() : null)
+                .userId(attempt.getUser() != null ? attempt.getUser().getId() : null)
+                .totalQuestions(attempt.getTotalQuestions())
+                .correctAnswers(attempt.getCorrectAnswers())
+                .scorePercentage(attempt.getScorePercentage())
+                .timeSpentSeconds(attempt.getTimeSpentSeconds())
+                .sessionId(attempt.getSessionId())
+                .createdAt(attempt.getCreatedAt())
+                .detailedResults(detailedResults)
+                .build();
+    }
+
+    private github.felkng.olha_minha_questao.dto.test.TestAttemptSummaryDTO toSummaryDTO(TestAttempt attempt) {
+        Test test = attempt.getTest();
+        return github.felkng.olha_minha_questao.dto.test.TestAttemptSummaryDTO.builder()
+                .id(attempt.getId())
+                .testId(test != null ? test.getId() : null)
+                .testName(test != null ? test.getName() : null)
+                .testYear(test != null ? test.getYear() : null)
+                .originName(test != null && test.getOrigin() != null ? test.getOrigin().getName() : null)
+                .areaName(test != null && test.getArea() != null ? test.getArea().getName() : null)
+                .userId(attempt.getUser() != null ? attempt.getUser().getId() : null)
+                .totalQuestions(attempt.getTotalQuestions())
+                .correctAnswers(attempt.getCorrectAnswers())
+                .scorePercentage(attempt.getScorePercentage())
+                .timeSpentSeconds(attempt.getTimeSpentSeconds())
+                .sessionId(attempt.getSessionId())
+                .createdAt(attempt.getCreatedAt())
+                .build();
+    }
 }

@@ -57,6 +57,27 @@ public class TestController {
         return ResponseEntity.ok(statisticsService.submitTestAttempt(id, dto, userId));
     }
 
+    @GetMapping("/{id}/attempts")
+    public ResponseEntity<List<github.felkng.olha_minha_questao.dto.test.TestAttemptSummaryDTO>> getTestAttempts(
+            @PathVariable Long id,
+            @RequestHeader(value = "X-User-Id", required = false) Long userIdHeader,
+            @RequestParam(required = false) Long userId) {
+        Long targetUser = userId != null ? userId : userIdHeader;
+        return ResponseEntity.ok(statisticsService.getTestAttempts(id, targetUser));
+    }
+
+    @GetMapping("/attempts/{attemptId}")
+    public ResponseEntity<github.felkng.olha_minha_questao.dto.test.TestAttemptDetailDTO> getTestAttemptDetail(
+            @PathVariable Long attemptId) {
+        return ResponseEntity.ok(statisticsService.getTestAttemptDetail(attemptId));
+    }
+
+    @GetMapping("/user-attempts/{userId}")
+    public ResponseEntity<List<github.felkng.olha_minha_questao.dto.test.TestAttemptSummaryDTO>> getUserTestAttempts(
+            @PathVariable Long userId) {
+        return ResponseEntity.ok(statisticsService.getUserTestAttempts(userId));
+    }
+
     @GetMapping("/{id}")
     public ResponseEntity<TestResponseDTO> findById(@PathVariable Long id) {
         return ResponseEntity.ok(testService.findById(id));

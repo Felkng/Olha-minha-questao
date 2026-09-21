@@ -74,6 +74,7 @@ import {
   deleteArea,
   getSubjects,
   deleteSubject,
+  getUserTestAttempts,
 } from '../services/api';
 import {
   Area,
@@ -85,6 +86,7 @@ import {
   Subject,
   Test,
   TestCard,
+  TestAttemptSummary,
   UserProfile,
 } from '../types';
 import { useAuth } from '../context/AuthContext';
@@ -105,6 +107,7 @@ import { EditSubjectModal } from '../components/crud/EditSubjectModal';
 
 type ProfileTab =
   | 'visao_geral'
+  | 'meus_simulados'
   | 'minhas_questoes'
   | 'minhas_provas'
   | 'minhas_pastas'
@@ -130,6 +133,11 @@ export const UserProfilePage: React.FC = () => {
   // Tabs de Categoria em Estatísticas: 0 = Área, 1 = Matéria, 2 = Banca
   const [categoryTab, setCategoryTab] = useState<number>(0);
   const [categorySortBy, setCategorySortBy] = useState<'resolved' | 'accuracy'>('resolved');
+
+  // Dados de Meus Simulados Realizados
+  const [myTestAttempts, setMyTestAttempts] = useState<TestAttemptSummary[]>([]);
+  const [loadingTestAttempts, setLoadingTestAttempts] = useState(false);
+  const [testAttemptSearch, setTestAttemptSearch] = useState('');
 
   // Dados de Minhas Questões
   const [myQuestions, setMyQuestions] = useState<Question[]>([]);
@@ -220,7 +228,9 @@ export const UserProfilePage: React.FC = () => {
   // Carregamento sob demanda das abas selecionadas
   useEffect(() => {
     if (!userId) return;
-    if (activeNavTab === 'minhas_questoes') {
+    if (activeNavTab === 'meus_simulados') {
+      loadMyTestAttempts();
+    } else if (activeNavTab === 'minhas_questoes') {
       loadMyQuestions();
     } else if (activeNavTab === 'minhas_provas') {
       loadMyTests();
@@ -235,6 +245,19 @@ export const UserProfilePage: React.FC = () => {
       loadAllAreas();
     }
   }, [activeNavTab, userId, folderTypeTab]);
+
+  const loadMyTestAttempts = async () => {
+    if (!userId) return;
+    setLoadingTestAttempts(true);
+    try {
+      const res = await getUserTestAttempts(userId);
+      setMyTestAttempts(res);
+    } catch (err) {
+      console.error('Erro ao carregar tentativas de simulados do usuário:', err);
+    } finally {
+      setLoadingTestAttempts(false);
+    }
+  };
 
   const loadMyQuestions = async () => {
     if (!userId) return;
@@ -528,6 +551,25 @@ export const UserProfilePage: React.FC = () => {
                     <BarChartIcon fontSize="small" />
                   </ListItemIcon>
                   <ListItemText primary="Visão Geral" primaryTypographyProps={{ fontWeight: activeNavTab === 'visao_geral' ? 700 : 500 }} />
+                </ListItemButton>
+
+                <ListItemButton
+                  selected={activeNavTab === 'meus_simulados'}
+                  onClick={() => setActiveNavTab('meus_simulados')}
+                  sx={{
+                    borderRadius: 2,
+                    mb: 0.5,
+                    '&.Mui-selected': {
+                      backgroundColor: isDark ? 'rgba(217, 183, 99, 0.15)' : 'rgba(217, 183, 99, 0.12)',
+                      color: PALETTE_COLORS.primary,
+                      fontWeight: 700,
+                    },
+                  }}
+                >
+                  <ListItemIcon sx={{ minWidth: 40, color: activeNavTab === 'meus_simulados' ? PALETTE_COLORS.primary : 'inherit' }}>
+                    <EmojiEventsIcon fontSize="small" />
+                  </ListItemIcon>
+                  <ListItemText primary="Simulados Realizados" primaryTypographyProps={{ fontWeight: activeNavTab === 'meus_simulados' ? 700 : 500 }} />
                 </ListItemButton>
 
                 {(isOwner || isAdmin) && (
@@ -1046,6 +1088,174 @@ export const UserProfilePage: React.FC = () => {
                 </Box>
               </Paper>
             </Stack>
+          )}
+
+          {/* ABA: MEUS SIMULADOS REALIZADOS */}
+          {activeNavTab === 'meus_simulados' && (
+            <Paper elevation={3} sx={{ p: 3, borderRadius: 3 }}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3, flexWrap: 'wrap', gap: 2 }}>
+                <Box>
+                  <Typography variant="h5" fontWeight="bold">
+                    Simulados Realizados
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Histórico de avaliações completas, notas, tempo gasto e revisão de gabarito.
+                  </Typography>
+                </Box>
+
+                <Button
+                  variant="outlined"
+                  onClick={() => navigate('/provas')}
+                  sx={{ fontWeight: 700 }}
+                >
+                  Fazer Novo Simulado
+                </Button>
+              </Box>
+
+              <TextField
+                placeholder="Buscar por prova, banca ou ano..."
+                size="small"
+                fullWidth
+                value={testAttemptSearch}
+                onChange={(e) => setTestAttemptSearch(e.target.value)}
+                InputProps={{
+                  startAdornment: <SearchIcon fontSize="small" sx={{ mr: 1, color: 'text.secondary' }} />,
+                }}
+                sx={{ mb: 3 }}
+              />
+
+              {loadingTestAttempts ? (
+                <Box sx={{ display: 'flex', justifyContent: 'center', py: 6 }}>
+                  <CircularProgress size={32} />
+                </Box>
+              ) : myTestAttempts.length === 0 ? (
+                <Box sx={{ textAlign: 'center', py: 6 }}>
+                  <Typography color="text.secondary" sx={{ mb: 2 }}>
+                    Nenhum simulado realizado até o momento.
+                  </Typography>
+                  <Button
+                    variant="contained"
+                    onClick={() => navigate('/provas')}
+                    sx={{ backgroundColor: PALETTE_COLORS.primary, color: '#1a1e24', fontWeight: 700 }}
+                  >
+                    Ir para Provas & Simulados
+                  </Button>
+                </Box>
+              ) : (
+                <Stack spacing={2}>
+                  {myTestAttempts
+                    .filter((att) => {
+                      if (!testAttemptSearch.trim()) return true;
+                      const term = testAttemptSearch.toLowerCase();
+                      const matchName = att.testName?.toLowerCase().includes(term);
+                      const matchOrigin = att.originName?.toLowerCase().includes(term);
+                      const matchArea = att.areaName?.toLowerCase().includes(term);
+                      const matchYear = att.testYear ? String(att.testYear).includes(term) : false;
+                      return matchName || matchOrigin || matchArea || matchYear;
+                    })
+                    .map((att) => {
+                      const mins = Math.floor((att.timeSpentSeconds || 0) / 60);
+                      const secs = (att.timeSpentSeconds || 0) % 60;
+                      const timeStr = `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+                      const formattedDate = att.createdAt
+                        ? new Date(att.createdAt).toLocaleDateString('pt-BR', {
+                            day: '2-digit',
+                            month: '2-digit',
+                            year: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit',
+                          })
+                        : '';
+
+                      return (
+                        <Paper
+                          key={att.id}
+                          variant="outlined"
+                          sx={{
+                            p: 2.5,
+                            borderRadius: 2.5,
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            flexWrap: 'wrap',
+                            gap: 2,
+                            transition: 'all 0.2s',
+                            '&:hover': {
+                              borderColor: PALETTE_COLORS.primary,
+                            },
+                          }}
+                        >
+                          <Box sx={{ flexGrow: 1, minWidth: 240 }}>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5, flexWrap: 'wrap' }}>
+                              <Typography variant="h6" fontWeight="bold" sx={{ fontSize: '1.05rem' }}>
+                                {att.testName || `Prova #${att.testId}`}
+                              </Typography>
+                              {att.testYear && (
+                                <Chip label={att.testYear} size="small" variant="outlined" sx={{ height: 22, fontWeight: 600 }} />
+                              )}
+                              {att.originName && (
+                                <Chip label={att.originName} size="small" sx={{ height: 22, fontWeight: 600, backgroundColor: 'action.hover' }} />
+                              )}
+                            </Box>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
+                              <Typography variant="caption" color="text.secondary">
+                                Realizado em: {formattedDate}
+                              </Typography>
+                              <Typography variant="caption" color="text.secondary">
+                                • Tempo: {timeStr}
+                              </Typography>
+                            </Box>
+                          </Box>
+
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+                            <Box sx={{ textAlign: 'right' }}>
+                              <Typography variant="body2" color="text.secondary" fontWeight={600}>
+                                {att.correctAnswers} / {att.totalQuestions} acertos
+                              </Typography>
+                              <Chip
+                                label={`${att.scorePercentage}%`}
+                                size="small"
+                                sx={{
+                                  fontWeight: 800,
+                                  backgroundColor:
+                                    att.scorePercentage >= 60
+                                      ? 'rgba(75, 241, 81, 0.15)'
+                                      : 'rgba(250, 66, 75, 0.15)',
+                                  color:
+                                    att.scorePercentage >= 60
+                                      ? PALETTE_COLORS.success
+                                      : PALETTE_COLORS.danger,
+                                  border: '1px solid',
+                                  borderColor:
+                                    att.scorePercentage >= 60
+                                      ? PALETTE_COLORS.success
+                                      : PALETTE_COLORS.danger,
+                                }}
+                              />
+                            </Box>
+
+                            <Button
+                              variant="contained"
+                              size="small"
+                              onClick={() => navigate(`/provas/${att.testId}/tentativas/${att.id}`)}
+                              sx={{
+                                backgroundColor: PALETTE_COLORS.primary,
+                                color: '#1a1e24',
+                                fontWeight: 800,
+                                textTransform: 'none',
+                                borderRadius: 2,
+                                px: 2,
+                              }}
+                            >
+                              Rever Gabarito
+                            </Button>
+                          </Box>
+                        </Paper>
+                      );
+                    })}
+                </Stack>
+              )}
+            </Paper>
           )}
 
           {/* ABA 1: MINHAS QUESTÕES */}

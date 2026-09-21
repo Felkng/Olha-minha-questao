@@ -14,6 +14,7 @@ public interface QuestionAttemptRepository extends JpaRepository<QuestionAttempt
     boolean existsByQuestionIdAndSessionId(Long questionId, String sessionId);
     boolean existsByQuestionIdAndUserId(Long questionId, Long userId);
     List<QuestionAttempt> findByUserId(Long userId);
+    List<QuestionAttempt> findBySessionId(String sessionId);
 
     @Query("SELECT DATE(qa.createdAt), COUNT(qa) FROM QuestionAttempt qa WHERE qa.user.id = :userId GROUP BY DATE(qa.createdAt)")
     List<Object[]> findDailyAttemptCountsByUserId(@Param("userId") Long userId);

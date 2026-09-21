@@ -6,6 +6,7 @@ import { QuestionDetailPage } from './pages/QuestionDetailPage';
 import { TestsPage } from './pages/TestsPage';
 import { TestDetailPage } from './pages/TestDetailPage';
 import { TestEvaluationPage } from './pages/TestEvaluationPage';
+import { TestAttemptReviewPage } from './pages/TestAttemptReviewPage';
 import { OriginsPage } from './pages/OriginsPage';
 import { AreasPage } from './pages/AreasPage';
 import { CategoryQuestionsPage } from './pages/CategoryQuestionsPage';
@@ -45,6 +46,10 @@ export const App: React.FC = () => {
               element={<TestDetailPage onBookmarkQuestion={handleOpenSaveModal} />}
             />
             <Route path="/provas/:id/avaliacao" element={<TestEvaluationPage />} />
+            <Route
+              path="/provas/:testId/tentativas/:attemptId"
+              element={<TestAttemptReviewPage />}
+            />
             <Route path="/bancas" element={<OriginsPage />} />
             <Route
               path="/bancas/:id"

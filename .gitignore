@@ -37,6 +37,7 @@ dist/
 .DS_Store
 *.log
 /storage/
+backend/storage/
 __pycache__/
 *.pyc
 

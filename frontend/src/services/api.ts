@@ -24,6 +24,8 @@ import {
   ParsedExamResponse,
   ParsedAnswerKeyResponse,
   TestWithQuestionsRequest,
+  TestAttemptSummary,
+  TestAttemptDetail,
 } from '../types';
 
 const apiClient = axios.create({
@@ -434,6 +436,30 @@ export const submitTest = async (
   submission: TestSubmissionRequest
 ): Promise<TestSubmissionResponse> => {
   const response = await apiClient.post<TestSubmissionResponse>(`/tests/${testId}/submit`, submission);
+  return response.data;
+};
+
+export const getTestAttempts = async (
+  testId: number,
+  userId?: number
+): Promise<TestAttemptSummary[]> => {
+  const params: Record<string, any> = {};
+  if (userId) params.userId = userId;
+  const response = await apiClient.get<TestAttemptSummary[]>(`/tests/${testId}/attempts`, { params });
+  return Array.isArray(response.data) ? response.data : [];
+};
+
+export const getUserTestAttempts = async (
+  userId: number
+): Promise<TestAttemptSummary[]> => {
+  const response = await apiClient.get<TestAttemptSummary[]>(`/tests/user-attempts/${userId}`);
+  return Array.isArray(response.data) ? response.data : [];
+};
+
+export const getTestAttemptDetail = async (
+  attemptId: number
+): Promise<TestAttemptDetail> => {
+  const response = await apiClient.get<TestAttemptDetail>(`/tests/attempts/${attemptId}`);
   return response.data;
 };
 

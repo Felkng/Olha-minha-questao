@@ -1,0 +1,7 @@
+- Persistir prova em execução (quando a guia for fechada ou quando sair do navegador, deve manter a prova em execução salvando as questões já preenchidas, o tempo de prova). Ao acessar novamente o sistema (quando recuperar a conexão), exibirá um banner informando que exite uma prova em execução e informando que o usuário pode se reconectar à prova.
+
+- Bugs na leitura do PDF, na extração da referencia textual (a ultima), nem todo o conteúdo foi salvo no sistema, cerca de 5 parágrafos ficaram perdidos no teste
+
+- aparecendo textos que não são da alternativa na alternativa. Exemplo: "tivesse escrito seus contos em outra língua. O H N U C S A R"
+
+- persistir a tentativa do simulado (para rever o tempo que levou para fazer o simulado, as questoes que errou)

@@ -278,6 +278,55 @@ export interface TestSubmissionResponse {
   }[];
 }
 
+export interface TestAttemptSummary {
+  id: number;
+  testId: number;
+  testName: string;
+  testYear?: number;
+  originName?: string;
+  areaName?: string;
+  userId?: number;
+  totalQuestions: number;
+  correctAnswers: number;
+  scorePercentage: number;
+  timeSpentSeconds: number;
+  sessionId?: string;
+  createdAt: string;
+}
+
+export interface TestAttemptDetail {
+  id: number;
+  testId: number;
+  testName: string;
+  testYear?: number;
+  originName?: string;
+  areaName?: string;
+  userId?: number;
+  totalQuestions: number;
+  correctAnswers: number;
+  scorePercentage: number;
+  timeSpentSeconds: number;
+  sessionId?: string;
+  createdAt: string;
+  detailedResults: {
+    questionId: number;
+    selectedAlternativeId?: number;
+    correctAlternativeId?: number;
+    isCorrect: boolean;
+    difficultyLevel: DifficultyLevel;
+  }[];
+}
+
+export interface ActiveTestSession {
+  testId: number;
+  testName: string;
+  answers: Record<number, number>;
+  timeSpent: number;
+  activeQuestionIndex: number;
+  totalQuestions: number;
+  lastUpdatedTimestamp: number;
+}
+
 export interface QuestionBoardResponse {
   id?: number;
   questionId: number;

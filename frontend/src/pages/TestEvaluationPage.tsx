@@ -85,12 +85,45 @@ export const TestEvaluationPage: React.FC = () => {
     try {
       const data = await getTestEvaluation(testId);
       setEvaluation(data);
+
+      // Check if there is an active session in progress for this test
+      const stored = localStorage.getItem('omq_active_test_session');
+      if (stored) {
+        try {
+          const parsed = JSON.parse(stored);
+          if (parsed && parsed.testId === testId) {
+            setAnswers(parsed.answers || {});
+            setTimeSpent(parsed.timeSpent || 0);
+            setActiveQuestionIndex(parsed.activeQuestionIndex || 0);
+            setIsStarted(true);
+          }
+        } catch (e) {
+          console.warn('Erro ao restaurar sessão ativa:', e);
+        }
+      }
     } catch (err) {
       console.error('Erro ao carregar avaliação:', err);
     } finally {
       setLoading(false);
     }
   };
+
+  // Sync active test session to localStorage in real time
+  useEffect(() => {
+    if (isStarted && evaluation && !result) {
+      const session = {
+        testId: evaluation.id,
+        testName: evaluation.name,
+        answers,
+        timeSpent,
+        activeQuestionIndex,
+        totalQuestions: evaluation.questions.length,
+        lastUpdatedTimestamp: Date.now(),
+      };
+      localStorage.setItem('omq_active_test_session', JSON.stringify(session));
+      window.dispatchEvent(new Event('omq_session_updated'));
+    }
+  }, [isStarted, evaluation, result, answers, timeSpent, activeQuestionIndex]);
 
   // Timer interval logic
   useEffect(() => {
@@ -170,6 +203,8 @@ export const TestEvaluationPage: React.FC = () => {
       });
 
       setResult(response);
+      localStorage.removeItem('omq_active_test_session');
+      window.dispatchEvent(new Event('omq_session_updated'));
     } catch (err) {
       console.error('Erro ao submeter prova:', err);
     } finally {
@@ -180,9 +215,12 @@ export const TestEvaluationPage: React.FC = () => {
   const handleRestart = () => {
     setResult(null);
     setAnswers({});
-    setIsStarted(false);
-    setActiveQuestionIndex(0);
     setTimeSpent(0);
+    setActiveQuestionIndex(0);
+    setIsStarted(false);
+    setIsPaused(false);
+    localStorage.removeItem('omq_active_test_session');
+    window.dispatchEvent(new Event('omq_session_updated'));
   };
 
   const formatTime = (seconds: number) => {
