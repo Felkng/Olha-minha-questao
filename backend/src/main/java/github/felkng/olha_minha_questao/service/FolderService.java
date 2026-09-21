@@ -183,7 +183,15 @@ public class FolderService {
             throw new ResourceNotFoundException("Pasta não encontrada com o id: " + folderId);
         }
         return savedTestRepository.findByFolderId(folderId).stream()
-                .map(st -> testMapper.toDTO(st.getTest()))
+                .map(st -> {
+                    TestResponseDTO dto = testMapper.toDTO(st.getTest());
+                    if (st.getTest() != null && st.getTest().getId() != null) {
+                        dto.setQuestionCount((int) questionRepository.countByTestId(st.getTest().getId()));
+                    } else {
+                        dto.setQuestionCount(0);
+                    }
+                    return dto;
+                })
                 .toList();
     }
 

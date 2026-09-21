@@ -339,8 +339,8 @@ export const getTests = async (params?: {
   return Array.isArray(response.data) ? response.data : [];
 };
 
-export const getTestById = async (id: number): Promise<TestCard> => {
-  const response = await apiClient.get<TestCard>(`/tests/${id}`);
+export const getTestById = async (id: number): Promise<Test> => {
+  const response = await apiClient.get<Test>(`/tests/${id}`);
   return response.data;
 };
 

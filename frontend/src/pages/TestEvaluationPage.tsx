@@ -227,7 +227,7 @@ export const TestEvaluationPage: React.FC = () => {
           <Chip label={`Ano ${evaluation.year}`} variant="outlined" />
           {evaluation.originName && <Chip label={evaluation.originName} color="info" variant="outlined" />}
           {evaluation.areaName && <Chip label={evaluation.areaName} variant="outlined" />}
-          <Chip label={`${evaluation.questionCount} Questões`} sx={{ fontWeight: 700 }} />
+          <Chip label={`${evaluation.questionCount ?? evaluation.questions?.length ?? 0} Questões`} sx={{ fontWeight: 700 }} />
         </Stack>
 
         <Divider sx={{ my: 3 }} />

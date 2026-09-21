@@ -22,6 +22,7 @@ public class TestResponseDTO {
     private String originName;
     private Long areaId;
     private String areaName;
+    private Integer questionCount;
     private UserSummaryDTO createdByUser;
     @Builder.Default
     private java.util.List<github.felkng.olha_minha_questao.dto.reference.TextualReferenceResponseDTO> textualReferences = new java.util.ArrayList<>();

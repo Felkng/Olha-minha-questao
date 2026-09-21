@@ -112,15 +112,25 @@ public class TestService {
         }
 
         return tests.stream()
-                .map(testMapper::toDTO)
+                .map(this::toDTOWithQuestionCount)
                 .toList();
+    }
+
+    private TestResponseDTO toDTOWithQuestionCount(Test test) {
+        TestResponseDTO dto = testMapper.toDTO(test);
+        if (test != null && test.getId() != null) {
+            dto.setQuestionCount((int) questionRepository.countByTestId(test.getId()));
+        } else {
+            dto.setQuestionCount(0);
+        }
+        return dto;
     }
 
     @Transactional(readOnly = true)
     public TestResponseDTO findById(Long id) {
         Test test = testRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Prova não encontrada com o id: " + id));
-        return testMapper.toDTO(test);
+        return toDTOWithQuestionCount(test);
     }
 
     @Transactional
@@ -166,7 +176,7 @@ public class TestService {
             saved = testRepository.save(saved);
         }
 
-        return testMapper.toDTO(saved);
+        return toDTOWithQuestionCount(saved);
     }
 
     @Transactional
@@ -315,7 +325,7 @@ public class TestService {
             savedTest = testRepository.save(savedTest);
         }
 
-        return testMapper.toDTO(savedTest);
+        return toDTOWithQuestionCount(savedTest);
     }
 
     @Transactional
@@ -357,7 +367,7 @@ public class TestService {
         test.setArea(area);
 
         Test updated = testRepository.save(test);
-        return testMapper.toDTO(updated);
+        return toDTOWithQuestionCount(updated);
     }
 
     @Transactional

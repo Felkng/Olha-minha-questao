@@ -16,7 +16,7 @@ import {
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import CheckIcon from '@mui/icons-material/Check';
-import { Folder, TestCard } from '../../types';
+import { Folder, Test, TestCard } from '../../types';
 import {
   addTestToFolder,
   createFolder,
@@ -29,7 +29,7 @@ import { PALETTE_COLORS } from '../../theme/theme';
 interface SaveTestToFolderModalProps {
   open: boolean;
   onClose: () => void;
-  test: TestCard | null;
+  test: Test | TestCard | null;
   onSavedStatusChange?: () => void;
 }
 

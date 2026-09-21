@@ -59,6 +59,7 @@ class TestServiceTest {
 
         TestResponseDTO found = testService.findById(created.getId());
         assertThat(found.getName()).isEqualTo("ENEM 2024 - Caderno Branco");
+        assertThat(found.getQuestionCount()).isEqualTo(0);
     }
 
     @Test
@@ -178,6 +179,7 @@ class TestServiceTest {
 
         assertThat(created.getId()).isNotNull();
         assertThat(created.getName()).isEqualTo("Prova Wizard Completa");
+        assertThat(created.getQuestionCount()).isEqualTo(2);
 
         var evaluation = testService.getTestEvaluation(created.getId());
         assertThat(evaluation.getQuestions()).hasSize(2);

@@ -116,6 +116,7 @@ export interface Test {
   originName?: string;
   areaId?: number;
   areaName?: string;
+  questionCount?: number;
   createdByUser?: UserSummary;
   textualReferences?: TextualReference[];
 }

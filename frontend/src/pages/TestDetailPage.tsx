@@ -22,7 +22,7 @@ import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
 import AccountBalanceIcon from '@mui/icons-material/AccountBalance';
 import CategoryIcon from '@mui/icons-material/Category';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
-import { Question, TestCard } from '../types';
+import { Question, Test } from '../types';
 import { getTestById, getTestEvaluation } from '../services/api';
 import { QuestionCard } from '../components/questions/QuestionCard';
 import { QuestionWhiteboard } from '../components/whiteboard/QuestionWhiteboard';
@@ -46,7 +46,7 @@ export const TestDetailPage: React.FC<TestDetailPageProps> = ({
   const initialQ = Number(searchParams.get('q'));
   const initialMode = searchParams.get('mode') as 'single' | 'all' | null;
 
-  const [test, setTest] = useState<TestCard | null>(null);
+  const [test, setTest] = useState<Test | null>(null);
   const [questions, setQuestions] = useState<Question[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [activeQuestionIndex, setActiveQuestionIndex] = useState<number>(
@@ -184,7 +184,7 @@ export const TestDetailPage: React.FC<TestDetailPageProps> = ({
               )}
               <Chip
                 icon={<MenuBookOutlinedIcon fontSize="small" />}
-                label={`${test.questionCount} questões`}
+                label={`${test.questionCount ?? questions.length ?? 0} questões`}
                 size="small"
                 sx={{ backgroundColor: 'rgba(217, 183, 99, 0.15)', color: PALETTE_COLORS.primary, fontWeight: 700 }}
               />

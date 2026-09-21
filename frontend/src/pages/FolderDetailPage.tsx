@@ -186,7 +186,7 @@ export const FolderDetailPage: React.FC<FolderDetailPageProps> = ({
                   </Typography>
                   <Stack direction="row" spacing={1} sx={{ mb: 2 }}>
                     <Chip size="small" label={`Ano: ${t.year}`} />
-                    <Chip size="small" icon={<QuizOutlinedIcon fontSize="small" />} label={`${t.questionCount} q.`} />
+                    <Chip size="small" icon={<QuizOutlinedIcon fontSize="small" />} label={`${t.questionCount ?? 0} q.`} />
                   </Stack>
                   <Button variant="outlined" fullWidth endIcon={<ArrowForwardIcon />}>
                     Visualizar Prova
