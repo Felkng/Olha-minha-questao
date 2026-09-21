@@ -38,6 +38,7 @@ import { PALETTE_COLORS } from '../theme/theme';
 import { useAppTheme } from '../theme/ThemeContext';
 import { TextualReferenceDrawer } from '../components/questions/TextualReferenceDrawer';
 import { TestQuestionsNavigator } from '../components/questions/TestQuestionsNavigator';
+import { QuestionWhiteboard } from '../components/whiteboard/QuestionWhiteboard';
 import { useAuth } from '../context/AuthContext';
 
 export const TestEvaluationPage: React.FC = () => {
@@ -480,8 +481,12 @@ export const TestEvaluationPage: React.FC = () => {
 
         {evaluation.questions.map((q, idx) => {
           const detail = result.detailedResults.find((d) => d.questionId === q.id);
-          const isCorrect = detail ? detail.isCorrect : false;
           const userSelectedId = answers[q.id];
+          const fallbackCorrectAlt = q.alternatives.find((a) => a.isCorrect);
+          const correctAltId = detail?.correctAlternativeId ?? fallbackCorrectAlt?.id;
+          const isCorrect = detail?.isCorrect !== undefined
+            ? detail.isCorrect
+            : Boolean(userSelectedId && correctAltId && userSelectedId === correctAltId);
 
           return (
             <Paper
@@ -542,7 +547,7 @@ export const TestEvaluationPage: React.FC = () => {
               <Stack spacing={1}>
                 {q.alternatives.map((alt) => {
                   const isUserSelection = userSelectedId === alt.id;
-                  const isCorrectAlt = detail ? detail.correctAlternativeId === alt.id : alt.isCorrect;
+                  const isCorrectAlt = correctAltId ? correctAltId === alt.id : alt.isCorrect;
 
                   let bgColor = 'transparent';
                   let borderCol = 'divider';
@@ -594,8 +599,13 @@ export const TestEvaluationPage: React.FC = () => {
                       {isCorrectAlt && (
                         <Chip size="small" label="Correta" color="success" sx={{ fontWeight: 600 }} />
                       )}
-                      {isUserSelection && !isCorrect && (
-                        <Chip size="small" label="Sua Escolha" color="error" sx={{ fontWeight: 600 }} />
+                      {isUserSelection && (
+                        <Chip
+                          size="small"
+                          label={isCorrect ? 'Sua Escolha' : 'Sua Escolha (Incorreta)'}
+                          color={isCorrect ? 'success' : 'error'}
+                          sx={{ fontWeight: 600 }}
+                        />
                       )}
                     </Box>
                   );
@@ -875,6 +885,16 @@ export const TestEvaluationPage: React.FC = () => {
             </Button>
           </Box>
         </Paper>
+      )}
+
+      {/* Lousa de Raciocínio da Questão Atual no Simulado */}
+      {currentQuestion && (
+        <Box sx={{ mt: 3, mb: 4 }}>
+          <QuestionWhiteboard
+            key={currentQuestion.id}
+            questionId={currentQuestion.id}
+          />
+        </Box>
       )}
 
       {/* Confirmation Dialog */}

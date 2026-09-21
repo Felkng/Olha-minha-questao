@@ -1,5 +1,6 @@
 package github.felkng.olha_minha_questao.service;
 
+import github.felkng.olha_minha_questao.domain.entity.Alternative;
 import github.felkng.olha_minha_questao.domain.entity.DifficultyLevel;
 import github.felkng.olha_minha_questao.domain.entity.Question;
 import github.felkng.olha_minha_questao.domain.entity.QuestionAttempt;
@@ -50,8 +51,16 @@ public class StatisticsService {
         }
 
         boolean isCorrect = false;
-        if (dto.getSelectedAlternativeId() != null && question.getCorrectAlternative() != null) {
-            isCorrect = question.getCorrectAlternative().getId().equals(dto.getSelectedAlternativeId());
+        if (dto.getSelectedAlternativeId() != null) {
+            if (question.getCorrectAlternative() != null && question.getCorrectAlternative().getId() != null) {
+                isCorrect = question.getCorrectAlternative().getId().equals(dto.getSelectedAlternativeId());
+            } else if (question.getAlternatives() != null) {
+                isCorrect = question.getAlternatives().stream()
+                        .filter(a -> a.getId().equals(dto.getSelectedAlternativeId()))
+                        .map(a -> Boolean.TRUE.equals(a.getIsCorrect()))
+                        .findFirst()
+                        .orElse(false);
+            }
         }
 
         boolean isFirstAttempt = true;
@@ -189,7 +198,16 @@ public class StatisticsService {
                         .difficultyLevel(attemptResponse.getDifficultyLevel())
                         .build());
             } else {
-                Long correctAltId = question.getCorrectAlternative() != null ? question.getCorrectAlternative().getId() : null;
+                Long correctAltId = null;
+                if (question.getCorrectAlternative() != null && question.getCorrectAlternative().getId() != null) {
+                    correctAltId = question.getCorrectAlternative().getId();
+                } else if (question.getAlternatives() != null) {
+                    correctAltId = question.getAlternatives().stream()
+                            .filter(a -> Boolean.TRUE.equals(a.getIsCorrect()))
+                            .map(Alternative::getId)
+                            .findFirst()
+                            .orElse(null);
+                }
                 DifficultyLevel diffLevel = question.getStatistic() != null ? question.getStatistic().getDifficultyLevel() : DifficultyLevel.SEM_DADOS;
 
                 detailedResults.add(TestSubmissionResponseDTO.QuestionResultDTO.builder()
