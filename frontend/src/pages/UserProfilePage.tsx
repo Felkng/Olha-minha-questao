@@ -57,6 +57,7 @@ import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import ListAltIcon from '@mui/icons-material/ListAlt';
 import SearchIcon from '@mui/icons-material/Search';
+import ShareIcon from '@mui/icons-material/Share';
 
 import {
   getUserProfile,
@@ -75,6 +76,8 @@ import {
   getSubjects,
   deleteSubject,
   getUserTestAttempts,
+  getTestAttemptDetail,
+  getTestEvaluation,
 } from '../services/api';
 import {
   Area,
@@ -87,10 +90,13 @@ import {
   Test,
   TestCard,
   TestAttemptSummary,
+  TestAttemptDetail,
+  TestEvaluation,
   UserProfile,
 } from '../types';
-import { useAuth } from '../context/AuthContext';
 import { PALETTE_COLORS } from '../theme/theme';
+import { useAuth } from '../context/AuthContext';
+import { ShareResultsModal } from '../components/simulations/ShareResultsModal';
 
 // Modais CRUD
 import { CreateQuestionModal } from '../components/crud/CreateQuestionModal';
@@ -203,6 +209,29 @@ export const UserProfilePage: React.FC = () => {
     onConfirm: async () => {},
   });
   const [deleting, setDeleting] = useState(false);
+
+  // Compartilhamento de Simulado CSV
+  const [shareModalOpen, setShareModalOpen] = useState<boolean>(false);
+  const [shareAttemptDetail, setShareAttemptDetail] = useState<TestAttemptDetail | null>(null);
+  const [shareEvaluation, setShareEvaluation] = useState<TestEvaluation | null>(null);
+  const [loadingShareAttemptId, setLoadingShareAttemptId] = useState<number | null>(null);
+
+  const handleOpenShareAttempt = async (att: TestAttemptSummary) => {
+    setLoadingShareAttemptId(att.id);
+    try {
+      const [detail, evalData] = await Promise.all([
+        getTestAttemptDetail(att.id),
+        getTestEvaluation(att.testId),
+      ]);
+      setShareAttemptDetail(detail);
+      setShareEvaluation(evalData);
+      setShareModalOpen(true);
+    } catch (err) {
+      console.error('Erro ao carregar detalhes para exportação CSV:', err);
+    } finally {
+      setLoadingShareAttemptId(null);
+    }
+  };
 
   const isOwner = currentUser?.id === userId;
   const isAdmin = currentUser?.role === 'ADMIN';
@@ -1234,21 +1263,53 @@ export const UserProfilePage: React.FC = () => {
                               />
                             </Box>
 
-                            <Button
-                              variant="contained"
-                              size="small"
-                              onClick={() => navigate(`/provas/${att.testId}/tentativas/${att.id}`)}
-                              sx={{
-                                backgroundColor: PALETTE_COLORS.primary,
-                                color: '#1a1e24',
-                                fontWeight: 800,
-                                textTransform: 'none',
-                                borderRadius: 2,
-                                px: 2,
-                              }}
-                            >
-                              Rever Gabarito
-                            </Button>
+                            <Stack direction="row" spacing={1}>
+                              <Button
+                                variant="outlined"
+                                size="small"
+                                startIcon={
+                                  loadingShareAttemptId === att.id ? (
+                                    <CircularProgress size={14} color="inherit" />
+                                  ) : (
+                                    <ShareIcon />
+                                  )
+                                }
+                                disabled={loadingShareAttemptId === att.id}
+                                onClick={() => handleOpenShareAttempt(att)}
+                                sx={{
+                                  borderColor: PALETTE_COLORS.primary,
+                                  color: PALETTE_COLORS.primary,
+                                  fontWeight: 700,
+                                  textTransform: 'none',
+                                  borderRadius: 2,
+                                  px: 1.5,
+                                  '&:hover': {
+                                    borderColor: PALETTE_COLORS.primary,
+                                    backgroundColor: 'rgba(217, 183, 99, 0.1)',
+                                  },
+                                }}
+                              >
+                                Exportar CSV
+                              </Button>
+                              <Button
+                                variant="contained"
+                                size="small"
+                                onClick={() => navigate(`/provas/${att.testId}/tentativas/${att.id}`)}
+                                sx={{
+                                  backgroundColor: PALETTE_COLORS.primary,
+                                  color: '#1a1e24',
+                                  fontWeight: 800,
+                                  textTransform: 'none',
+                                  borderRadius: 2,
+                                  px: 2,
+                                  '&:hover': {
+                                    backgroundColor: '#c4a251',
+                                  },
+                                }}
+                              >
+                                Rever Gabarito
+                              </Button>
+                            </Stack>
                           </Box>
                         </Paper>
                       );
@@ -2225,6 +2286,22 @@ export const UserProfilePage: React.FC = () => {
           </Button>
         </DialogActions>
       </Dialog>
+
+      {/* Modal de Compartilhamento/Exportação de Simulado CSV */}
+      {shareAttemptDetail && shareEvaluation && (
+        <ShareResultsModal
+          open={shareModalOpen}
+          onClose={() => setShareModalOpen(false)}
+          testName={shareAttemptDetail.testName || shareEvaluation.name}
+          testYear={shareAttemptDetail.testYear || shareEvaluation.year}
+          scorePercentage={shareAttemptDetail.scorePercentage}
+          correctAnswers={shareAttemptDetail.correctAnswers}
+          totalQuestions={shareAttemptDetail.totalQuestions}
+          timeSpentSeconds={shareAttemptDetail.timeSpentSeconds}
+          questions={shareEvaluation.questions}
+          detailedResults={shareAttemptDetail.detailedResults}
+        />
+      )}
     </Box>
   );
 };

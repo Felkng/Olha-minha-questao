@@ -14,12 +14,15 @@ import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import HighlightOffIcon from '@mui/icons-material/HighlightOff';
 import MenuBookIcon from '@mui/icons-material/MenuBook';
 import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
+import ShareIcon from '@mui/icons-material/Share';
+import RestartAltIcon from '@mui/icons-material/RestartAlt';
 import { useParams, useNavigate } from 'react-router-dom';
 import { TestAttemptDetail, TestEvaluation, TextualReference } from '../types';
 import { getTestAttemptDetail, getTestEvaluation } from '../services/api';
 import { PALETTE_COLORS } from '../theme/theme';
 import { useAppTheme } from '../theme/ThemeContext';
 import { TextualReferenceDrawer } from '../components/questions/TextualReferenceDrawer';
+import { ShareResultsModal } from '../components/simulations/ShareResultsModal';
 
 export const TestAttemptReviewPage: React.FC = () => {
   const { testId, attemptId } = useParams<{ testId: string; attemptId: string }>();
@@ -31,6 +34,7 @@ export const TestAttemptReviewPage: React.FC = () => {
   const [evaluation, setEvaluation] = useState<TestEvaluation | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+  const [shareModalOpen, setShareModalOpen] = useState<boolean>(false);
 
   const [activeDrawerRef, setActiveDrawerRef] = useState<TextualReference | null>(null);
   const [activeDrawerQuestionId, setActiveDrawerQuestionId] = useState<string | undefined>(undefined);
@@ -219,6 +223,47 @@ export const TestAttemptReviewPage: React.FC = () => {
             </Typography>
           </Paper>
         </Box>
+
+        {/* Action Buttons in Scorecard */}
+        <Stack direction="row" spacing={2} justifyContent="center" flexWrap="wrap" gap={1.5} sx={{ mt: 3 }}>
+          <Button
+            variant="outlined"
+            startIcon={<ShareIcon />}
+            onClick={() => setShareModalOpen(true)}
+            sx={{
+              px: 3,
+              py: 1.2,
+              fontWeight: 800,
+              borderColor: PALETTE_COLORS.primary,
+              color: PALETTE_COLORS.primary,
+              borderRadius: 2,
+              '&:hover': {
+                borderColor: PALETTE_COLORS.primary,
+                backgroundColor: 'rgba(217, 183, 99, 0.1)',
+              },
+            }}
+          >
+            Compartilhar Resultados (CSV)
+          </Button>
+          <Button
+            variant="contained"
+            startIcon={<RestartAltIcon />}
+            onClick={() => navigate(`/provas/${testId}/avaliacao`)}
+            sx={{
+              px: 3,
+              py: 1.2,
+              fontWeight: 800,
+              borderRadius: 2,
+              backgroundColor: PALETTE_COLORS.primary,
+              color: '#1a1e24',
+              '&:hover': {
+                backgroundColor: '#c4a251',
+              },
+            }}
+          >
+            Refazer Simulado
+          </Button>
+        </Stack>
       </Paper>
 
       {/* Detailed Question Review */}
@@ -369,6 +414,21 @@ export const TestAttemptReviewPage: React.FC = () => {
         reference={activeDrawerRef}
         questionIdentifier={activeDrawerQuestionId}
       />
+
+      {attempt && evaluation && (
+        <ShareResultsModal
+          open={shareModalOpen}
+          onClose={() => setShareModalOpen(false)}
+          testName={attempt.testName || evaluation.name}
+          testYear={attempt.testYear || evaluation.year}
+          scorePercentage={attempt.scorePercentage}
+          correctAnswers={attempt.correctAnswers}
+          totalQuestions={attempt.totalQuestions}
+          timeSpentSeconds={attempt.timeSpentSeconds}
+          questions={evaluation.questions}
+          detailedResults={attempt.detailedResults}
+        />
+      )}
     </Box>
   );
 };

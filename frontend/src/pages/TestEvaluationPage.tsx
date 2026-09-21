@@ -31,6 +31,7 @@ import RestartAltIcon from '@mui/icons-material/RestartAlt';
 import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
 import MenuBookIcon from '@mui/icons-material/MenuBook';
 import BorderColorIcon from '@mui/icons-material/BorderColor';
+import ShareIcon from '@mui/icons-material/Share';
 import { useParams, useNavigate } from 'react-router-dom';
 import { TestEvaluation, TestSubmissionResponse, TextualReference } from '../types';
 import { getTestEvaluation, submitTest } from '../services/api';
@@ -39,6 +40,7 @@ import { useAppTheme } from '../theme/ThemeContext';
 import { TextualReferenceDrawer } from '../components/questions/TextualReferenceDrawer';
 import { TestQuestionsNavigator } from '../components/questions/TestQuestionsNavigator';
 import { QuestionWhiteboard } from '../components/whiteboard/QuestionWhiteboard';
+import { ShareResultsModal } from '../components/simulations/ShareResultsModal';
 import { useAuth } from '../context/AuthContext';
 
 export const TestEvaluationPage: React.FC = () => {
@@ -71,6 +73,7 @@ export const TestEvaluationPage: React.FC = () => {
   const [confirmOpen, setConfirmOpen] = useState<boolean>(false);
   const [submitting, setSubmitting] = useState<boolean>(false);
   const [result, setResult] = useState<TestSubmissionResponse | null>(null);
+  const [shareModalOpen, setShareModalOpen] = useState<boolean>(false);
 
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -492,12 +495,31 @@ export const TestEvaluationPage: React.FC = () => {
             </Paper>
           </Box>
 
-          <Stack direction="row" spacing={2} justifyContent="center">
+          <Stack direction="row" spacing={2} justifyContent="center" flexWrap="wrap" gap={1.5}>
+            <Button
+              variant="outlined"
+              startIcon={<ShareIcon />}
+              onClick={() => setShareModalOpen(true)}
+              sx={{
+                px: 3,
+                py: 1.2,
+                fontWeight: 800,
+                borderColor: PALETTE_COLORS.primary,
+                color: PALETTE_COLORS.primary,
+                borderRadius: 2,
+                '&:hover': {
+                  borderColor: PALETTE_COLORS.primary,
+                  backgroundColor: 'rgba(217, 183, 99, 0.1)',
+                },
+              }}
+            >
+              Compartilhar Resultados (CSV)
+            </Button>
             <Button
               variant="outlined"
               startIcon={<RestartAltIcon />}
               onClick={handleRestart}
-              sx={{ px: 3, py: 1.2, fontWeight: 700 }}
+              sx={{ px: 3, py: 1.2, fontWeight: 700, borderRadius: 2 }}
             >
               Refazer Avaliação
             </Button>
@@ -505,7 +527,7 @@ export const TestEvaluationPage: React.FC = () => {
               variant="contained"
               color="primary"
               onClick={() => navigate('/provas')}
-              sx={{ px: 3, py: 1.2, fontWeight: 700 }}
+              sx={{ px: 3, py: 1.2, fontWeight: 700, borderRadius: 2 }}
             >
               Ver Outras Provas
             </Button>
@@ -652,6 +674,20 @@ export const TestEvaluationPage: React.FC = () => {
             </Paper>
           );
         })}
+
+        <ShareResultsModal
+          open={shareModalOpen}
+          onClose={() => setShareModalOpen(false)}
+          testName={evaluation.name}
+          testYear={evaluation.year}
+          scorePercentage={result.scorePercentage}
+          correctAnswers={result.correctAnswers}
+          totalQuestions={result.totalQuestions || evaluation.questions.length}
+          timeSpentSeconds={result.timeSpentSeconds || timeSpent}
+          questions={evaluation.questions}
+          detailedResults={result.detailedResults}
+          answers={answers}
+        />
       </Box>
     );
   }
