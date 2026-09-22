@@ -12,6 +12,12 @@ import {
   TextField,
   InputAdornment,
   IconButton,
+  Tooltip,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogContentText,
+  DialogActions,
 } from '@mui/material';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import MenuBookIcon from '@mui/icons-material/MenuBook';
@@ -19,20 +25,34 @@ import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import SearchIcon from '@mui/icons-material/Search';
 import ClearIcon from '@mui/icons-material/Clear';
+import AddIcon from '@mui/icons-material/Add';
+import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
+import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
+import PublicIcon from '@mui/icons-material/Public';
+import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
 import { useNavigate } from 'react-router-dom';
 import { TestCard } from '../types';
-import { getTestCards } from '../services/api';
+import { getTestCards, deleteTest, toggleTestVisibility } from '../services/api';
 import { PALETTE_COLORS } from '../theme/theme';
 import { useAppTheme } from '../theme/ThemeContext';
+import { useAuth } from '../context/AuthContext';
+import { CreateTestWizardModal } from '../components/crud/CreateTestWizardModal';
+import { EditTestModal } from '../components/crud/EditTestModal';
 
 export const TestsPage: React.FC = () => {
   const navigate = useNavigate();
   const { mode } = useAppTheme();
   const isDark = mode === 'dark';
+  const { user, isAdmin } = useAuth();
 
   const [tests, setTests] = useState<TestCard[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [searchTerm, setSearchTerm] = useState<string>('');
+
+  const [createModalOpen, setCreateModalOpen] = useState(false);
+  const [editingTest, setEditingTest] = useState<TestCard | null>(null);
+  const [deletingTest, setDeletingTest] = useState<TestCard | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
     loadTests();
@@ -128,13 +148,23 @@ export const TestsPage: React.FC = () => {
 
   return (
     <Box sx={{ mb: 6 }}>
-      <Box sx={{ mb: 3 }}>
-        <Typography variant="h5" sx={{ fontWeight: 800, mb: 0.5 }}>
-          Provas & Simulados
-        </Typography>
-        <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-          Selecione uma prova para iniciar a avaliação com cronômetro personalizado e feedback de desempenho.
-        </Typography>
+      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 3, flexWrap: 'wrap', gap: 2 }}>
+        <Box>
+          <Typography variant="h5" sx={{ fontWeight: 800, mb: 0.5 }}>
+            Provas & Simulados
+          </Typography>
+          <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+            Selecione uma prova para iniciar a avaliação com cronômetro personalizado e feedback de desempenho.
+          </Typography>
+        </Box>
+        <Button
+          variant="contained"
+          startIcon={<AddIcon />}
+          onClick={() => setCreateModalOpen(true)}
+          sx={{ fontWeight: 700, backgroundColor: PALETTE_COLORS.primary }}
+        >
+          Nova Prova
+        </Button>
       </Box>
 
       {/* Barra de Pesquisa */}
@@ -211,113 +241,224 @@ export const TestsPage: React.FC = () => {
         </Alert>
       ) : (
         <Grid container spacing={3}>
-          {filteredTests.map((test) => (
-            <Grid item xs={12} md={6} key={test.id}>
-              <Paper
-                elevation={4}
-                sx={{
-                  p: 3,
-                  height: '100%',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  justifyContent: 'space-between',
-                  borderRadius: 3,
-                  transition: 'transform 0.2s, box-shadow 0.2s',
-                  '&:hover': {
-                    transform: 'translateY(-3px)',
-                    boxShadow: 6,
-                  },
-                }}
-              >
-                <Box>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1.5, gap: 1 }}>
-                    <Typography variant="h6" sx={{ fontWeight: 700, lineHeight: 1.3 }}>
-                      {test.name}
-                    </Typography>
-                    {getDifficultyBadge(test.difficultyLevel)}
-                  </Box>
+          {filteredTests.map((test) => {
+            const isOwner = Boolean(user?.id && test.createdByUser?.id && user.id === test.createdByUser.id);
+            const isPublic = test.isPublic !== undefined ? test.isPublic : true;
+            const canDelete = isOwner || (isAdmin && isPublic);
 
-                  <Stack direction="row" spacing={1} flexWrap="wrap" sx={{ gap: 0.8, mb: 2 }}>
-                    <Chip
-                      size="small"
-                      label={`Ano ${test.year}`}
-                      variant="outlined"
-                      sx={{ borderColor: 'divider', color: 'text.secondary' }}
-                    />
-                    {test.originName && (
-                      <Chip
-                        size="small"
-                        label={test.originName}
-                        sx={{
-                          backgroundColor: isDark ? 'rgba(90, 166, 226, 0.15)' : 'rgba(90, 166, 226, 0.12)',
-                          color: PALETTE_COLORS.secondary,
-                          fontWeight: 600,
-                        }}
-                      />
-                    )}
-                    {test.areaName && (
-                      <Chip
-                        size="small"
-                        label={test.areaName}
-                        variant="outlined"
-                        sx={{ borderColor: PALETTE_COLORS.secondary, color: PALETTE_COLORS.secondary }}
-                      />
-                    )}
-                    <Chip
-                      size="small"
-                      icon={<MenuBookIcon fontSize="small" />}
-                      label={`${test.questionCount} questões`}
-                      sx={{ backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)' }}
-                    />
-                  </Stack>
-
-                  <Box
-                    sx={{
-                      p: 1.5,
-                      borderRadius: 2,
-                      backgroundColor: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)',
-                      mb: 2.5,
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 2,
-                    }}
-                  >
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.8 }}>
-                      <TrendingUpIcon fontSize="small" sx={{ color: PALETTE_COLORS.primary }} />
-                      <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                        Média de Acertos:{' '}
-                        <Box component="span" sx={{ fontWeight: 700, color: 'text.primary' }}>
-                          {test.averageScore > 0 ? `${test.averageScore.toFixed(1)}%` : '—'}
-                        </Box>
-                      </Typography>
-                    </Box>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.8 }}>
-                      <CheckCircleOutlineIcon fontSize="small" sx={{ color: PALETTE_COLORS.secondary }} />
-                      <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                        Resoluções:{' '}
-                        <Box component="span" sx={{ fontWeight: 700, color: 'text.primary' }}>
-                          {test.totalAttempts}
-                        </Box>
-                      </Typography>
-                    </Box>
-                  </Box>
-                </Box>
-
-                <Button
-                  variant="contained"
-                  color="primary"
-                  fullWidth
-                  startIcon={<PlayArrowIcon />}
-                  onClick={() => navigate(`/provas/${test.id}`)}
-                  sx={{ fontWeight: 700, py: 1.2, borderRadius: 2 }}
+            return (
+              <Grid item xs={12} md={6} key={test.id}>
+                <Paper
+                  elevation={4}
+                  sx={{
+                    p: 3,
+                    height: '100%',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'space-between',
+                    borderRadius: 3,
+                    transition: 'transform 0.2s, box-shadow 0.2s',
+                    '&:hover': {
+                      transform: 'translateY(-3px)',
+                      boxShadow: 6,
+                    },
+                  }}
                 >
-                  Iniciar Avaliação
-                </Button>
-              </Paper>
-            </Grid>
-          ))}
+                  <Box>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1.5, gap: 1 }}>
+                      <Typography variant="h6" sx={{ fontWeight: 700, lineHeight: 1.3 }}>
+                        {test.name}
+                      </Typography>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                        {getDifficultyBadge(test.difficultyLevel)}
+                        {isOwner && (
+                          <Tooltip title="Editar prova">
+                            <IconButton size="small" onClick={() => setEditingTest(test)}>
+                              <EditOutlinedIcon fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                        )}
+                        {canDelete && (
+                          <Tooltip title={isAdmin && !isOwner ? "Moderar / Excluir prova pública (Admin)" : "Excluir prova"}>
+                            <IconButton size="small" color="error" onClick={() => setDeletingTest(test)}>
+                              <DeleteOutlineIcon fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                        )}
+                      </Box>
+                    </Box>
+
+                    <Stack direction="row" spacing={1} flexWrap="wrap" sx={{ gap: 0.8, mb: 2 }}>
+                      <Chip
+                        size="small"
+                        label={`Ano ${test.year}`}
+                        variant="outlined"
+                        sx={{ borderColor: 'divider', color: 'text.secondary' }}
+                      />
+                      {test.originName && (
+                        <Chip
+                          size="small"
+                          label={test.originName}
+                          sx={{
+                            backgroundColor: isDark ? 'rgba(90, 166, 226, 0.15)' : 'rgba(90, 166, 226, 0.12)',
+                            color: PALETTE_COLORS.secondary,
+                            fontWeight: 600,
+                          }}
+                        />
+                      )}
+                      {test.areaName && (
+                        <Chip
+                          size="small"
+                          label={test.areaName}
+                          variant="outlined"
+                          sx={{ borderColor: PALETTE_COLORS.secondary, color: PALETTE_COLORS.secondary }}
+                        />
+                      )}
+                      <Chip
+                        size="small"
+                        icon={<MenuBookIcon fontSize="small" />}
+                        label={`${test.questionCount} questões`}
+                        sx={{ backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)' }}
+                      />
+
+                      <Tooltip title={isOwner ? "Clique para alternar visibilidade (Pública/Privada)" : (isPublic ? "Prova pública" : "Prova privada")}>
+                        <Chip
+                          size="small"
+                          icon={isPublic ? <PublicIcon fontSize="inherit" /> : <LockOutlinedIcon fontSize="inherit" />}
+                          label={isPublic ? 'Pública' : 'Privada'}
+                          onClick={isOwner ? async () => {
+                            try {
+                              await toggleTestVisibility(test.id);
+                              loadTests();
+                            } catch (e) { console.error(e); }
+                          } : undefined}
+                          clickable={isOwner}
+                          sx={{
+                            backgroundColor: isPublic
+                              ? (isDark ? 'rgba(75, 241, 81, 0.12)' : 'rgba(75, 241, 81, 0.15)')
+                              : (isDark ? 'rgba(250, 66, 75, 0.12)' : 'rgba(250, 66, 75, 0.15)'),
+                            color: isPublic ? PALETTE_COLORS.success : PALETTE_COLORS.danger,
+                            border: '1px solid',
+                            borderColor: isPublic ? PALETTE_COLORS.success : PALETTE_COLORS.danger,
+                            fontWeight: 700,
+                            cursor: isOwner ? 'pointer' : 'default',
+                          }}
+                        />
+                      </Tooltip>
+                    </Stack>
+
+                    <Box
+                      sx={{
+                        p: 1.5,
+                        borderRadius: 2,
+                        backgroundColor: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)',
+                        mb: 2.5,
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 2,
+                      }}
+                    >
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.8 }}>
+                        <TrendingUpIcon fontSize="small" sx={{ color: PALETTE_COLORS.primary }} />
+                        <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+                          Média de Acertos:{' '}
+                          <Box component="span" sx={{ fontWeight: 700, color: 'text.primary' }}>
+                            {test.averageScore > 0 ? `${test.averageScore.toFixed(1)}%` : '—'}
+                          </Box>
+                        </Typography>
+                      </Box>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.8 }}>
+                        <CheckCircleOutlineIcon fontSize="small" sx={{ color: PALETTE_COLORS.secondary }} />
+                        <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+                          Resoluções:{' '}
+                          <Box component="span" sx={{ fontWeight: 700, color: 'text.primary' }}>
+                            {test.totalAttempts}
+                          </Box>
+                        </Typography>
+                      </Box>
+                    </Box>
+                  </Box>
+
+                  <Button
+                    variant="contained"
+                    color="primary"
+                    fullWidth
+                    startIcon={<PlayArrowIcon />}
+                    onClick={() => navigate(`/provas/${test.id}`)}
+                    sx={{ fontWeight: 700, py: 1.2, borderRadius: 2 }}
+                  >
+                    Iniciar Avaliação
+                  </Button>
+                </Paper>
+              </Grid>
+            );
+          })}
         </Grid>
       )}
+
+      <CreateTestWizardModal
+        open={createModalOpen}
+        onClose={() => setCreateModalOpen(false)}
+        onCreated={() => loadTests()}
+      />
+
+      <EditTestModal
+        open={Boolean(editingTest)}
+        test={editingTest}
+        onClose={() => setEditingTest(null)}
+        onUpdated={() => {
+          setEditingTest(null);
+          loadTests();
+        }}
+      />
+
+      <Dialog
+        open={Boolean(deletingTest)}
+        onClose={() => !isDeleting && setDeletingTest(null)}
+      >
+        <DialogTitle sx={{ fontWeight: 700 }}>
+          {isAdmin && deletingTest?.createdByUser?.id !== user?.id
+            ? 'Moderação: Excluir Prova Pública'
+            : 'Excluir Prova'}
+        </DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            {isAdmin && deletingTest?.createdByUser?.id !== user?.id
+              ? `Como Administrador, você está prestes a remover a prova pública "${deletingTest?.name}" criada por outro usuário. Deseja continuar?`
+              : `Tem certeza que deseja excluir a prova "${deletingTest?.name}"? Esta ação removerá a prova e suas vinculações.`}
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions sx={{ p: 2 }}>
+          <Button
+            onClick={() => setDeletingTest(null)}
+            disabled={isDeleting}
+            sx={{ color: 'text.secondary' }}
+          >
+            Cancelar
+          </Button>
+          <Button
+            variant="contained"
+            color="error"
+            onClick={async () => {
+              if (!deletingTest) return;
+              setIsDeleting(true);
+              try {
+                await deleteTest(deletingTest.id);
+                setDeletingTest(null);
+                loadTests();
+              } catch (err) {
+                console.error('Erro ao excluir prova:', err);
+              } finally {
+                setIsDeleting(false);
+              }
+            }}
+            disabled={isDeleting}
+            sx={{ fontWeight: 700 }}
+          >
+            {isDeleting ? 'Excluindo...' : 'Excluir Prova'}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 };

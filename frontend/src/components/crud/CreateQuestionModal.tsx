@@ -7,6 +7,7 @@ import {
   Button,
   TextField,
   Stack,
+  Box,
   FormControl,
   InputLabel,
   Select,
@@ -17,6 +18,7 @@ import {
   FormControlLabel,
   Paper,
   FormHelperText,
+  Switch,
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
@@ -56,6 +58,7 @@ export const CreateQuestionModal: React.FC<CreateQuestionModalProps> = ({
   const [areaId, setAreaId] = useState<number | ''>('');
   const [subjectId, setSubjectId] = useState<number | ''>('');
   const [testId, setTestId] = useState<number | ''>('');
+  const [isPublic, setIsPublic] = useState<boolean>(true);
 
   const [alternatives, setAlternatives] = useState<AltInput[]>([
     { identifier: 'A', text: '' },
@@ -153,6 +156,7 @@ export const CreateQuestionModal: React.FC<CreateQuestionModalProps> = ({
         areaId: Number(areaId),
         subjectId: subjectId ? Number(subjectId) : undefined,
         testId: testId ? Number(testId) : undefined,
+        isPublic,
         alternatives: finalAlternatives,
       });
 
@@ -162,6 +166,7 @@ export const CreateQuestionModal: React.FC<CreateQuestionModalProps> = ({
       setAreaId('');
       setSubjectId('');
       setTestId('');
+      setIsPublic(true);
       onClose();
       if (onCreated) onCreated();
     } catch (err) {
@@ -286,6 +291,41 @@ export const CreateQuestionModal: React.FC<CreateQuestionModalProps> = ({
               </FormHelperText>
             )}
           </FormControl>
+
+          <Paper
+            elevation={0}
+            sx={{
+              p: 1.5,
+              borderRadius: 2,
+              border: '1px solid',
+              borderColor: 'divider',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+            }}
+          >
+            <Box>
+              <Typography variant="body2" sx={{ fontWeight: 700 }}>
+                Visibilidade: {isPublic ? 'Pública' : 'Privada'}
+              </Typography>
+              <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                {isPublic
+                  ? 'Visível para todos os usuários da plataforma'
+                  : 'Visível apenas para você'}
+              </Typography>
+            </Box>
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={isPublic}
+                  onChange={(e) => setIsPublic(e.target.checked)}
+                  color="primary"
+                />
+              }
+              label={isPublic ? 'Pública' : 'Privada'}
+              sx={{ m: 0 }}
+            />
+          </Paper>
 
           <Typography variant="subtitle2" sx={{ fontWeight: 800, pt: 1 }}>
             ALTERNATIVAS DA QUESTÃO (Mínimo de 2 alternativas fechadas. Selecione a opção correta no botão de rádio):

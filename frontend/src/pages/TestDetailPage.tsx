@@ -11,6 +11,12 @@ import {
   Snackbar,
   ToggleButtonGroup,
   ToggleButton,
+  Tooltip,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogContentText,
+  DialogActions,
 } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
@@ -24,9 +30,12 @@ import CategoryIcon from '@mui/icons-material/Category';
 import HistoryIcon from '@mui/icons-material/History';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import TimerOutlinedIcon from '@mui/icons-material/TimerOutlined';
+import PublicIcon from '@mui/icons-material/Public';
+import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
+import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { Question, Test, TestAttemptSummary } from '../types';
-import { getTestById, getTestEvaluation, getTestAttempts } from '../services/api';
+import { getTestById, getTestEvaluation, getTestAttempts, deleteTest, toggleTestVisibility } from '../services/api';
 import { QuestionCard } from '../components/questions/QuestionCard';
 import { QuestionWhiteboard } from '../components/whiteboard/QuestionWhiteboard';
 import { TestQuestionsNavigator } from '../components/questions/TestQuestionsNavigator';
@@ -44,7 +53,7 @@ export const TestDetailPage: React.FC<TestDetailPageProps> = ({
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const { user, attemptedQuestionIds } = useAuth();
+  const { user, isAdmin, attemptedQuestionIds } = useAuth();
 
   const initialQ = Number(searchParams.get('q'));
   const initialMode = searchParams.get('mode') as 'single' | 'all' | null;
@@ -62,6 +71,8 @@ export const TestDetailPage: React.FC<TestDetailPageProps> = ({
 
   const [saveModalOpen, setSaveModalOpen] = useState<boolean>(false);
   const [toastOpen, setToastOpen] = useState<boolean>(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState<boolean>(false);
+  const [isDeleting, setIsDeleting] = useState<boolean>(false);
 
   useEffect(() => {
     if (id) {
@@ -195,10 +206,36 @@ export const TestDetailPage: React.FC<TestDetailPageProps> = ({
                 size="small"
                 sx={{ backgroundColor: 'rgba(217, 183, 99, 0.15)', color: PALETTE_COLORS.primary, fontWeight: 700 }}
               />
+              <Tooltip title={user?.id === test.createdByUser?.id ? "Clique para alternar visibilidade (Pública/Privada)" : (test.isPublic !== false ? "Prova pública" : "Prova privada")}>
+                <Chip
+                  size="small"
+                  icon={test.isPublic !== false ? <PublicIcon fontSize="inherit" /> : <LockOutlinedIcon fontSize="inherit" />}
+                  label={test.isPublic !== false ? 'Pública' : 'Privada'}
+                  onClick={user?.id === test.createdByUser?.id ? async () => {
+                    try {
+                      const updated = await toggleTestVisibility(test.id);
+                      setTest({ ...test, isPublic: updated.isPublic });
+                    } catch (e) {
+                      console.error('Erro ao alternar visibilidade:', e);
+                    }
+                  } : undefined}
+                  clickable={user?.id === test.createdByUser?.id}
+                  sx={{
+                    backgroundColor: test.isPublic !== false
+                      ? 'rgba(75, 241, 81, 0.15)'
+                      : 'rgba(250, 66, 75, 0.15)',
+                    color: test.isPublic !== false ? PALETTE_COLORS.success : PALETTE_COLORS.danger,
+                    border: '1px solid',
+                    borderColor: test.isPublic !== false ? PALETTE_COLORS.success : PALETTE_COLORS.danger,
+                    fontWeight: 700,
+                    cursor: user?.id === test.createdByUser?.id ? 'pointer' : 'default',
+                  }}
+                />
+              </Tooltip>
             </Stack>
           </Box>
 
-          <Stack direction="row" spacing={1.5}>
+          <Stack direction="row" spacing={1.5} alignItems="center" flexWrap="wrap">
             <Button
               variant="outlined"
               startIcon={<BookmarkBorderIcon />}
@@ -215,6 +252,17 @@ export const TestDetailPage: React.FC<TestDetailPageProps> = ({
             >
               Compartilhar
             </Button>
+            {(user?.id === test.createdByUser?.id || (isAdmin && (test.isPublic !== false))) && (
+              <Button
+                variant="outlined"
+                color="error"
+                startIcon={<DeleteOutlineIcon />}
+                onClick={() => setDeleteDialogOpen(true)}
+                sx={{ fontWeight: 700, borderRadius: 2 }}
+              >
+                {isAdmin && user?.id !== test.createdByUser?.id ? 'Moderar (Excluir)' : 'Excluir'}
+              </Button>
+            )}
             <Button
               variant="contained"
               startIcon={<PlayArrowIcon />}
@@ -459,6 +507,54 @@ export const TestDetailPage: React.FC<TestDetailPageProps> = ({
         onClose={() => setToastOpen(false)}
         message="Link da prova copiado para a área de transferência!"
       />
+
+      <Dialog
+        open={deleteDialogOpen}
+        onClose={() => !isDeleting && setDeleteDialogOpen(false)}
+      >
+        <DialogTitle sx={{ fontWeight: 700 }}>
+          {isAdmin && test?.createdByUser?.id !== user?.id
+            ? 'Moderação: Excluir Prova Pública'
+            : 'Excluir Prova'}
+        </DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            {isAdmin && test?.createdByUser?.id !== user?.id
+              ? `Como Administrador, você está prestes a remover a prova pública "${test?.name}" criada por outro usuário. Deseja continuar?`
+              : `Tem certeza que deseja excluir a prova "${test?.name}"? Esta ação removerá a prova e suas vinculações.`}
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions sx={{ p: 2 }}>
+          <Button
+            onClick={() => setDeleteDialogOpen(false)}
+            disabled={isDeleting}
+            sx={{ color: 'text.secondary' }}
+          >
+            Cancelar
+          </Button>
+          <Button
+            variant="contained"
+            color="error"
+            onClick={async () => {
+              if (!test) return;
+              setIsDeleting(true);
+              try {
+                await deleteTest(test.id);
+                setDeleteDialogOpen(false);
+                navigate('/provas');
+              } catch (err) {
+                console.error('Erro ao excluir prova:', err);
+              } finally {
+                setIsDeleting(false);
+              }
+            }}
+            disabled={isDeleting}
+            sx={{ fontWeight: 700 }}
+          >
+            {isDeleting ? 'Excluindo...' : 'Excluir Prova'}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 };

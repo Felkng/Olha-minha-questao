@@ -18,6 +18,8 @@ import {
   Paper,
   FormHelperText,
   Alert,
+  Switch,
+  Box,
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
@@ -61,6 +63,7 @@ export const EditQuestionModal: React.FC<EditQuestionModalProps> = ({
   const [subjectId, setSubjectId] = useState<number | ''>('');
   const [testId, setTestId] = useState<number | ''>('');
   const [textualReferenceId, setTextualReferenceId] = useState<number | ''>('');
+  const [isPublic, setIsPublic] = useState<boolean>(true);
 
   const [alternatives, setAlternatives] = useState<AltInput[]>([]);
   const [correctAltIndex, setCorrectAltIndex] = useState<number>(0);
@@ -82,6 +85,7 @@ export const EditQuestionModal: React.FC<EditQuestionModalProps> = ({
       setSubjectId(question.subjectId || '');
       setTestId(question.testId || '');
       setTextualReferenceId(question.textualReferenceId || question.textualReference?.id ? Number(question.textualReferenceId || question.textualReference?.id) : '');
+      setIsPublic(question.isPublic !== undefined ? question.isPublic : true);
 
       const alts: AltInput[] = (question.alternatives || []).map((a) => ({
         id: a.id,
@@ -190,6 +194,7 @@ export const EditQuestionModal: React.FC<EditQuestionModalProps> = ({
         subjectId: subjectId ? Number(subjectId) : undefined,
         testId: testId ? Number(testId) : undefined,
         textualReferenceId: textualReferenceId ? Number(textualReferenceId) : null,
+        isPublic,
         alternatives: formattedAlternatives,
       });
 
@@ -350,6 +355,41 @@ export const EditQuestionModal: React.FC<EditQuestionModalProps> = ({
               </FormControl>
             );
           })()}
+
+          <Paper
+            elevation={0}
+            sx={{
+              p: 1.5,
+              borderRadius: 2,
+              border: '1px solid',
+              borderColor: 'divider',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+            }}
+          >
+            <Box>
+              <Typography variant="body2" sx={{ fontWeight: 700 }}>
+                Visibilidade: {isPublic ? 'Pública' : 'Privada'}
+              </Typography>
+              <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                {isPublic
+                  ? 'Visível para todos os usuários da plataforma'
+                  : 'Visível apenas para você'}
+              </Typography>
+            </Box>
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={isPublic}
+                  onChange={(e) => setIsPublic(e.target.checked)}
+                  color="primary"
+                />
+              }
+              label={isPublic ? 'Pública' : 'Privada'}
+              sx={{ m: 0 }}
+            />
+          </Paper>
 
           <Paper variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
             <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>

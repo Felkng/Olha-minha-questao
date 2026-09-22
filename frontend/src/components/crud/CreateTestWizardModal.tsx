@@ -28,6 +28,7 @@ import {
   AccordionDetails,
   Chip,
   Tooltip,
+  Switch,
 } from '@mui/material';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
@@ -93,6 +94,7 @@ export const CreateTestWizardModal: React.FC<CreateTestWizardModalProps> = ({
   const [originId, setOriginId] = useState<number | ''>('');
   const [areaId, setAreaId] = useState<number | ''>('');
   const [description, setDescription] = useState('');
+  const [isPublic, setIsPublic] = useState<boolean>(true);
   const [creationMode, setCreationMode] = useState<'manual' | 'pdf'>('manual');
   const [examPdfFile, setExamPdfFile] = useState<File | null>(null);
 
@@ -407,6 +409,7 @@ export const CreateTestWizardModal: React.FC<CreateTestWizardModalProps> = ({
         originId: originId ? Number(originId) : null,
         areaId: areaId ? Number(areaId) : null,
         description: description.trim() || undefined,
+        isPublic,
         textualReferences: textualReferences.map((ref) => ({
           title: ref.title?.trim() || undefined,
           subtitle: ref.subtitle?.trim() || undefined,
@@ -560,6 +563,41 @@ export const CreateTestWizardModal: React.FC<CreateTestWizardModalProps> = ({
               rows={2}
               size="small"
             />
+
+            <Paper
+              elevation={0}
+              sx={{
+                p: 1.5,
+                borderRadius: 2,
+                border: '1px solid',
+                borderColor: 'divider',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+              }}
+            >
+              <Box>
+                <Typography variant="body2" sx={{ fontWeight: 700 }}>
+                  Visibilidade: {isPublic ? 'Pública' : 'Privada'}
+                </Typography>
+                <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                  {isPublic
+                    ? 'Visível para todos os usuários da plataforma'
+                    : 'Visível apenas para você'}
+                </Typography>
+              </Box>
+              <FormControlLabel
+                control={
+                  <Switch
+                    checked={isPublic}
+                    onChange={(e) => setIsPublic(e.target.checked)}
+                    color="primary"
+                  />
+                }
+                label={isPublic ? 'Pública' : 'Privada'}
+                sx={{ m: 0 }}
+              />
+            </Paper>
 
             <Paper variant="outlined" sx={{ p: 2, borderRadius: 2, bgcolor: 'background.default' }}>
               <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1.5 }}>
