@@ -5,6 +5,7 @@ import {
   Paper,
   Button,
   Grid,
+  Stack,
   IconButton,
   Tooltip,
   Chip,
@@ -21,20 +22,27 @@ import {
   RadioGroup,
   FormControlLabel,
   Radio,
+  Switch,
 } from '@mui/material';
 import FolderSpecialOutlinedIcon from '@mui/icons-material/FolderSpecialOutlined';
 import AddIcon from '@mui/icons-material/Add';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import QuizOutlinedIcon from '@mui/icons-material/QuizOutlined';
 import MenuBookOutlinedIcon from '@mui/icons-material/MenuBookOutlined';
+import StyleOutlinedIcon from '@mui/icons-material/StyleOutlined';
+import PublicIcon from '@mui/icons-material/Public';
+import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
 import { useNavigate } from 'react-router-dom';
 import { Folder, FolderType } from '../types';
 import {
   createFolder,
   deleteFolder,
   getFolders,
+  toggleFolderVisibility,
 } from '../services/api';
 import { PALETTE_COLORS } from '../theme/theme';
+import { useAuth } from '../context/AuthContext';
+import { useAppTheme } from '../theme/ThemeContext';
 
 const COLOR_OPTIONS = [
   { hex: PALETTE_COLORS.primary, label: 'Ocre' },
@@ -48,6 +56,10 @@ const COLOR_OPTIONS = [
 
 export const FoldersPage: React.FC = () => {
   const navigate = useNavigate();
+  const { user, isAdmin } = useAuth();
+  const { mode } = useAppTheme();
+  const isDark = mode === 'dark';
+
   const [currentTab, setCurrentTab] = useState<FolderType>('QUESTION');
   const [folders, setFolders] = useState<Folder[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
@@ -58,6 +70,7 @@ export const FoldersPage: React.FC = () => {
   const [folderDesc, setFolderDesc] = useState<string>('');
   const [folderColor, setFolderColor] = useState<string>(PALETTE_COLORS.primary);
   const [folderType, setFolderType] = useState<FolderType>('QUESTION');
+  const [isPublic, setIsPublic] = useState<boolean>(true);
   const [saving, setSaving] = useState<boolean>(false);
 
   const loadFolders = async (type: FolderType) => {
@@ -89,9 +102,11 @@ export const FoldersPage: React.FC = () => {
         description: folderDesc.trim(),
         color: folderColor,
         folderType,
+        isPublic,
       });
       setFolderName('');
       setFolderDesc('');
+      setIsPublic(true);
       setOpenCreateDialog(false);
       loadFolders(currentTab);
     } catch (err) {
@@ -121,7 +136,7 @@ export const FoldersPage: React.FC = () => {
             Minhas Pastas & Cadernos de Estudo
           </Typography>
           <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-            Organize suas questões e provas em pastas exclusivas e compartilháveis via URL pública.
+            Organize suas questões, provas e flashcards em pastas exclusivas e compartilháveis.
           </Typography>
         </Box>
         <Button
@@ -137,7 +152,7 @@ export const FoldersPage: React.FC = () => {
         </Button>
       </Box>
 
-      {/* Tabs para separar Pastas de Questões e Pastas de Provas */}
+      {/* Tabs para separar Pastas de Questões, Provas e Flashcards */}
       <Paper elevation={0} sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }}>
         <Tabs
           value={currentTab}
@@ -159,6 +174,13 @@ export const FoldersPage: React.FC = () => {
             value="TEST"
             sx={{ fontWeight: 700 }}
           />
+          <Tab
+            icon={<StyleOutlinedIcon />}
+            iconPosition="start"
+            label="Decks de Flashcards"
+            value="FLASHCARD"
+            sx={{ fontWeight: 700 }}
+          />
         </Tabs>
       </Paper>
 
@@ -168,86 +190,133 @@ export const FoldersPage: React.FC = () => {
         </Box>
       ) : folders.length > 0 ? (
         <Grid container spacing={2.5}>
-          {folders.map((folder) => (
-            <Grid item xs={12} sm={6} md={4} key={folder.id}>
-              <Paper
-                elevation={4}
-                onClick={() => navigate(`/pastas/${folder.id}`)}
-                sx={{
-                  p: 3,
-                  borderRadius: 3,
-                  cursor: 'pointer',
-                  position: 'relative',
-                  borderLeft: `6px solid ${folder.color}`,
-                  transition: 'transform 0.15s ease, box-shadow 0.15s ease',
-                  '&:hover': {
-                    transform: 'translateY(-3px)',
-                  },
-                }}
-              >
-                <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', mb: 1.5 }}>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <FolderSpecialOutlinedIcon sx={{ color: folder.color, fontSize: 26 }} />
-                    <Typography variant="h6" sx={{ fontWeight: 700, fontSize: '1.1rem' }}>
-                      {folder.name}
-                    </Typography>
-                  </Box>
-                  <Tooltip title="Excluir pasta">
-                    <IconButton
-                      size="small"
-                      onClick={(e) => handleDeleteFolder(e, folder.id)}
-                      sx={{ color: 'text.secondary', '&:hover': { color: PALETTE_COLORS.danger } }}
-                    >
-                      <DeleteOutlineIcon fontSize="small" />
-                    </IconButton>
-                  </Tooltip>
-                </Box>
+          {folders.map((folder) => {
+            const isOwner = Boolean(user?.id && folder.createdByUser?.id && user.id === folder.createdByUser.id);
+            const isPublicFolder = folder.isPublic !== false;
+            const canDelete = isOwner || (isAdmin && isPublicFolder);
 
-                <Typography
-                  variant="body2"
+            return (
+              <Grid item xs={12} sm={6} md={4} key={folder.id}>
+                <Paper
+                  elevation={4}
+                  onClick={() => {
+                    if (folder.folderType === 'FLASHCARD') {
+                      navigate(`/flashcards?folderId=${folder.id}`);
+                    } else {
+                      navigate(`/pastas/${folder.id}`);
+                    }
+                  }}
                   sx={{
-                    color: 'text.secondary',
-                    mb: 2,
-                    minHeight: 40,
-                    display: '-webkit-box',
-                    WebkitLineClamp: 2,
-                    WebkitBoxOrient: 'vertical',
-                    overflow: 'hidden',
+                    p: 3,
+                    borderRadius: 3,
+                    cursor: 'pointer',
+                    position: 'relative',
+                    borderLeft: `6px solid ${folder.color}`,
+                    transition: 'transform 0.15s ease, box-shadow 0.15s ease',
+                    '&:hover': {
+                      transform: 'translateY(-3px)',
+                    },
                   }}
                 >
-                  {folder.description || 'Sem descrição.'}
-                </Typography>
+                  <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', mb: 1.5 }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <FolderSpecialOutlinedIcon sx={{ color: folder.color, fontSize: 26 }} />
+                      <Typography variant="h6" sx={{ fontWeight: 700, fontSize: '1.1rem' }}>
+                        {folder.name}
+                      </Typography>
+                    </Box>
+                    {canDelete && (
+                      <Tooltip title={isAdmin && !isOwner ? "Moderar / Excluir pasta pública (Admin)" : "Excluir pasta"}>
+                        <IconButton
+                          size="small"
+                          onClick={(e) => handleDeleteFolder(e, folder.id)}
+                          sx={{ color: 'text.secondary', '&:hover': { color: PALETTE_COLORS.danger } }}
+                        >
+                          <DeleteOutlineIcon fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                    )}
+                  </Box>
 
-                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <Chip
-                    label={
-                      folder.folderType === 'TEST'
-                        ? `${folder.testCount ?? 0} provas`
-                        : `${folder.questionCount ?? 0} questões`
-                    }
-                    size="small"
+                  <Typography
+                    variant="body2"
                     sx={{
-                      backgroundColor: `${folder.color}20`,
-                      color: folder.color,
-                      fontWeight: 700,
+                      color: 'text.secondary',
+                      mb: 2,
+                      minHeight: 40,
+                      display: '-webkit-box',
+                      WebkitLineClamp: 2,
+                      WebkitBoxOrient: 'vertical',
+                      overflow: 'hidden',
                     }}
-                  />
-                  <Typography variant="caption" sx={{ color: 'primary.main', fontWeight: 600 }}>
-                    Abrir pasta &rarr;
+                  >
+                    {folder.description || 'Sem descrição.'}
                   </Typography>
-                </Box>
-              </Paper>
-            </Grid>
-          ))}
+
+                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 1 }}>
+                    <Stack direction="row" spacing={1} alignItems="center">
+                      <Chip
+                        label={
+                          folder.folderType === 'FLASHCARD'
+                            ? `${folder.flashcardCount ?? 0} flashcards`
+                            : folder.folderType === 'TEST'
+                            ? `${folder.testCount ?? 0} provas`
+                            : `${folder.questionCount ?? 0} questões`
+                        }
+                        size="small"
+                        sx={{
+                          backgroundColor: `${folder.color}20`,
+                          color: folder.color,
+                          fontWeight: 700,
+                        }}
+                      />
+
+                      <Tooltip title={isOwner ? "Clique para alternar visibilidade" : (isPublicFolder ? "Pasta pública" : "Pasta privada")}>
+                        <Chip
+                          size="small"
+                          icon={isPublicFolder ? <PublicIcon fontSize="inherit" /> : <LockOutlinedIcon fontSize="inherit" />}
+                          label={isPublicFolder ? 'Pública' : 'Privada'}
+                          onClick={isOwner ? async (e) => {
+                            e.stopPropagation();
+                            try {
+                              await toggleFolderVisibility(folder.id);
+                              loadFolders(currentTab);
+                            } catch (err) {
+                              console.error(err);
+                            }
+                          } : undefined}
+                          clickable={isOwner}
+                          sx={{
+                            backgroundColor: isPublicFolder
+                              ? (isDark ? 'rgba(75, 241, 81, 0.12)' : 'rgba(75, 241, 81, 0.15)')
+                              : (isDark ? 'rgba(250, 66, 75, 0.12)' : 'rgba(250, 66, 75, 0.15)'),
+                            color: isPublicFolder ? PALETTE_COLORS.success : PALETTE_COLORS.danger,
+                            border: '1px solid',
+                            borderColor: isPublicFolder ? PALETTE_COLORS.success : PALETTE_COLORS.danger,
+                            fontWeight: 700,
+                            cursor: isOwner ? 'pointer' : 'default',
+                          }}
+                        />
+                      </Tooltip>
+                    </Stack>
+
+                    <Typography variant="caption" sx={{ color: 'primary.main', fontWeight: 600 }}>
+                      Abrir &rarr;
+                    </Typography>
+                  </Box>
+                </Paper>
+              </Grid>
+            );
+          })}
         </Grid>
       ) : (
         <Paper elevation={4} sx={{ p: 6, textAlign: 'center', borderRadius: 3 }}>
           <FolderSpecialOutlinedIcon sx={{ fontSize: 52, color: 'text.secondary', mb: 2 }} />
           <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>
-            Nenhuma pasta de {currentTab === 'QUESTION' ? 'questões' : 'provas'} encontrada
+            Nenhuma pasta de {currentTab === 'QUESTION' ? 'questões' : currentTab === 'TEST' ? 'provas' : 'flashcards'} encontrada
           </Typography>
           <Typography variant="body2" sx={{ color: 'text.secondary', mb: 3 }}>
-            Crie pastas personalizadas para organizar suas {currentTab === 'QUESTION' ? 'questões' : 'provas'}.
+            Crie pastas personalizadas para organizar suas {currentTab === 'QUESTION' ? 'questões' : currentTab === 'TEST' ? 'provas' : 'flashcards'}.
           </Typography>
           <Button
             variant="contained"
@@ -275,8 +344,9 @@ export const FoldersPage: React.FC = () => {
               value={folderType}
               onChange={(e) => setFolderType(e.target.value as FolderType)}
             >
-              <FormControlLabel value="QUESTION" control={<Radio />} label="Guardar Questões" />
-              <FormControlLabel value="TEST" control={<Radio />} label="Guardar Provas" />
+              <FormControlLabel value="QUESTION" control={<Radio />} label="Questões" />
+              <FormControlLabel value="TEST" control={<Radio />} label="Provas" />
+              <FormControlLabel value="FLASHCARD" control={<Radio />} label="Flashcards" />
             </RadioGroup>
           </FormControl>
 
@@ -295,6 +365,42 @@ export const FoldersPage: React.FC = () => {
             onChange={(e) => setFolderDesc(e.target.value)}
             sx={{ mb: 2 }}
           />
+
+          <Paper
+            elevation={0}
+            sx={{
+              p: 1.5,
+              borderRadius: 2,
+              border: '1px solid',
+              borderColor: 'divider',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              mb: 2,
+            }}
+          >
+            <Box>
+              <Typography variant="body2" sx={{ fontWeight: 700 }}>
+                Visibilidade: {isPublic ? 'Pública' : 'Privada'}
+              </Typography>
+              <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                {isPublic
+                  ? 'Visível para todos os usuários'
+                  : 'Visível apenas para você'}
+              </Typography>
+            </Box>
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={isPublic}
+                  onChange={(e) => setIsPublic(e.target.checked)}
+                  color="primary"
+                />
+              }
+              label={isPublic ? 'Pública' : 'Privada'}
+              sx={{ m: 0 }}
+            />
+          </Paper>
 
           <Typography variant="caption" sx={{ fontWeight: 600, color: 'text.secondary', display: 'block', mb: 1 }}>
             COR PERSONALIZADA DA PASTA:

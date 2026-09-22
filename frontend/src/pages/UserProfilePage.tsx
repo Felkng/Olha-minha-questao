@@ -50,6 +50,7 @@ import BarChartIcon from '@mui/icons-material/BarChart';
 import SortIcon from '@mui/icons-material/Sort';
 import QuizOutlinedIcon from '@mui/icons-material/QuizOutlined';
 import MenuBookOutlinedIcon from '@mui/icons-material/MenuBookOutlined';
+import StyleOutlinedIcon from '@mui/icons-material/StyleOutlined';
 import FolderSpecialOutlinedIcon from '@mui/icons-material/FolderSpecialOutlined';
 import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
@@ -1714,6 +1715,7 @@ export const UserProfilePage: React.FC = () => {
               >
                 <Tab value="QUESTION" label="Pastas de Questões" icon={<QuizOutlinedIcon fontSize="small" />} iconPosition="start" />
                 <Tab value="TEST" label="Pastas de Provas" icon={<MenuBookOutlinedIcon fontSize="small" />} iconPosition="start" />
+                <Tab value="FLASHCARD" label="Decks de Flashcards" icon={<StyleOutlinedIcon fontSize="small" />} iconPosition="start" />
               </Tabs>
 
               {loadingFolders ? (
@@ -1784,14 +1786,21 @@ export const UserProfilePage: React.FC = () => {
 
                         <Box sx={{ mt: 2, pt: 1, borderTop: 1, borderColor: 'divider', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                           <Typography variant="caption" color="text.secondary">
-                            {folder.folderType === 'QUESTION' ? 'Questões' : 'Provas'}
+                            {folder.folderType === 'QUESTION'
+                              ? 'Questões'
+                              : folder.folderType === 'TEST'
+                              ? 'Provas'
+                              : 'Flashcards'}
+                            {folder.folderType === 'FLASHCARD' && folder.flashcardCount !== undefined
+                              ? ` • ${folder.flashcardCount} cards`
+                              : ''}
                           </Typography>
                           <Button
                             size="small"
                             onClick={() => navigate(`/pastas/${folder.id}`)}
                             sx={{ textTransform: 'none', fontWeight: 600 }}
                           >
-                            Abrir Pasta
+                            {folder.folderType === 'FLASHCARD' ? 'Abrir Deck' : 'Abrir Pasta'}
                           </Button>
                         </Box>
                       </Paper>
@@ -2248,7 +2257,7 @@ export const UserProfilePage: React.FC = () => {
         fullWidth
       >
         <DialogTitle sx={{ fontWeight: 700 }}>
-          Criar Nova Pasta ({folderTypeTab === 'QUESTION' ? 'Questões' : 'Provas'})
+          Criar Nova Pasta ({folderTypeTab === 'QUESTION' ? 'Questões' : folderTypeTab === 'TEST' ? 'Provas' : 'Flashcards'})
         </DialogTitle>
         <DialogContent dividers>
           <Stack spacing={2.5}>
