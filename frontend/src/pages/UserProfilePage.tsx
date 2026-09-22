@@ -93,6 +93,7 @@ import {
   TestAttemptDetail,
   TestEvaluation,
   UserProfile,
+  UserSummary,
 } from '../types';
 import { PALETTE_COLORS } from '../theme/theme';
 import { useAuth } from '../context/AuthContext';
@@ -110,6 +111,7 @@ import { CreateAreaModal } from '../components/crud/CreateAreaModal';
 import { EditAreaModal } from '../components/crud/EditAreaModal';
 import { CreateSubjectModal } from '../components/crud/CreateSubjectModal';
 import { EditSubjectModal } from '../components/crud/EditSubjectModal';
+import { EditProfileModal } from '../components/profile/EditProfileModal';
 
 type ProfileTab =
   | 'visao_geral'
@@ -231,6 +233,16 @@ export const UserProfilePage: React.FC = () => {
     } finally {
       setLoadingShareAttemptId(null);
     }
+  };
+
+  const [openEditProfileModal, setOpenEditProfileModal] = useState<boolean>(false);
+
+  const handleProfileUpdated = (updated: UserSummary) => {
+    setProfile((prev) => (prev ? { ...prev, name: updated.name, email: updated.email } : null));
+    if (isOwner && currentUser) {
+      login({ ...currentUser, name: updated.name, email: updated.email });
+    }
+    setActionSuccess('Informações do perfil atualizadas com sucesso!');
   };
 
   const isOwner = currentUser?.id === userId;
@@ -544,7 +556,30 @@ export const UserProfilePage: React.FC = () => {
                 Cadastrado em {new Date(profile.createdAt).toLocaleDateString()}
               </Typography>
 
-              {currentUser?.role === 'ADMIN' && profile.role === 'GENERAL' && (
+              {(isOwner || isAdmin) && (
+                <Button
+                  variant="outlined"
+                  size="small"
+                  startIcon={<EditIcon />}
+                  onClick={() => setOpenEditProfileModal(true)}
+                  sx={{
+                    mt: 2,
+                    fontWeight: 'bold',
+                    borderRadius: 2,
+                    borderColor: PALETTE_COLORS.primary,
+                    color: PALETTE_COLORS.primary,
+                    '&:hover': {
+                      borderColor: PALETTE_COLORS.primary,
+                      backgroundColor: 'rgba(217, 183, 99, 0.1)',
+                    },
+                  }}
+                  fullWidth
+                >
+                  Editar Perfil
+                </Button>
+              )}
+
+              {currentUser?.role === 'ADMIN' && profile.role === 'GENERAL' && !isOwner && (
                 <Button
                   variant="outlined"
                   color="secondary"
@@ -552,7 +587,7 @@ export const UserProfilePage: React.FC = () => {
                   startIcon={<AdminPanelSettingsIcon />}
                   onClick={handlePromote}
                   disabled={promoting}
-                  sx={{ mt: 2, fontWeight: 'bold', borderRadius: 2 }}
+                  sx={{ mt: 1.5, fontWeight: 'bold', borderRadius: 2 }}
                   fullWidth
                 >
                   {promoting ? 'Promovendo...' : 'Tornar ADMIN'}
@@ -581,6 +616,27 @@ export const UserProfilePage: React.FC = () => {
                   </ListItemIcon>
                   <ListItemText primary="Visão Geral" primaryTypographyProps={{ fontWeight: activeNavTab === 'visao_geral' ? 700 : 500 }} />
                 </ListItemButton>
+
+                {(isOwner || isAdmin) && (
+                  <ListItemButton
+                    onClick={() => setOpenEditProfileModal(true)}
+                    sx={{
+                      borderRadius: 2,
+                      mb: 0.5,
+                      '&:hover': {
+                        backgroundColor: isDark ? 'rgba(217, 183, 99, 0.1)' : 'rgba(217, 183, 99, 0.08)',
+                      },
+                    }}
+                  >
+                    <ListItemIcon sx={{ minWidth: 40, color: PALETTE_COLORS.primary }}>
+                      <EditIcon fontSize="small" />
+                    </ListItemIcon>
+                    <ListItemText
+                      primary="Editar Meus Dados"
+                      primaryTypographyProps={{ fontWeight: 600, color: PALETTE_COLORS.primary }}
+                    />
+                  </ListItemButton>
+                )}
 
                 <ListItemButton
                   selected={activeNavTab === 'meus_simulados'}
@@ -2302,6 +2358,17 @@ export const UserProfilePage: React.FC = () => {
           detailedResults={shareAttemptDetail.detailedResults}
         />
       )}
+
+      {/* Modal de Edição de Perfil */}
+      {profile && (
+        <EditProfileModal
+          open={openEditProfileModal}
+          onClose={() => setOpenEditProfileModal(false)}
+          profile={profile}
+          onSuccess={handleProfileUpdated}
+        />
+      )}
     </Box>
   );
 };
+

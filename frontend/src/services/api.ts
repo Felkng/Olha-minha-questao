@@ -27,6 +27,7 @@ import {
   TestAttemptSummary,
   TestAttemptDetail,
   PlatformSummary,
+  UserUpdateRequest,
 } from '../types';
 
 const apiClient = axios.create({
@@ -105,6 +106,14 @@ export const getUserProfile = async (userId: number): Promise<UserProfile> => {
 
 export const promoteUserToAdmin = async (userId: number): Promise<UserSummary> => {
   const response = await apiClient.patch<UserSummary>(`/users/${userId}/promote-admin`);
+  return response.data;
+};
+
+export const updateUser = async (
+  userId: number,
+  data: UserUpdateRequest
+): Promise<UserSummary> => {
+  const response = await apiClient.put<UserSummary>(`/users/${userId}`, data);
   return response.data;
 };
 

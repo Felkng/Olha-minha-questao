@@ -9,6 +9,7 @@ import github.felkng.olha_minha_questao.domain.repository.UserRepository;
 import github.felkng.olha_minha_questao.dto.user.DailyActivityDTO;
 import github.felkng.olha_minha_questao.dto.user.UserProfileDTO;
 import github.felkng.olha_minha_questao.dto.user.UserSummaryDTO;
+import github.felkng.olha_minha_questao.dto.user.UserUpdateRequestDTO;
 import github.felkng.olha_minha_questao.exception.ResourceNotFoundException;
 import github.felkng.olha_minha_questao.mapper.UserMapper;
 import lombok.RequiredArgsConstructor;
@@ -25,6 +26,7 @@ public class UserService {
     private final UserRepository userRepository;
     private final QuestionAttemptRepository questionAttemptRepository;
     private final UserMapper userMapper;
+    private final AuthService authService;
 
     @Transactional(readOnly = true)
     public UserProfileDTO getUserProfile(Long id) {
@@ -259,6 +261,63 @@ public class UserService {
 
         targetUser.setRole(UserRole.ADMIN);
         User saved = userRepository.save(targetUser);
+        return userMapper.toSummaryDTO(saved);
+    }
+
+    @Transactional
+    public UserSummaryDTO updateUser(Long id, UserUpdateRequestDTO dto, Long actingUserId) {
+        if (actingUserId != null) {
+            User actingUser = userRepository.findById(actingUserId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Usuário solicitante não encontrado com id: " + actingUserId));
+            if (!actingUser.getId().equals(id) && actingUser.getRole() != UserRole.ADMIN) {
+                throw new IllegalArgumentException("Você não tem permissão para alterar as informações deste usuário.");
+            }
+        }
+
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado com id: " + id));
+
+        // Atualização de Nome
+        if (dto.getName() != null && !dto.getName().trim().isEmpty()) {
+            user.setName(dto.getName().trim());
+        }
+
+        // Atualização de E-mail
+        if (dto.getEmail() != null && !dto.getEmail().trim().isEmpty()) {
+            String newEmail = dto.getEmail().toLowerCase().trim();
+            if (!newEmail.equals(user.getEmail())) {
+                if (userRepository.existsByEmail(newEmail)) {
+                    throw new IllegalArgumentException("Este e-mail já está sendo utilizado por outro usuário.");
+                }
+                user.setEmail(newEmail);
+            }
+        }
+
+        // Atualização de Senha
+        if (dto.getNewPassword() != null && !dto.getNewPassword().trim().isEmpty()) {
+            String newPass = dto.getNewPassword().trim();
+            if (newPass.length() < 6) {
+                throw new IllegalArgumentException("A nova senha deve ter no mínimo 6 caracteres.");
+            }
+
+            boolean isAdmin = actingUserId != null && userRepository.findById(actingUserId)
+                    .map(u -> u.getRole() == UserRole.ADMIN && !u.getId().equals(id))
+                    .orElse(false);
+
+            if (!isAdmin) {
+                if (dto.getCurrentPassword() == null || dto.getCurrentPassword().trim().isEmpty()) {
+                    throw new IllegalArgumentException("Para alterar a senha, informe sua senha atual.");
+                }
+                String currentPassHash = authService.hashPassword(dto.getCurrentPassword().trim());
+                if (!currentPassHash.equals(user.getPasswordHash())) {
+                    throw new IllegalArgumentException("Senha atual incorreta.");
+                }
+            }
+
+            user.setPasswordHash(authService.hashPassword(newPass));
+        }
+
+        User saved = userRepository.save(user);
         return userMapper.toSummaryDTO(saved);
     }
 }

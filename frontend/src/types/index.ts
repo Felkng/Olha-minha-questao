@@ -47,6 +47,13 @@ export interface UserSummary {
   role: UserRole;
 }
 
+export interface UserUpdateRequest {
+  name?: string;
+  email?: string;
+  currentPassword?: string;
+  newPassword?: string;
+}
+
 export interface AuthResponse {
   user: UserSummary;
   token?: string;
