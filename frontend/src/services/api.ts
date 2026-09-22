@@ -28,6 +28,10 @@ import {
   TestAttemptDetail,
   PlatformSummary,
   UserUpdateRequest,
+  Flashcard,
+  FlashcardRequest,
+  FlashcardSession,
+  FlashcardSessionRequest,
 } from '../types';
 
 const apiClient = axios.create({
@@ -214,6 +218,7 @@ export const createQuestion = async (questionData: {
   subjectId?: number;
   testId?: number;
   textualReferenceId?: number | null;
+  isPublic?: boolean;
   alternatives: { identifier: string; text: string; isCorrect?: boolean }[];
 }): Promise<Question> => {
   const response = await apiClient.post('/questions', questionData);
@@ -231,10 +236,16 @@ export const updateQuestion = async (
     subjectId?: number;
     testId?: number;
     textualReferenceId?: number | null;
+    isPublic?: boolean;
     alternatives: { identifier: string; text: string; isCorrect?: boolean }[];
   }
 ): Promise<Question> => {
   const response = await apiClient.put(`/questions/${id}`, questionData);
+  return normalizeQuestion(response.data);
+};
+
+export const toggleQuestionVisibility = async (id: number): Promise<Question> => {
+  const response = await apiClient.patch(`/questions/${id}/visibility`);
   return normalizeQuestion(response.data);
 };
 
@@ -367,6 +378,7 @@ export const createTest = async (testData: {
   originId?: number;
   areaId?: number;
   description?: string;
+  isPublic?: boolean;
 }): Promise<Test> => {
   const response = await apiClient.post<Test>('/tests', testData);
   return response.data;
@@ -380,9 +392,15 @@ export const updateTest = async (
     originId?: number;
     areaId?: number;
     description?: string;
+    isPublic?: boolean;
   }
 ): Promise<Test> => {
   const response = await apiClient.put<Test>(`/tests/${id}`, testData);
+  return response.data;
+};
+
+export const toggleTestVisibility = async (id: number): Promise<Test> => {
+  const response = await apiClient.patch<Test>(`/tests/${id}/visibility`);
   return response.data;
 };
 
@@ -503,6 +521,7 @@ export const createFolder = async (folder: {
   description?: string;
   color?: string;
   folderType?: FolderType;
+  isPublic?: boolean;
 }): Promise<Folder> => {
   const response = await apiClient.post<Folder>('/folders', folder);
   return response.data;
@@ -510,9 +529,14 @@ export const createFolder = async (folder: {
 
 export const updateFolder = async (
   id: number,
-  folder: { name: string; description?: string; color?: string; folderType?: FolderType }
+  folder: { name: string; description?: string; color?: string; folderType?: FolderType; isPublic?: boolean }
 ): Promise<Folder> => {
   const response = await apiClient.put<Folder>(`/folders/${id}`, folder);
+  return response.data;
+};
+
+export const toggleFolderVisibility = async (id: number): Promise<Folder> => {
+  const response = await apiClient.patch<Folder>(`/folders/${id}/visibility`);
   return response.data;
 };
 
@@ -609,3 +633,109 @@ export const saveQuestionBoard = async (
   );
   return response.data;
 };
+
+// ==========================================
+// Flashcards & Sessões de Estudo
+// ==========================================
+
+export const getFlashcards = async (params?: {
+  areaId?: number | '';
+  subjectId?: number | '';
+  folderId?: number | '';
+  search?: string;
+  createdByUserId?: number | '';
+  page?: number;
+  size?: number;
+}): Promise<PageResponse<Flashcard>> => {
+  try {
+    const page = params?.page ?? 0;
+    const size = params?.size ?? 50;
+    const queryParams: Record<string, any> = { page, size };
+
+    if (params?.areaId) queryParams.areaId = params.areaId;
+    if (params?.subjectId) queryParams.subjectId = params.subjectId;
+    if (params?.folderId) queryParams.folderId = params.folderId;
+    if (params?.search) queryParams.search = params.search;
+    if (params?.createdByUserId) queryParams.createdByUserId = params.createdByUserId;
+
+    const response = await apiClient.get('/flashcards', { params: queryParams });
+    const data = response.data;
+
+    if (data && Array.isArray(data.content)) {
+      return data;
+    }
+
+    return {
+      content: Array.isArray(data) ? data : [],
+      totalPages: 1,
+      totalElements: Array.isArray(data) ? data.length : 0,
+      number: page,
+      size,
+      first: page === 0,
+      last: true,
+    };
+  } catch (err) {
+    console.warn('API /flashcards error:', err);
+    return {
+      content: [],
+      totalPages: 0,
+      totalElements: 0,
+      number: 0,
+      size: 50,
+      first: true,
+      last: true,
+    };
+  }
+};
+
+export const getFlashcardById = async (id: number): Promise<Flashcard> => {
+  const response = await apiClient.get<Flashcard>(`/flashcards/${id}`);
+  return response.data;
+};
+
+export const createFlashcard = async (data: FlashcardRequest): Promise<Flashcard> => {
+  const response = await apiClient.post<Flashcard>('/flashcards', data);
+  return response.data;
+};
+
+export const updateFlashcard = async (id: number, data: FlashcardRequest): Promise<Flashcard> => {
+  const response = await apiClient.put<Flashcard>(`/flashcards/${id}`, data);
+  return response.data;
+};
+
+export const toggleFlashcardVisibility = async (id: number): Promise<Flashcard> => {
+  const response = await apiClient.patch<Flashcard>(`/flashcards/${id}/visibility`);
+  return response.data;
+};
+
+export const deleteFlashcard = async (id: number): Promise<void> => {
+  await apiClient.delete(`/flashcards/${id}`);
+};
+
+export const getFlashcardsInFolder = async (folderId: number): Promise<Flashcard[]> => {
+  try {
+    const response = await apiClient.get<Flashcard[]>(`/folders/${folderId}/flashcards`);
+    return Array.isArray(response.data) ? response.data : [];
+  } catch (err) {
+    console.warn(`API /folders/${folderId}/flashcards error:`, err);
+    return [];
+  }
+};
+
+export const submitFlashcardSession = async (
+  sessionData: FlashcardSessionRequest
+): Promise<FlashcardSession> => {
+  const response = await apiClient.post<FlashcardSession>('/flashcards/sessions', sessionData);
+  return response.data;
+};
+
+export const getMyFlashcardSessions = async (): Promise<FlashcardSession[]> => {
+  try {
+    const response = await apiClient.get<FlashcardSession[]>('/flashcards/sessions/my');
+    return Array.isArray(response.data) ? response.data : [];
+  } catch (err) {
+    console.warn('API /flashcards/sessions/my error:', err);
+    return [];
+  }
+};
+

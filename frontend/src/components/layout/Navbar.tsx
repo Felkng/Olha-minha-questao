@@ -22,6 +22,7 @@ import QuizOutlinedIcon from '@mui/icons-material/QuizOutlined';
 import MenuBookOutlinedIcon from '@mui/icons-material/MenuBookOutlined';
 import AccountBalanceOutlinedIcon from '@mui/icons-material/AccountBalanceOutlined';
 import CategoryOutlinedIcon from '@mui/icons-material/CategoryOutlined';
+import StyleOutlinedIcon from '@mui/icons-material/StyleOutlined';
 import PersonIcon from '@mui/icons-material/Person';
 import LogoutIcon from '@mui/icons-material/Logout';
 import { useLocation, useNavigate } from 'react-router-dom';
@@ -48,12 +49,14 @@ export const Navbar: React.FC = () => {
   const navItems = [
     { id: 'questoes', path: '/questoes', label: 'Questões', icon: <QuizOutlinedIcon fontSize="small" /> },
     { id: 'provas', path: '/provas', label: 'Provas', icon: <MenuBookOutlinedIcon fontSize="small" /> },
+    { id: 'flashcards', path: '/flashcards', label: 'Flashcards', icon: <StyleOutlinedIcon fontSize="small" /> },
     { id: 'bancas', path: '/bancas', label: 'Bancas', icon: <AccountBalanceOutlinedIcon fontSize="small" /> },
     { id: 'areas', path: '/areas', label: 'Áreas', icon: <CategoryOutlinedIcon fontSize="small" /> },
   ];
 
   const getActiveTab = () => {
     const p = location.pathname;
+    if (p.startsWith('/flashcards')) return 'flashcards';
     if (p.startsWith('/provas')) return 'provas';
     if (p.startsWith('/bancas')) return 'bancas';
     if (p.startsWith('/areas')) return 'areas';
