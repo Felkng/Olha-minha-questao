@@ -42,13 +42,21 @@ public class FolderService {
     private final TestMapper testMapper;
     private final SavedQuestionMapper savedQuestionMapper;
 
+    private final github.felkng.olha_minha_questao.domain.repository.FlashcardRepository flashcardRepository;
+    private final github.felkng.olha_minha_questao.mapper.FlashcardMapper flashcardMapper;
+
     @Transactional(readOnly = true)
     public List<FolderResponseDTO> findAll(FolderType type) {
-        return findAll(type, null);
+        return findAll(type, null, null);
     }
 
     @Transactional(readOnly = true)
     public List<FolderResponseDTO> findAll(FolderType type, Long createdByUserId) {
+        return findAll(type, createdByUserId, null);
+    }
+
+    @Transactional(readOnly = true)
+    public List<FolderResponseDTO> findAll(FolderType type, Long createdByUserId, Long currentUserId) {
         List<Folder> folders;
         if (createdByUserId != null) {
             if (type != null) {
@@ -63,16 +71,31 @@ public class FolderService {
                 folders = folderRepository.findAllByOrderByNameAsc();
             }
         }
+
         return folders.stream()
-                .map(folderMapper::toDTO)
+                .filter(f -> {
+                    if (createdByUserId != null && createdByUserId.equals(currentUserId)) {
+                        return true;
+                    }
+                    return Boolean.TRUE.equals(f.getIsPublic()) || (currentUserId != null && f.getCreatedByUser() != null && f.getCreatedByUser().getId().equals(currentUserId));
+                })
+                .map(this::toDTOWithCounts)
                 .toList();
+    }
+
+    private FolderResponseDTO toDTOWithCounts(Folder folder) {
+        FolderResponseDTO dto = folderMapper.toDTO(folder);
+        if (folder != null && folder.getId() != null) {
+            dto.setFlashcardCount(flashcardRepository.countByFolderId(folder.getId()));
+        }
+        return dto;
     }
 
     @Transactional(readOnly = true)
     public FolderResponseDTO findById(Long id) {
         Folder folder = folderRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Pasta não encontrada com o id: " + id));
-        return folderMapper.toDTO(folder);
+        return toDTOWithCounts(folder);
     }
 
     @Transactional
@@ -95,25 +118,106 @@ public class FolderService {
         if (folder.getFolderType() == null) {
             folder.setFolderType(FolderType.QUESTION);
         }
+        if (dto.getIsPublic() != null) {
+            folder.setIsPublic(dto.getIsPublic());
+        }
         Folder saved = folderRepository.save(folder);
-        return folderMapper.toDTO(saved);
+        return toDTOWithCounts(saved);
     }
 
     @Transactional
     public FolderResponseDTO update(Long id, FolderRequestDTO dto) {
+        return update(id, dto, null);
+    }
+
+    @Transactional
+    public FolderResponseDTO update(Long id, FolderRequestDTO dto, Long userId) {
         Folder folder = folderRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Pasta não encontrada com o id: " + id));
+
+        if (userId != null) {
+            github.felkng.olha_minha_questao.domain.entity.User user = userRepository.findById(userId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado com o id: " + userId));
+            if (user.getRole() != github.felkng.olha_minha_questao.domain.entity.UserRole.ADMIN) {
+                if (folder.getCreatedByUser() == null || !folder.getCreatedByUser().getId().equals(user.getId())) {
+                    throw new org.springframework.web.server.ResponseStatusException(
+                            org.springframework.http.HttpStatus.FORBIDDEN,
+                            "Você não tem permissão para editar esta pasta.");
+                }
+            }
+        }
+
         folderMapper.updateEntityFromDTO(dto, folder);
+        if (dto.getIsPublic() != null) {
+            folder.setIsPublic(dto.getIsPublic());
+        }
         Folder updated = folderRepository.save(folder);
-        return folderMapper.toDTO(updated);
+        return toDTOWithCounts(updated);
+    }
+
+    @Transactional
+    public FolderResponseDTO toggleVisibility(Long id, Long userId) {
+        Folder folder = folderRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Pasta não encontrada com o id: " + id));
+
+        if (userId != null) {
+            github.felkng.olha_minha_questao.domain.entity.User user = userRepository.findById(userId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado com o id: " + userId));
+            if (user.getRole() != github.felkng.olha_minha_questao.domain.entity.UserRole.ADMIN) {
+                if (folder.getCreatedByUser() == null || !folder.getCreatedByUser().getId().equals(user.getId())) {
+                    throw new org.springframework.web.server.ResponseStatusException(
+                            org.springframework.http.HttpStatus.FORBIDDEN,
+                            "Você não tem permissão para alterar a visibilidade desta pasta.");
+                }
+            }
+        }
+
+        folder.setIsPublic(!Boolean.TRUE.equals(folder.getIsPublic()));
+        Folder updated = folderRepository.save(folder);
+        return toDTOWithCounts(updated);
     }
 
     @Transactional
     public void delete(Long id) {
-        if (!folderRepository.existsById(id)) {
-            throw new ResourceNotFoundException("Pasta não encontrada com o id: " + id);
+        delete(id, null);
+    }
+
+    @Transactional
+    public void delete(Long id, Long userId) {
+        Folder folder = folderRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Pasta não encontrada com o id: " + id));
+
+        if (userId != null) {
+            github.felkng.olha_minha_questao.domain.entity.User user = userRepository.findById(userId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado com o id: " + userId));
+            if (user.getRole() == github.felkng.olha_minha_questao.domain.entity.UserRole.ADMIN) {
+                // Admin pode excluir se for público ou criado por ele mesmo
+                if (!Boolean.TRUE.equals(folder.getIsPublic()) && (folder.getCreatedByUser() == null || !folder.getCreatedByUser().getId().equals(user.getId()))) {
+                    throw new org.springframework.web.server.ResponseStatusException(
+                            org.springframework.http.HttpStatus.FORBIDDEN,
+                            "Administradores podem moderar apenas conteúdos públicos de terceiros.");
+                }
+            } else {
+                // Usuário comum só pode excluir suas próprias pastas
+                if (folder.getCreatedByUser() == null || !folder.getCreatedByUser().getId().equals(user.getId())) {
+                    throw new org.springframework.web.server.ResponseStatusException(
+                            org.springframework.http.HttpStatus.FORBIDDEN,
+                            "Você não tem permissão para excluir esta pasta.");
+                }
+            }
         }
-        folderRepository.deleteById(id);
+
+        folderRepository.delete(folder);
+    }
+
+    @Transactional(readOnly = true)
+    public List<github.felkng.olha_minha_questao.dto.flashcard.FlashcardResponseDTO> getFlashcardsInFolder(Long folderId) {
+        if (!folderRepository.existsById(folderId)) {
+            throw new ResourceNotFoundException("Pasta não encontrada com o id: " + folderId);
+        }
+        return flashcardRepository.findByFolderIdOrderByIdAsc(folderId).stream()
+                .map(flashcardMapper::toDTO)
+                .toList();
     }
 
     // ==========================================

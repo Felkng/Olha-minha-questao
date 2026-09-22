@@ -48,6 +48,10 @@ public class Folder {
     @Builder.Default
     private FolderType folderType = FolderType.QUESTION;
 
+    @Column(name = "is_public", nullable = false)
+    @Builder.Default
+    private Boolean isPublic = true;
+
     @jakarta.persistence.ManyToOne(fetch = jakarta.persistence.FetchType.LAZY)
     @jakarta.persistence.JoinColumn(name = "created_by_user_id")
     private User createdByUser;

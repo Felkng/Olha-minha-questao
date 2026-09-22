@@ -46,24 +46,31 @@ public class TestService {
 
     @Transactional(readOnly = true)
     public List<TestCardDTO> findTestCards() {
+        return findTestCards(null);
+    }
+
+    @Transactional(readOnly = true)
+    public List<TestCardDTO> findTestCards(Long currentUserId) {
         List<Test> tests = testRepository.findAllByOrderByYearDescIdDesc();
-        return tests.stream().map(test -> {
-            TestStatistic stat = test.getStatistic();
-            int qCount = (int) questionRepository.countByTestId(test.getId());
-            return TestCardDTO.builder()
-                    .id(test.getId())
-                    .name(test.getName())
-                    .year(test.getYear())
-                    .originId(test.getOrigin() != null ? test.getOrigin().getId() : null)
-                    .originName(test.getOrigin() != null ? test.getOrigin().getName() : null)
-                    .areaId(test.getArea() != null ? test.getArea().getId() : null)
-                    .areaName(test.getArea() != null ? test.getArea().getName() : null)
-                    .questionCount(qCount)
-                    .difficultyLevel(stat != null ? stat.getDifficultyLevel() : DifficultyLevel.SEM_DADOS)
-                    .averageScore(stat != null ? stat.getAverageScore() : 0.0)
-                    .totalAttempts(stat != null ? stat.getTotalAttempts() : 0L)
-                    .build();
-        }).toList();
+        return tests.stream()
+                .filter(t -> Boolean.TRUE.equals(t.getIsPublic()) || (currentUserId != null && t.getCreatedByUser() != null && t.getCreatedByUser().getId().equals(currentUserId)))
+                .map(test -> {
+                    TestStatistic stat = test.getStatistic();
+                    int qCount = (int) questionRepository.countByTestId(test.getId());
+                    return TestCardDTO.builder()
+                            .id(test.getId())
+                            .name(test.getName())
+                            .year(test.getYear())
+                            .originId(test.getOrigin() != null ? test.getOrigin().getId() : null)
+                            .originName(test.getOrigin() != null ? test.getOrigin().getName() : null)
+                            .areaId(test.getArea() != null ? test.getArea().getId() : null)
+                            .areaName(test.getArea() != null ? test.getArea().getName() : null)
+                            .questionCount(qCount)
+                            .difficultyLevel(stat != null ? stat.getDifficultyLevel() : DifficultyLevel.SEM_DADOS)
+                            .averageScore(stat != null ? stat.getAverageScore() : 0.0)
+                            .totalAttempts(stat != null ? stat.getTotalAttempts() : 0L)
+                            .build();
+                }).toList();
     }
 
     @Transactional(readOnly = true)
@@ -91,11 +98,16 @@ public class TestService {
 
     @Transactional(readOnly = true)
     public List<TestResponseDTO> findAll(Long originId, Long areaId, Integer year) {
-        return findAll(originId, areaId, year, null);
+        return findAll(originId, areaId, year, null, null);
     }
 
     @Transactional(readOnly = true)
     public List<TestResponseDTO> findAll(Long originId, Long areaId, Integer year, Long createdByUserId) {
+        return findAll(originId, areaId, year, createdByUserId, null);
+    }
+
+    @Transactional(readOnly = true)
+    public List<TestResponseDTO> findAll(Long originId, Long areaId, Integer year, Long createdByUserId, Long currentUserId) {
         List<Test> tests;
         if (createdByUserId != null) {
             tests = testRepository.findByCreatedByUserIdOrderByYearDescIdDesc(createdByUserId);
@@ -112,6 +124,12 @@ public class TestService {
         }
 
         return tests.stream()
+                .filter(t -> {
+                    if (createdByUserId != null && createdByUserId.equals(currentUserId)) {
+                        return true;
+                    }
+                    return Boolean.TRUE.equals(t.getIsPublic()) || (currentUserId != null && t.getCreatedByUser() != null && t.getCreatedByUser().getId().equals(currentUserId));
+                })
                 .map(this::toDTOWithQuestionCount)
                 .toList();
     }
@@ -161,6 +179,9 @@ public class TestService {
         test.setOrigin(origin);
         test.setArea(area);
         test.setCreatedByUser(user);
+        if (dto.getIsPublic() != null) {
+            test.setIsPublic(dto.getIsPublic());
+        }
 
         Test saved = testRepository.save(test);
 
@@ -216,6 +237,7 @@ public class TestService {
                 .origin(origin)
                 .area(area)
                 .createdByUser(user)
+                .isPublic(dto.getIsPublic() != null ? dto.getIsPublic() : true)
                 .build();
 
         Test savedTest = testRepository.save(test);
@@ -263,6 +285,7 @@ public class TestService {
                         .test(savedTest)
                         .textualReference(qRef)
                         .createdByUser(user)
+                        .isPublic(qDto.getIsPublic() != null ? qDto.getIsPublic() : (dto.getIsPublic() != null ? dto.getIsPublic() : true))
                         .alternatives(new java.util.ArrayList<>())
                         .build();
 
@@ -365,7 +388,32 @@ public class TestService {
         testMapper.updateEntityFromDTO(dto, test);
         test.setOrigin(origin);
         test.setArea(area);
+        if (dto.getIsPublic() != null) {
+            test.setIsPublic(dto.getIsPublic());
+        }
 
+        Test updated = testRepository.save(test);
+        return toDTOWithQuestionCount(updated);
+    }
+
+    @Transactional
+    public TestResponseDTO toggleVisibility(Long id, Long userId) {
+        Test test = testRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Prova não encontrada com o id: " + id));
+
+        if (userId != null) {
+            github.felkng.olha_minha_questao.domain.entity.User user = userRepository.findById(userId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado com o id: " + userId));
+            if (user.getRole() != github.felkng.olha_minha_questao.domain.entity.UserRole.ADMIN) {
+                if (test.getCreatedByUser() == null || !test.getCreatedByUser().getId().equals(user.getId())) {
+                    throw new org.springframework.web.server.ResponseStatusException(
+                            org.springframework.http.HttpStatus.FORBIDDEN,
+                            "Você não tem permissão para alterar a visibilidade desta prova.");
+                }
+            }
+        }
+
+        test.setIsPublic(!Boolean.TRUE.equals(test.getIsPublic()));
         Test updated = testRepository.save(test);
         return toDTOWithQuestionCount(updated);
     }
@@ -383,7 +431,15 @@ public class TestService {
         if (userId != null) {
             github.felkng.olha_minha_questao.domain.entity.User user = userRepository.findById(userId)
                     .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado com o id: " + userId));
-            if (user.getRole() != github.felkng.olha_minha_questao.domain.entity.UserRole.ADMIN) {
+            if (user.getRole() == github.felkng.olha_minha_questao.domain.entity.UserRole.ADMIN) {
+                // Admin pode excluir se for público ou criado por ele mesmo
+                if (!Boolean.TRUE.equals(test.getIsPublic()) && (test.getCreatedByUser() == null || !test.getCreatedByUser().getId().equals(user.getId()))) {
+                    throw new org.springframework.web.server.ResponseStatusException(
+                            org.springframework.http.HttpStatus.FORBIDDEN,
+                            "Administradores podem moderar apenas conteúdos públicos de terceiros.");
+                }
+            } else {
+                // Usuário comum só pode excluir suas próprias provas
                 if (test.getCreatedByUser() == null || !test.getCreatedByUser().getId().equals(user.getId())) {
                     throw new org.springframework.web.server.ResponseStatusException(
                             org.springframework.http.HttpStatus.FORBIDDEN,

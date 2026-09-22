@@ -28,4 +28,7 @@ public class TestRequestDTO {
     private Long originId;
 
     private Long areaId;
+
+    @Builder.Default
+    private Boolean isPublic = true;
 }

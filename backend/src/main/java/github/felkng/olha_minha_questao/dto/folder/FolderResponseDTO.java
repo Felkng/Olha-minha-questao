@@ -21,8 +21,10 @@ public class FolderResponseDTO {
     private String description;
     private String color;
     private FolderType folderType;
+    private Boolean isPublic;
     private long questionCount;
     private long testCount;
+    private long flashcardCount;
     private UserSummaryDTO createdByUser;
     private Instant createdAt;
     private Instant updatedAt;

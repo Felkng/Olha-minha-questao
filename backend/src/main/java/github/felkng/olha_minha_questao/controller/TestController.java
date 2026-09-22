@@ -34,13 +34,22 @@ public class TestController {
             @RequestParam(required = false) Long originId,
             @RequestParam(required = false) Long areaId,
             @RequestParam(required = false) Integer year,
-            @RequestParam(required = false) Long createdByUserId) {
-        return ResponseEntity.ok(testService.findAll(originId, areaId, year, createdByUserId));
+            @RequestParam(required = false) Long createdByUserId,
+            @RequestHeader(value = "X-User-Id", required = false) Long currentUserId) {
+        return ResponseEntity.ok(testService.findAll(originId, areaId, year, createdByUserId, currentUserId));
     }
 
     @GetMapping("/cards")
-    public ResponseEntity<List<github.felkng.olha_minha_questao.dto.test.TestCardDTO>> findTestCards() {
-        return ResponseEntity.ok(testService.findTestCards());
+    public ResponseEntity<List<github.felkng.olha_minha_questao.dto.test.TestCardDTO>> findTestCards(
+            @RequestHeader(value = "X-User-Id", required = false) Long currentUserId) {
+        return ResponseEntity.ok(testService.findTestCards(currentUserId));
+    }
+
+    @org.springframework.web.bind.annotation.PatchMapping("/{id}/visibility")
+    public ResponseEntity<TestResponseDTO> toggleVisibility(
+            @PathVariable Long id,
+            @RequestHeader(value = "X-User-Id", required = false) Long userId) {
+        return ResponseEntity.ok(testService.toggleVisibility(id, userId));
     }
 
     @GetMapping("/{id}/evaluation")

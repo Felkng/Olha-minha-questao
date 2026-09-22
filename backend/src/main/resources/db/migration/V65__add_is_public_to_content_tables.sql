@@ -1,0 +1,8 @@
+ALTER TABLE question ADD COLUMN IF NOT EXISTS is_public BOOLEAN NOT NULL DEFAULT TRUE;
+CREATE INDEX IF NOT EXISTS idx_question_is_public ON question(is_public);
+
+ALTER TABLE test ADD COLUMN IF NOT EXISTS is_public BOOLEAN NOT NULL DEFAULT TRUE;
+CREATE INDEX IF NOT EXISTS idx_test_is_public ON test(is_public);
+
+ALTER TABLE folder ADD COLUMN IF NOT EXISTS is_public BOOLEAN NOT NULL DEFAULT TRUE;
+CREATE INDEX IF NOT EXISTS idx_folder_is_public ON folder(is_public);

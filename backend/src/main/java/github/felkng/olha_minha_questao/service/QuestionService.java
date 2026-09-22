@@ -51,20 +51,41 @@ public class QuestionService {
 
     @Transactional(readOnly = true)
     public Page<QuestionResponseDTO> findAll(Long originId, Long areaId, Long testId, Integer year, Pageable pageable) {
-        return findAll(originId, areaId, testId, year, null, null, null, pageable);
+        return findAll(originId, areaId, testId, year, null, null, null, null, null, pageable);
     }
 
     @Transactional(readOnly = true)
     public Page<QuestionResponseDTO> findAll(Long originId, Long areaId, Long testId, Integer year,
                                              String difficulty, String search, String sort, Pageable pageable) {
-        return findAll(originId, areaId, testId, year, difficulty, search, sort, null, pageable);
+        return findAll(originId, areaId, testId, year, difficulty, search, sort, null, null, pageable);
     }
 
     @Transactional(readOnly = true)
     public Page<QuestionResponseDTO> findAll(Long originId, Long areaId, Long testId, Integer year,
                                              String difficulty, String search, String sort, Long createdByUserId, Pageable pageable) {
+        return findAll(originId, areaId, testId, year, difficulty, search, sort, createdByUserId, null, pageable);
+    }
+
+    @Transactional(readOnly = true)
+    public Page<QuestionResponseDTO> findAll(Long originId, Long areaId, Long testId, Integer year,
+                                             String difficulty, String search, String sort, Long createdByUserId, Long currentUserId, Pageable pageable) {
         Specification<Question> spec = (root, query, cb) -> {
             List<Predicate> predicates = new ArrayList<>();
+
+            // Regra de Privacidade
+            if (currentUserId == null) {
+                predicates.add(cb.isTrue(root.get("isPublic")));
+            } else {
+                if (createdByUserId != null && createdByUserId.equals(currentUserId)) {
+                    // Usuário visualizando suas próprias questões -> exibe públicas e privadas
+                } else {
+                    predicates.add(cb.or(
+                            cb.isTrue(root.get("isPublic")),
+                            cb.equal(root.get("createdByUser").get("id"), currentUserId)
+                    ));
+                }
+            }
+
             if (createdByUserId != null) {
                 predicates.add(cb.equal(root.get("createdByUser").get("id"), createdByUserId));
             }
@@ -279,6 +300,10 @@ public class QuestionService {
             question.setAlternatives(new ArrayList<>(alternatives));
         }
 
+        if (dto.getIsPublic() != null) {
+            question.setIsPublic(dto.getIsPublic());
+        }
+
         Question saved = questionRepository.save(question);
 
         // Define a alternativa correta a partir de isCorrect=true ou correctAlternativeId
@@ -379,6 +404,9 @@ public class QuestionService {
         question.setSubject(subject);
         question.setTest(test);
         question.setTextualReference(textualReference);
+        if (dto.getIsPublic() != null) {
+            question.setIsPublic(dto.getIsPublic());
+        }
 
         if (dto.getAlternatives() != null) {
             question.setCorrectAlternative(null);
@@ -413,6 +441,28 @@ public class QuestionService {
     }
 
     @Transactional
+    public QuestionResponseDTO toggleVisibility(Long id, Long userId) {
+        Question question = questionRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Questão não encontrada com o id: " + id));
+
+        if (userId != null) {
+            User user = userRepository.findById(userId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado com o id: " + userId));
+            if (user.getRole() != github.felkng.olha_minha_questao.domain.entity.UserRole.ADMIN) {
+                if (question.getCreatedByUser() == null || !question.getCreatedByUser().getId().equals(user.getId())) {
+                    throw new org.springframework.web.server.ResponseStatusException(
+                            org.springframework.http.HttpStatus.FORBIDDEN,
+                            "Você não tem permissão para alterar a visibilidade desta questão.");
+                }
+            }
+        }
+
+        question.setIsPublic(!Boolean.TRUE.equals(question.getIsPublic()));
+        Question updated = questionRepository.save(question);
+        return questionMapper.toDTO(updated);
+    }
+
+    @Transactional
     public void delete(Long id) {
         delete(id, null);
     }
@@ -425,7 +475,15 @@ public class QuestionService {
         if (userId != null) {
             User user = userRepository.findById(userId)
                     .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado com o id: " + userId));
-            if (user.getRole() != github.felkng.olha_minha_questao.domain.entity.UserRole.ADMIN) {
+            if (user.getRole() == github.felkng.olha_minha_questao.domain.entity.UserRole.ADMIN) {
+                // Admin pode excluir se for público ou criado por ele mesmo
+                if (!Boolean.TRUE.equals(question.getIsPublic()) && (question.getCreatedByUser() == null || !question.getCreatedByUser().getId().equals(user.getId()))) {
+                    throw new org.springframework.web.server.ResponseStatusException(
+                            org.springframework.http.HttpStatus.FORBIDDEN,
+                            "Administradores podem moderar apenas conteúdos públicos de terceiros.");
+                }
+            } else {
+                // Usuário comum só pode excluir suas próprias questões
                 if (question.getCreatedByUser() == null || !question.getCreatedByUser().getId().equals(user.getId())) {
                     throw new org.springframework.web.server.ResponseStatusException(
                             org.springframework.http.HttpStatus.FORBIDDEN,

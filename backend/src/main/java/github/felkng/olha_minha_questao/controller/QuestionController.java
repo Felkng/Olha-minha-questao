@@ -45,8 +45,9 @@ public class QuestionController {
             @RequestParam(required = false) String search,
             @RequestParam(required = false) String sort,
             @RequestParam(required = false) Long createdByUserId,
+            @RequestHeader(value = "X-User-Id", required = false) Long currentUserId,
             @PageableDefault(size = 20) Pageable pageable) {
-        return ResponseEntity.ok(questionService.findAll(originId, areaId, testId, year, difficulty, search, sort, createdByUserId, pageable));
+        return ResponseEntity.ok(questionService.findAll(originId, areaId, testId, year, difficulty, search, sort, createdByUserId, currentUserId, pageable));
     }
 
     @PostMapping("/{id}/attempts")
@@ -94,6 +95,13 @@ public class QuestionController {
             @Valid @RequestBody QuestionRequestDTO dto,
             @RequestHeader(value = "X-User-Id", required = false) Long userId) {
         return ResponseEntity.ok(questionService.update(id, dto, userId));
+    }
+
+    @org.springframework.web.bind.annotation.PatchMapping("/{id}/visibility")
+    public ResponseEntity<QuestionResponseDTO> toggleVisibility(
+            @PathVariable Long id,
+            @RequestHeader(value = "X-User-Id", required = false) Long userId) {
+        return ResponseEntity.ok(questionService.toggleVisibility(id, userId));
     }
 
     @DeleteMapping("/{id}")
