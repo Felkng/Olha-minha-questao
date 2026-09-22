@@ -12,6 +12,7 @@ import lombok.NoArgsConstructor;
 public class PlatformSummaryDTO {
     private long totalQuestions;
     private long totalTests;
+    private long totalFlashcards;
     private long activeUsersLast5Days;
     private long totalAttempts;
     private long totalOrigins;

@@ -10,6 +10,7 @@ import github.felkng.olha_minha_questao.domain.entity.TestAttempt;
 import github.felkng.olha_minha_questao.domain.entity.TestStatistic;
 import github.felkng.olha_minha_questao.domain.entity.User;
 import github.felkng.olha_minha_questao.domain.repository.AreaRepository;
+import github.felkng.olha_minha_questao.domain.repository.FlashcardRepository;
 import github.felkng.olha_minha_questao.domain.repository.OriginRepository;
 import github.felkng.olha_minha_questao.domain.repository.QuestionAttemptRepository;
 import github.felkng.olha_minha_questao.domain.repository.QuestionRepository;
@@ -45,6 +46,7 @@ public class StatisticsService {
     private final UserRepository userRepository;
     private final OriginRepository originRepository;
     private final AreaRepository areaRepository;
+    private final FlashcardRepository flashcardRepository;
 
     @Transactional
     public QuestionAttemptResponseDTO registerQuestionAttempt(Long questionId, QuestionAttemptRequestDTO dto) {
@@ -383,6 +385,7 @@ public class StatisticsService {
     public PlatformSummaryDTO getPlatformSummary() {
         long totalQuestions = questionRepository.count();
         long totalTests = testRepository.count();
+        long totalFlashcards = flashcardRepository.count();
         java.time.Instant fiveDaysAgo = java.time.Instant.now().minus(5, java.time.temporal.ChronoUnit.DAYS);
         long activeUsers = questionAttemptRepository.countDistinctActiveUsersSince(fiveDaysAgo);
         long totalOrigins = originRepository.count();
@@ -392,6 +395,7 @@ public class StatisticsService {
         return PlatformSummaryDTO.builder()
                 .totalQuestions(totalQuestions)
                 .totalTests(totalTests)
+                .totalFlashcards(totalFlashcards)
                 .activeUsersLast5Days(activeUsers)
                 .totalOrigins(totalOrigins)
                 .totalAreas(totalAreas)

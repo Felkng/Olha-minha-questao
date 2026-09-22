@@ -349,6 +349,7 @@ export interface TestSubmissionResponse {
 export interface PlatformSummary {
   totalQuestions: number;
   totalTests: number;
+  totalFlashcards?: number;
   activeUsersLast5Days: number;
   totalAttempts: number;
   totalOrigins: number;
