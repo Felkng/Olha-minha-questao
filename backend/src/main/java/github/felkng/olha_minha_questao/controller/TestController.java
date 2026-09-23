@@ -136,4 +136,25 @@ public class TestController {
         testService.delete(id, userId);
         return ResponseEntity.noContent().build();
     }
+
+    @PostMapping("/{id}/questions/{questionId}")
+    public ResponseEntity<Void> addQuestionToTest(
+            @PathVariable Long id,
+            @PathVariable Long questionId) {
+        testService.addQuestionToTest(id, questionId);
+        return ResponseEntity.status(HttpStatus.CREATED).build();
+    }
+
+    @DeleteMapping("/{id}/questions/{questionId}")
+    public ResponseEntity<Void> removeQuestionFromTest(
+            @PathVariable Long id,
+            @PathVariable Long questionId) {
+        testService.removeQuestionFromTest(id, questionId);
+        return ResponseEntity.noContent().build();
+    }
+
+    @GetMapping("/by-question/{questionId}")
+    public ResponseEntity<List<Long>> getTestIdsForQuestion(@PathVariable Long questionId) {
+        return ResponseEntity.ok(testService.getTestIdsForQuestion(questionId));
+    }
 }

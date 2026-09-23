@@ -21,10 +21,16 @@ import org.springframework.web.bind.annotation.RestController;
 public class UserController {
 
     private final UserService userService;
+    private final github.felkng.olha_minha_questao.service.StatisticsService statisticsService;
 
     @GetMapping("/{id}/profile")
     public ResponseEntity<UserProfileDTO> getUserProfile(@PathVariable Long id) {
         return ResponseEntity.ok(userService.getUserProfile(id));
+    }
+
+    @GetMapping("/{id}/question-attempts")
+    public ResponseEntity<java.util.List<github.felkng.olha_minha_questao.dto.question.QuestionAttemptHistoryDTO>> getUserQuestionAttempts(@PathVariable Long id) {
+        return ResponseEntity.ok(statisticsService.getUserQuestionAttempts(id));
     }
 
     @PutMapping("/{id}")

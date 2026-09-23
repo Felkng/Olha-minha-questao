@@ -37,6 +37,7 @@ public class TestService {
     private final AreaRepository areaRepository;
     private final github.felkng.olha_minha_questao.domain.repository.SubjectRepository subjectRepository;
     private final QuestionRepository questionRepository;
+    private final github.felkng.olha_minha_questao.domain.repository.TestQuestionRepository testQuestionRepository;
     private final github.felkng.olha_minha_questao.domain.repository.UserRepository userRepository;
     private final github.felkng.olha_minha_questao.domain.repository.TextualReferenceRepository textualReferenceRepository;
     private final TestMapper testMapper;
@@ -56,7 +57,7 @@ public class TestService {
                 .filter(t -> Boolean.TRUE.equals(t.getIsPublic()) || (currentUserId != null && t.getCreatedByUser() != null && t.getCreatedByUser().getId().equals(currentUserId)))
                 .map(test -> {
                     TestStatistic stat = test.getStatistic();
-                    int qCount = (int) questionRepository.countByTestId(test.getId());
+                    int qCount = questionRepository.findAllQuestionsByTestId(test.getId()).size();
                     return TestCardDTO.builder()
                             .id(test.getId())
                             .name(test.getName())
@@ -78,7 +79,7 @@ public class TestService {
         Test test = testRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Prova não encontrada com o id: " + id));
 
-        List<Question> questions = questionRepository.findByTestIdOrderByIdAsc(id);
+        List<Question> questions = questionRepository.findAllQuestionsByTestId(id);
         List<QuestionResponseDTO> questionDTOs = questions.stream()
                 .map(questionMapper::toDTO)
                 .toList();
@@ -137,7 +138,7 @@ public class TestService {
     private TestResponseDTO toDTOWithQuestionCount(Test test) {
         TestResponseDTO dto = testMapper.toDTO(test);
         if (test != null && test.getId() != null) {
-            dto.setQuestionCount((int) questionRepository.countByTestId(test.getId()));
+            dto.setQuestionCount(questionRepository.findAllQuestionsByTestId(test.getId()).size());
         } else {
             dto.setQuestionCount(0);
         }
@@ -449,5 +450,49 @@ public class TestService {
         }
 
         testRepository.delete(test);
+    }
+
+    @Transactional
+    public void addQuestionToTest(Long testId, Long questionId) {
+        Test test = testRepository.findById(testId)
+                .orElseThrow(() -> new ResourceNotFoundException("Prova não encontrada com o id: " + testId));
+        Question question = questionRepository.findById(questionId)
+                .orElseThrow(() -> new ResourceNotFoundException("Questão não encontrada com o id: " + questionId));
+
+        if (!testQuestionRepository.existsByTestIdAndQuestionId(testId, questionId)) {
+            github.felkng.olha_minha_questao.domain.entity.TestQuestion tq = github.felkng.olha_minha_questao.domain.entity.TestQuestion.builder()
+                    .test(test)
+                    .question(question)
+                    .build();
+            testQuestionRepository.save(tq);
+        }
+    }
+
+    @Transactional
+    public void removeQuestionFromTest(Long testId, Long questionId) {
+        if (!testRepository.existsById(testId)) {
+            throw new ResourceNotFoundException("Prova não encontrada com o id: " + testId);
+        }
+        if (!questionRepository.existsById(questionId)) {
+            throw new ResourceNotFoundException("Questão não encontrada com o id: " + questionId);
+        }
+        testQuestionRepository.deleteByTestIdAndQuestionId(testId, questionId);
+        questionRepository.findById(questionId).ifPresent(q -> {
+            if (q.getTest() != null && q.getTest().getId().equals(testId)) {
+                q.setTest(null);
+                questionRepository.save(q);
+            }
+        });
+    }
+
+    @Transactional(readOnly = true)
+    public List<Long> getTestIdsForQuestion(Long questionId) {
+        List<Long> testIds = new java.util.ArrayList<>(testQuestionRepository.findTestIdsByQuestionId(questionId));
+        questionRepository.findById(questionId).ifPresent(q -> {
+            if (q.getTest() != null && !testIds.contains(q.getTest().getId())) {
+                testIds.add(q.getTest().getId());
+            }
+        });
+        return testIds;
     }
 }
