@@ -27,6 +27,7 @@ import {
 import FolderSpecialOutlinedIcon from '@mui/icons-material/FolderSpecialOutlined';
 import AddIcon from '@mui/icons-material/Add';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
+import EditIcon from '@mui/icons-material/Edit';
 import QuizOutlinedIcon from '@mui/icons-material/QuizOutlined';
 import MenuBookOutlinedIcon from '@mui/icons-material/MenuBookOutlined';
 import StyleOutlinedIcon from '@mui/icons-material/StyleOutlined';
@@ -40,6 +41,7 @@ import {
   getFolders,
   toggleFolderVisibility,
 } from '../services/api';
+import { EditFolderModal } from '../components/crud/EditFolderModal';
 import { PALETTE_COLORS } from '../theme/theme';
 import { useAuth } from '../context/AuthContext';
 import { useAppTheme } from '../theme/ThemeContext';
@@ -72,6 +74,8 @@ export const FoldersPage: React.FC = () => {
   const [folderType, setFolderType] = useState<FolderType>('QUESTION');
   const [isPublic, setIsPublic] = useState<boolean>(true);
   const [saving, setSaving] = useState<boolean>(false);
+  const [editingFolder, setEditingFolder] = useState<Folder | null>(null);
+  const [editFolderModalOpen, setEditFolderModalOpen] = useState<boolean>(false);
 
   const loadFolders = async (type: FolderType) => {
     setLoading(true);
@@ -159,27 +163,36 @@ export const FoldersPage: React.FC = () => {
           onChange={handleTabChange}
           indicatorColor="primary"
           textColor="primary"
+          variant="scrollable"
+          scrollButtons="auto"
+          allowScrollButtonsMobile
+          sx={{
+            '& .MuiTab-root': {
+              fontWeight: 700,
+              textTransform: 'none',
+              fontSize: { xs: '0.85rem', sm: '0.95rem' },
+              minWidth: 'auto',
+              px: { xs: 1.5, sm: 2 },
+            },
+          }}
         >
           <Tab
             icon={<QuizOutlinedIcon />}
             iconPosition="start"
             label="Pastas de Questões"
             value="QUESTION"
-            sx={{ fontWeight: 700 }}
           />
           <Tab
             icon={<MenuBookOutlinedIcon />}
             iconPosition="start"
             label="Pastas de Provas"
             value="TEST"
-            sx={{ fontWeight: 700 }}
           />
           <Tab
             icon={<StyleOutlinedIcon />}
             iconPosition="start"
             label="Decks de Flashcards"
             value="FLASHCARD"
-            sx={{ fontWeight: 700 }}
           />
         </Tabs>
       </Paper>
@@ -193,6 +206,7 @@ export const FoldersPage: React.FC = () => {
           {folders.map((folder) => {
             const isOwner = Boolean(user?.id && folder.createdByUser?.id && user.id === folder.createdByUser.id);
             const isPublicFolder = folder.isPublic !== false;
+            const canEdit = isOwner || (isAdmin && isPublicFolder);
             const canDelete = isOwner || (isAdmin && isPublicFolder);
 
             return (
@@ -225,17 +239,34 @@ export const FoldersPage: React.FC = () => {
                         {folder.name}
                       </Typography>
                     </Box>
-                    {canDelete && (
-                      <Tooltip title={isAdmin && !isOwner ? "Moderar / Excluir pasta pública (Admin)" : "Excluir pasta"}>
-                        <IconButton
-                          size="small"
-                          onClick={(e) => handleDeleteFolder(e, folder.id)}
-                          sx={{ color: 'text.secondary', '&:hover': { color: PALETTE_COLORS.danger } }}
-                        >
-                          <DeleteOutlineIcon fontSize="small" />
-                        </IconButton>
-                      </Tooltip>
-                    )}
+                    <Stack direction="row" spacing={0.5} alignItems="center">
+                      {canEdit && (
+                        <Tooltip title="Editar pasta">
+                          <IconButton
+                            size="small"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setEditingFolder(folder);
+                              setEditFolderModalOpen(true);
+                            }}
+                            sx={{ color: 'text.secondary', '&:hover': { color: PALETTE_COLORS.primary } }}
+                          >
+                            <EditIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                      )}
+                      {canDelete && (
+                        <Tooltip title={isAdmin && !isOwner ? "Moderar / Excluir pasta pública (Admin)" : "Excluir pasta"}>
+                          <IconButton
+                            size="small"
+                            onClick={(e) => handleDeleteFolder(e, folder.id)}
+                            sx={{ color: 'text.secondary', '&:hover': { color: PALETTE_COLORS.danger } }}
+                          >
+                            <DeleteOutlineIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                      )}
+                    </Stack>
                   </Box>
 
                   <Typography
@@ -444,6 +475,17 @@ export const FoldersPage: React.FC = () => {
           </Button>
         </DialogActions>
       </Dialog>
+
+      {/* Modal de Edição de Pasta */}
+      <EditFolderModal
+        open={editFolderModalOpen}
+        folder={editingFolder}
+        onClose={() => {
+          setEditFolderModalOpen(false);
+          setEditingFolder(null);
+        }}
+        onUpdated={() => loadFolders(currentTab)}
+      />
     </Box>
   );
 };

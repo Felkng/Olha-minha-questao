@@ -29,6 +29,7 @@ import {
   Radio,
   RadioGroup,
   FormControlLabel,
+  Switch,
   Select,
   Stack,
   Tab,
@@ -59,6 +60,8 @@ import VisibilityIcon from '@mui/icons-material/Visibility';
 import ListAltIcon from '@mui/icons-material/ListAlt';
 import SearchIcon from '@mui/icons-material/Search';
 import ShareIcon from '@mui/icons-material/Share';
+import HistoryIcon from '@mui/icons-material/History';
+import CancelOutlinedIcon from '@mui/icons-material/CancelOutlined';
 
 import {
   getUserProfile,
@@ -79,6 +82,7 @@ import {
   getUserTestAttempts,
   getTestAttemptDetail,
   getTestEvaluation,
+  getUserQuestionAttempts,
 } from '../services/api';
 import {
   Area,
@@ -87,6 +91,7 @@ import {
   FolderType,
   Origin,
   Question,
+  QuestionAttemptHistory,
   Subject,
   Test,
   TestCard,
@@ -112,10 +117,12 @@ import { CreateAreaModal } from '../components/crud/CreateAreaModal';
 import { EditAreaModal } from '../components/crud/EditAreaModal';
 import { CreateSubjectModal } from '../components/crud/CreateSubjectModal';
 import { EditSubjectModal } from '../components/crud/EditSubjectModal';
+import { EditFolderModal } from '../components/crud/EditFolderModal';
 import { EditProfileModal } from '../components/profile/EditProfileModal';
 
 type ProfileTab =
   | 'visao_geral'
+  | 'questoes_respondidas'
   | 'meus_simulados'
   | 'minhas_questoes'
   | 'minhas_provas'
@@ -143,6 +150,12 @@ export const UserProfilePage: React.FC = () => {
   const [categoryTab, setCategoryTab] = useState<number>(0);
   const [categorySortBy, setCategorySortBy] = useState<'resolved' | 'accuracy'>('resolved');
 
+  // Dados de Histórico de Questões Respondidas
+  const [myQuestionAttempts, setMyQuestionAttempts] = useState<QuestionAttemptHistory[]>([]);
+  const [loadingQuestionAttempts, setLoadingQuestionAttempts] = useState(false);
+  const [questionAttemptSearch, setQuestionAttemptSearch] = useState('');
+  const [questionAttemptFilter, setQuestionAttemptFilter] = useState<'ALL' | 'CORRECT' | 'WRONG'>('ALL');
+
   // Dados de Meus Simulados Realizados
   const [myTestAttempts, setMyTestAttempts] = useState<TestAttemptSummary[]>([]);
   const [loadingTestAttempts, setLoadingTestAttempts] = useState(false);
@@ -166,7 +179,10 @@ export const UserProfilePage: React.FC = () => {
   const [newFolderName, setNewFolderName] = useState('');
   const [newFolderDesc, setNewFolderDesc] = useState('');
   const [newFolderColor, setNewFolderColor] = useState(PALETTE_COLORS.primary);
+  const [newFolderIsPublic, setNewFolderIsPublic] = useState(true);
   const [savingFolder, setSavingFolder] = useState(false);
+  const [editingFolder, setEditingFolder] = useState<Folder | null>(null);
+  const [editFolderModalOpen, setEditFolderModalOpen] = useState(false);
 
   // Dados de Administração (ADMIN)
   const [allOrigins, setAllOrigins] = useState<Origin[]>([]);
@@ -270,7 +286,9 @@ export const UserProfilePage: React.FC = () => {
   // Carregamento sob demanda das abas selecionadas
   useEffect(() => {
     if (!userId) return;
-    if (activeNavTab === 'meus_simulados') {
+    if (activeNavTab === 'questoes_respondidas') {
+      loadMyQuestionAttempts();
+    } else if (activeNavTab === 'meus_simulados') {
       loadMyTestAttempts();
     } else if (activeNavTab === 'minhas_questoes') {
       loadMyQuestions();
@@ -287,6 +305,19 @@ export const UserProfilePage: React.FC = () => {
       loadAllAreas();
     }
   }, [activeNavTab, userId, folderTypeTab]);
+
+  const loadMyQuestionAttempts = async () => {
+    if (!userId) return;
+    setLoadingQuestionAttempts(true);
+    try {
+      const res = await getUserQuestionAttempts(userId);
+      setMyQuestionAttempts(res);
+    } catch (err) {
+      console.error('Erro ao carregar histórico de questões do usuário:', err);
+    } finally {
+      setLoadingQuestionAttempts(false);
+    }
+  };
 
   const loadMyTestAttempts = async () => {
     if (!userId) return;
@@ -403,9 +434,11 @@ export const UserProfilePage: React.FC = () => {
         description: newFolderDesc.trim() || undefined,
         color: newFolderColor,
         folderType: folderTypeTab,
+        isPublic: newFolderIsPublic,
       });
       setNewFolderName('');
       setNewFolderDesc('');
+      setNewFolderIsPublic(true);
       setOpenCreateFolderDialog(false);
       loadMyFolders();
     } catch (err) {
@@ -618,26 +651,24 @@ export const UserProfilePage: React.FC = () => {
                   <ListItemText primary="Visão Geral" primaryTypographyProps={{ fontWeight: activeNavTab === 'visao_geral' ? 700 : 500 }} />
                 </ListItemButton>
 
-                {(isOwner || isAdmin) && (
-                  <ListItemButton
-                    onClick={() => setOpenEditProfileModal(true)}
-                    sx={{
-                      borderRadius: 2,
-                      mb: 0.5,
-                      '&:hover': {
-                        backgroundColor: isDark ? 'rgba(217, 183, 99, 0.1)' : 'rgba(217, 183, 99, 0.08)',
-                      },
-                    }}
-                  >
-                    <ListItemIcon sx={{ minWidth: 40, color: PALETTE_COLORS.primary }}>
-                      <EditIcon fontSize="small" />
-                    </ListItemIcon>
-                    <ListItemText
-                      primary="Editar Meus Dados"
-                      primaryTypographyProps={{ fontWeight: 600, color: PALETTE_COLORS.primary }}
-                    />
-                  </ListItemButton>
-                )}
+                <ListItemButton
+                  selected={activeNavTab === 'questoes_respondidas'}
+                  onClick={() => setActiveNavTab('questoes_respondidas')}
+                  sx={{
+                    borderRadius: 2,
+                    mb: 0.5,
+                    '&.Mui-selected': {
+                      backgroundColor: isDark ? 'rgba(217, 183, 99, 0.15)' : 'rgba(217, 183, 99, 0.12)',
+                      color: PALETTE_COLORS.primary,
+                      fontWeight: 700,
+                    },
+                  }}
+                >
+                  <ListItemIcon sx={{ minWidth: 40, color: activeNavTab === 'questoes_respondidas' ? PALETTE_COLORS.primary : 'inherit' }}>
+                    <HistoryIcon fontSize="small" />
+                  </ListItemIcon>
+                  <ListItemText primary="Questões Respondidas" primaryTypographyProps={{ fontWeight: activeNavTab === 'questoes_respondidas' ? 700 : 500 }} />
+                </ListItemButton>
 
                 <ListItemButton
                   selected={activeNavTab === 'meus_simulados'}
@@ -949,81 +980,87 @@ export const UserProfilePage: React.FC = () => {
                 </Paper>
               )}
 
-              {/* Cards de Estatísticas Gerais */}
-              <Grid container spacing={2.5}>
-                <Grid item xs={12} sm={6} md={3}>
-                  <Card elevation={3} sx={{ textAlign: 'center', py: 2, borderRadius: 2.5, height: '100%' }}>
-                    <CardContent>
-                      <Typography variant="h3" fontWeight="bold" color="primary">
-                        {profile.totalResolved ?? 0}
-                      </Typography>
-                      <Typography variant="subtitle2" color="text.secondary" sx={{ mt: 0.5 }}>
-                        Questões Resolvidas
-                      </Typography>
-                      <Typography variant="caption" color="text.secondary">
-                        {profile.totalCorrectAnswers ?? 0} acertos no total
-                      </Typography>
-                    </CardContent>
-                  </Card>
-                </Grid>
-                <Grid item xs={12} sm={6} md={3}>
-                  <Card elevation={3} sx={{ textAlign: 'center', py: 2, borderRadius: 2.5, height: '100%' }}>
-                    <CardContent>
-                      <Typography variant="h3" fontWeight="bold" sx={{ color: '#4bf151' }}>
-                        {(profile.easyAccuracy ?? 0).toFixed(1)}%
-                      </Typography>
-                      <Typography variant="subtitle2" color="text.secondary" sx={{ mt: 0.5 }}>
-                        Acerto em Fáceis
-                      </Typography>
-                      <Box sx={{ width: '80%', mx: 'auto', mt: 1 }}>
-                        <LinearProgress
-                          variant="determinate"
-                          value={profile.easyAccuracy ?? 0}
-                          sx={{ height: 6, borderRadius: 3, bgcolor: 'rgba(75, 241, 81, 0.15)', '& .MuiLinearProgress-bar': { bgcolor: '#4bf151' } }}
-                        />
-                      </Box>
-                    </CardContent>
-                  </Card>
-                </Grid>
-                <Grid item xs={12} sm={6} md={3}>
-                  <Card elevation={3} sx={{ textAlign: 'center', py: 2, borderRadius: 2.5, height: '100%' }}>
-                    <CardContent>
-                      <Typography variant="h3" fontWeight="bold" sx={{ color: '#f3ff3d' }}>
-                        {(profile.mediumAccuracy ?? 0).toFixed(1)}%
-                      </Typography>
-                      <Typography variant="subtitle2" color="text.secondary" sx={{ mt: 0.5 }}>
-                        Acerto em Médias
-                      </Typography>
-                      <Box sx={{ width: '80%', mx: 'auto', mt: 1 }}>
-                        <LinearProgress
-                          variant="determinate"
-                          value={profile.mediumAccuracy ?? 0}
-                          sx={{ height: 6, borderRadius: 3, bgcolor: 'rgba(243, 255, 61, 0.15)', '& .MuiLinearProgress-bar': { bgcolor: '#f3ff3d' } }}
-                        />
-                      </Box>
-                    </CardContent>
-                  </Card>
-                </Grid>
-                <Grid item xs={12} sm={6} md={3}>
-                  <Card elevation={3} sx={{ textAlign: 'center', py: 2, borderRadius: 2.5, height: '100%' }}>
-                    <CardContent>
-                      <Typography variant="h3" fontWeight="bold" sx={{ color: '#fa424b' }}>
-                        {(profile.hardAccuracy ?? 0).toFixed(1)}%
-                      </Typography>
-                      <Typography variant="subtitle2" color="text.secondary" sx={{ mt: 0.5 }}>
-                        Acerto em Difíceis
-                      </Typography>
-                      <Box sx={{ width: '80%', mx: 'auto', mt: 1 }}>
-                        <LinearProgress
-                          variant="determinate"
-                          value={profile.hardAccuracy ?? 0}
-                          sx={{ height: 6, borderRadius: 3, bgcolor: 'rgba(250, 66, 75, 0.15)', '& .MuiLinearProgress-bar': { bgcolor: '#fa424b' } }}
-                        />
-                      </Box>
-                    </CardContent>
-                  </Card>
-                </Grid>
-              </Grid>
+              {/* Cards de Estatísticas Gerais - Alinhamento Perfeito com CSS Grid */}
+              <Box
+                sx={{
+                  display: 'grid',
+                  gridTemplateColumns: {
+                    xs: '1fr',
+                    sm: 'repeat(2, 1fr)',
+                    md: 'repeat(4, 1fr)',
+                  },
+                  gap: 2.5,
+                  width: '100%',
+                }}
+              >
+                <Card elevation={3} sx={{ textAlign: 'center', py: 2, borderRadius: 2.5, height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                  <CardContent sx={{ pb: '16px !important' }}>
+                    <Typography variant="h3" fontWeight="bold" color="primary">
+                      {profile.totalResolved ?? 0}
+                    </Typography>
+                    <Typography variant="subtitle2" color="text.secondary" sx={{ mt: 0.5 }}>
+                      Questões Resolvidas
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      {profile.totalCorrectAnswers ?? 0} acertos no total
+                    </Typography>
+                  </CardContent>
+                </Card>
+
+                <Card elevation={3} sx={{ textAlign: 'center', py: 2, borderRadius: 2.5, height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                  <CardContent sx={{ pb: '16px !important' }}>
+                    <Typography variant="h3" fontWeight="bold" sx={{ color: '#4bf151' }}>
+                      {(profile.easyAccuracy ?? 0).toFixed(1)}%
+                    </Typography>
+                    <Typography variant="subtitle2" color="text.secondary" sx={{ mt: 0.5 }}>
+                      Acerto em Fáceis
+                    </Typography>
+                    <Box sx={{ width: '80%', mx: 'auto', mt: 1 }}>
+                      <LinearProgress
+                        variant="determinate"
+                        value={profile.easyAccuracy ?? 0}
+                        sx={{ height: 6, borderRadius: 3, bgcolor: 'rgba(75, 241, 81, 0.15)', '& .MuiLinearProgress-bar': { bgcolor: '#4bf151' } }}
+                      />
+                    </Box>
+                  </CardContent>
+                </Card>
+
+                <Card elevation={3} sx={{ textAlign: 'center', py: 2, borderRadius: 2.5, height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                  <CardContent sx={{ pb: '16px !important' }}>
+                    <Typography variant="h3" fontWeight="bold" sx={{ color: '#f3ff3d' }}>
+                      {(profile.mediumAccuracy ?? 0).toFixed(1)}%
+                    </Typography>
+                    <Typography variant="subtitle2" color="text.secondary" sx={{ mt: 0.5 }}>
+                      Acerto em Médias
+                    </Typography>
+                    <Box sx={{ width: '80%', mx: 'auto', mt: 1 }}>
+                      <LinearProgress
+                        variant="determinate"
+                        value={profile.mediumAccuracy ?? 0}
+                        sx={{ height: 6, borderRadius: 3, bgcolor: 'rgba(243, 255, 61, 0.15)', '& .MuiLinearProgress-bar': { bgcolor: '#f3ff3d' } }}
+                      />
+                    </Box>
+                  </CardContent>
+                </Card>
+
+                <Card elevation={3} sx={{ textAlign: 'center', py: 2, borderRadius: 2.5, height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                  <CardContent sx={{ pb: '16px !important' }}>
+                    <Typography variant="h3" fontWeight="bold" sx={{ color: '#fa424b' }}>
+                      {(profile.hardAccuracy ?? 0).toFixed(1)}%
+                    </Typography>
+                    <Typography variant="subtitle2" color="text.secondary" sx={{ mt: 0.5 }}>
+                      Acerto em Difíceis
+                    </Typography>
+                    <Box sx={{ width: '80%', mx: 'auto', mt: 1 }}>
+                      <LinearProgress
+                        variant="determinate"
+                        value={profile.hardAccuracy ?? 0}
+                        sx={{ height: 6, borderRadius: 3, bgcolor: 'rgba(250, 66, 75, 0.15)', '& .MuiLinearProgress-bar': { bgcolor: '#fa424b' } }}
+                      />
+                    </Box>
+                  </CardContent>
+                </Card>
+              </Box>
 
               {/* Painel Interativo de Análise por Categorias */}
               <Paper elevation={4} sx={{ p: { xs: 2.5, md: 4 }, borderRadius: 3 }}>
@@ -1056,6 +1093,7 @@ export const UserProfilePage: React.FC = () => {
                   onChange={(_, val) => setCategoryTab(val)}
                   variant="scrollable"
                   scrollButtons="auto"
+                  allowScrollButtonsMobile
                   sx={{
                     mb: 3,
                     borderBottom: 1,
@@ -1174,6 +1212,263 @@ export const UserProfilePage: React.FC = () => {
                 </Box>
               </Paper>
             </Stack>
+          )}
+
+          {/* ABA: HISTÓRICO DE QUESTÕES RESPONDIDAS */}
+          {activeNavTab === 'questoes_respondidas' && (
+            <Paper elevation={3} sx={{ p: 3, borderRadius: 3 }}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3, flexWrap: 'wrap', gap: 2 }}>
+                <Box>
+                  <Typography variant="h5" fontWeight="bold">
+                    Questões Respondidas
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Histórico completo de tentativas, alternativas assinaladas, acertos e revisões de gabarito.
+                  </Typography>
+                </Box>
+
+                <Button
+                  variant="outlined"
+                  onClick={() => navigate('/questoes')}
+                  sx={{ fontWeight: 700 }}
+                >
+                  Resolver Mais Questões
+                </Button>
+              </Box>
+
+              {/* Filtros e Busca */}
+              <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} sx={{ mb: 3 }} alignItems="center">
+                <TextField
+                  placeholder="Buscar por enunciado, matéria, área, banca ou ano..."
+                  size="small"
+                  fullWidth
+                  value={questionAttemptSearch}
+                  onChange={(e) => setQuestionAttemptSearch(e.target.value)}
+                  InputProps={{
+                    startAdornment: <SearchIcon fontSize="small" sx={{ mr: 1, color: 'text.secondary' }} />,
+                  }}
+                />
+
+                <Stack direction="row" spacing={1} sx={{ flexShrink: 0 }}>
+                  <Chip
+                    label={`Todas (${myQuestionAttempts.length})`}
+                    clickable
+                    color={questionAttemptFilter === 'ALL' ? 'primary' : 'default'}
+                    variant={questionAttemptFilter === 'ALL' ? 'filled' : 'outlined'}
+                    onClick={() => setQuestionAttemptFilter('ALL')}
+                    sx={{ fontWeight: 700 }}
+                  />
+                  <Chip
+                    label={`Acertos (${myQuestionAttempts.filter((a) => a.isCorrect).length})`}
+                    clickable
+                    color={questionAttemptFilter === 'CORRECT' ? 'success' : 'default'}
+                    variant={questionAttemptFilter === 'CORRECT' ? 'filled' : 'outlined'}
+                    onClick={() => setQuestionAttemptFilter('CORRECT')}
+                    sx={{ fontWeight: 700 }}
+                  />
+                  <Chip
+                    label={`Erros (${myQuestionAttempts.filter((a) => !a.isCorrect).length})`}
+                    clickable
+                    color={questionAttemptFilter === 'WRONG' ? 'error' : 'default'}
+                    variant={questionAttemptFilter === 'WRONG' ? 'filled' : 'outlined'}
+                    onClick={() => setQuestionAttemptFilter('WRONG')}
+                    sx={{ fontWeight: 700 }}
+                  />
+                </Stack>
+              </Stack>
+
+              {loadingQuestionAttempts ? (
+                <Box sx={{ display: 'flex', justifyContent: 'center', py: 6 }}>
+                  <CircularProgress size={32} />
+                </Box>
+              ) : myQuestionAttempts.length === 0 ? (
+                <Box sx={{ textAlign: 'center', py: 6 }}>
+                  <Typography color="text.secondary" sx={{ mb: 2 }}>
+                    Nenhuma questão respondida até o momento.
+                  </Typography>
+                  <Button
+                    variant="contained"
+                    onClick={() => navigate('/questoes')}
+                    sx={{ backgroundColor: PALETTE_COLORS.primary, color: '#1a1e24', fontWeight: 700 }}
+                  >
+                    Ir para o Banco de Questões
+                  </Button>
+                </Box>
+              ) : (
+                <Stack spacing={2}>
+                  {myQuestionAttempts
+                    .filter((att) => {
+                      if (questionAttemptFilter === 'CORRECT' && !att.isCorrect) return false;
+                      if (questionAttemptFilter === 'WRONG' && att.isCorrect) return false;
+
+                      if (!questionAttemptSearch.trim()) return true;
+                      const term = questionAttemptSearch.toLowerCase();
+                      const matchEnunciado = att.questionEnunciado?.toLowerCase().includes(term);
+                      const matchIdent = att.questionIdentifier?.toLowerCase().includes(term);
+                      const matchOrigin = att.originName?.toLowerCase().includes(term);
+                      const matchSubject = att.subjectName?.toLowerCase().includes(term);
+                      const matchArea = att.areaName?.toLowerCase().includes(term);
+                      const matchYear = att.year ? String(att.year).includes(term) : false;
+                      return matchEnunciado || matchIdent || matchOrigin || matchSubject || matchArea || matchYear;
+                    })
+                    .map((att) => {
+                      const mins = Math.floor((att.timeSpentSeconds || 0) / 60);
+                      const secs = (att.timeSpentSeconds || 0) % 60;
+                      const timeStr = `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+                      const formattedDate = att.createdAt
+                        ? new Date(att.createdAt).toLocaleDateString('pt-BR', {
+                            day: '2-digit',
+                            month: '2-digit',
+                            year: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit',
+                          })
+                        : '';
+
+                      return (
+                        <Paper
+                          key={att.id}
+                          variant="outlined"
+                          sx={{
+                            p: 2.5,
+                            borderRadius: 2.5,
+                            borderLeft: `5px solid ${att.isCorrect ? PALETTE_COLORS.success : PALETTE_COLORS.danger}`,
+                            transition: 'all 0.2s',
+                            '&:hover': {
+                              borderColor: PALETTE_COLORS.primary,
+                            },
+                          }}
+                        >
+                          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 1.5, mb: 1.5 }}>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+                              <Typography variant="subtitle1" fontWeight="bold">
+                                {att.questionIdentifier ? `Questão ${att.questionIdentifier}` : `Questão #${att.questionId}`}
+                              </Typography>
+                              {att.year && (
+                                <Chip label={att.year} size="small" variant="outlined" sx={{ height: 22, fontWeight: 600 }} />
+                              )}
+                              {att.originName && (
+                                <Chip label={att.originName} size="small" sx={{ height: 22, fontWeight: 600, backgroundColor: 'action.hover' }} />
+                              )}
+                              {att.areaName && (
+                                <Chip label={att.areaName} size="small" variant="outlined" sx={{ height: 22, fontWeight: 600 }} />
+                              )}
+                              {att.subjectName && (
+                                <Chip label={att.subjectName} size="small" sx={{ height: 22, fontWeight: 600, backgroundColor: 'action.hover' }} />
+                              )}
+                            </Box>
+
+                            <Chip
+                              icon={att.isCorrect ? <CheckCircleOutlineIcon fontSize="inherit" /> : <CancelOutlinedIcon fontSize="inherit" />}
+                              label={att.isCorrect ? 'Acertou' : 'Errou'}
+                              size="small"
+                              sx={{
+                                fontWeight: 800,
+                                backgroundColor: att.isCorrect
+                                  ? 'rgba(75, 241, 81, 0.15)'
+                                  : 'rgba(250, 66, 75, 0.15)',
+                                color: att.isCorrect
+                                  ? PALETTE_COLORS.success
+                                  : PALETTE_COLORS.danger,
+                                border: '1px solid',
+                                borderColor: att.isCorrect
+                                  ? PALETTE_COLORS.success
+                                  : PALETTE_COLORS.danger,
+                              }}
+                            />
+                          </Box>
+
+                          <Typography
+                            variant="body2"
+                            color="text.secondary"
+                            sx={{
+                              mb: 2,
+                              display: '-webkit-box',
+                              WebkitLineClamp: 3,
+                              WebkitBoxOrient: 'vertical',
+                              overflow: 'hidden',
+                              lineHeight: 1.6,
+                            }}
+                          >
+                            {att.questionEnunciado}
+                          </Typography>
+
+                          {/* Comparativo de Resposta */}
+                          <Paper
+                            variant="outlined"
+                            sx={{
+                              p: 1.5,
+                              mb: 2,
+                              borderRadius: 2,
+                              backgroundColor: isDark ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.02)',
+                            }}
+                          >
+                            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.75 }}>
+                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+                                <Typography variant="caption" sx={{ fontWeight: 700, minWidth: 90 }}>
+                                  Sua resposta:
+                                </Typography>
+                                <Typography
+                                  variant="body2"
+                                  sx={{
+                                    fontWeight: 600,
+                                    color: att.isCorrect ? PALETTE_COLORS.success : PALETTE_COLORS.danger,
+                                  }}
+                                >
+                                  {att.selectedAlternativeLetter
+                                    ? `Alternativa (${att.selectedAlternativeLetter})`
+                                    : 'Nenhuma selecionada'}{' '}
+                                  {att.selectedAlternativeText && `— ${att.selectedAlternativeText}`}
+                                </Typography>
+                              </Box>
+
+                              {!att.isCorrect && att.correctAlternativeLetter && (
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+                                  <Typography variant="caption" sx={{ fontWeight: 700, minWidth: 90, color: PALETTE_COLORS.success }}>
+                                    Gabarito correto:
+                                  </Typography>
+                                  <Typography variant="body2" sx={{ fontWeight: 600, color: PALETTE_COLORS.success }}>
+                                    Alternativa ({att.correctAlternativeLetter})
+                                    {att.correctAlternativeText && ` — ${att.correctAlternativeText}`}
+                                  </Typography>
+                                </Box>
+                              )}
+                            </Box>
+                          </Paper>
+
+                          {/* Rodapé do Card */}
+                          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 1.5 }}>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
+                              <Typography variant="caption" color="text.secondary">
+                                Respondida em: {formattedDate}
+                              </Typography>
+                              {att.timeSpentSeconds !== undefined && att.timeSpentSeconds !== null && (
+                                <Typography variant="caption" color="text.secondary">
+                                  • Tempo: {timeStr}
+                                </Typography>
+                              )}
+                              {att.isFirstAttempt && (
+                                <Chip label="1ª Tentativa" size="small" variant="outlined" sx={{ height: 18, fontSize: '0.65rem' }} />
+                              )}
+                            </Box>
+
+                            <Stack direction="row" spacing={1}>
+                              <Button
+                                size="small"
+                                variant="outlined"
+                                onClick={() => navigate(`/questoes/${att.questionId}`)}
+                                sx={{ textTransform: 'none', fontWeight: 600 }}
+                              >
+                                Ver no Banco de Questões
+                              </Button>
+                            </Stack>
+                          </Box>
+                        </Paper>
+                      );
+                    })}
+                </Stack>
+              )}
+            </Paper>
           )}
 
           {/* ABA: MEUS SIMULADOS REALIZADOS */}
@@ -1711,7 +2006,21 @@ export const UserProfilePage: React.FC = () => {
               <Tabs
                 value={folderTypeTab}
                 onChange={(_, val) => setFolderTypeTab(val)}
-                sx={{ mb: 3, borderBottom: 1, borderColor: 'divider' }}
+                variant="scrollable"
+                scrollButtons="auto"
+                allowScrollButtonsMobile
+                sx={{
+                  mb: 3,
+                  borderBottom: 1,
+                  borderColor: 'divider',
+                  '& .MuiTab-root': {
+                    fontWeight: 700,
+                    textTransform: 'none',
+                    fontSize: { xs: '0.85rem', sm: '0.95rem' },
+                    minWidth: 'auto',
+                    px: { xs: 1.5, sm: 2 },
+                  },
+                }}
               >
                 <Tab value="QUESTION" label="Pastas de Questões" icon={<QuizOutlinedIcon fontSize="small" />} iconPosition="start" />
                 <Tab value="TEST" label="Pastas de Provas" icon={<MenuBookOutlinedIcon fontSize="small" />} iconPosition="start" />
@@ -1759,22 +2068,38 @@ export const UserProfilePage: React.FC = () => {
                             <Typography variant="h6" fontWeight="bold">
                               {folder.name}
                             </Typography>
-                            <IconButton
-                              size="small"
-                              color="error"
-                              onClick={() =>
-                                handleDeleteItem(
-                                  'Excluir Pasta',
-                                  `Tem certeza que deseja excluir a pasta "${folder.name}"? Os itens salvos nela não serão apagados do sistema.`,
-                                  async () => {
-                                    await deleteFolder(folder.id);
-                                    loadMyFolders();
+                            <Stack direction="row" spacing={0.5} alignItems="center">
+                              <Tooltip title="Editar Pasta">
+                                <IconButton
+                                  size="small"
+                                  color="primary"
+                                  onClick={() => {
+                                    setEditingFolder(folder);
+                                    setEditFolderModalOpen(true);
+                                  }}
+                                >
+                                  <EditIcon fontSize="small" />
+                                </IconButton>
+                              </Tooltip>
+                              <Tooltip title="Excluir Pasta">
+                                <IconButton
+                                  size="small"
+                                  color="error"
+                                  onClick={() =>
+                                    handleDeleteItem(
+                                      'Excluir Pasta',
+                                      `Tem certeza que deseja excluir a pasta "${folder.name}"? Os itens salvos nela não serão apagados do sistema.`,
+                                      async () => {
+                                        await deleteFolder(folder.id);
+                                        loadMyFolders();
+                                      }
+                                    )
                                   }
-                                )
-                              }
-                            >
-                              <DeleteOutlineIcon fontSize="small" />
-                            </IconButton>
+                                >
+                                  <DeleteOutlineIcon fontSize="small" />
+                                </IconButton>
+                              </Tooltip>
+                            </Stack>
                           </Stack>
 
                           {folder.description && (
@@ -2314,6 +2639,20 @@ export const UserProfilePage: React.FC = () => {
                 ))}
               </RadioGroup>
             </FormControl>
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={newFolderIsPublic}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewFolderIsPublic(e.target.checked)}
+                  color="success"
+                />
+              }
+              label={
+                <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                  {newFolderIsPublic ? 'Pasta Pública (visível na comunidade)' : 'Pasta Privada (apenas para você)'}
+                </Typography>
+              }
+            />
           </Stack>
         </DialogContent>
         <DialogActions sx={{ p: 2 }}>
@@ -2330,6 +2669,17 @@ export const UserProfilePage: React.FC = () => {
           </Button>
         </DialogActions>
       </Dialog>
+
+      {/* Modal de Edição de Pasta */}
+      <EditFolderModal
+        open={editFolderModalOpen}
+        folder={editingFolder}
+        onClose={() => {
+          setEditFolderModalOpen(false);
+          setEditingFolder(null);
+        }}
+        onUpdated={() => loadMyFolders()}
+      />
 
       {/* Diálogo Genérico de Confirmação de Exclusão */}
       <Dialog open={deleteDialog.open} onClose={() => setDeleteDialog((prev) => ({ ...prev, open: false }))}>

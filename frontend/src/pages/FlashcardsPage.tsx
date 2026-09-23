@@ -53,6 +53,7 @@ import { useAppTheme } from '../theme/ThemeContext';
 import { useAuth } from '../context/AuthContext';
 import { CreateFlashcardModal } from '../components/crud/CreateFlashcardModal';
 import { EditFlashcardModal } from '../components/crud/EditFlashcardModal';
+import { EditFolderModal } from '../components/crud/EditFolderModal';
 import { SaveFlashcardToFolderModal } from '../components/folders/SaveFlashcardToFolderModal';
 
 const COLOR_OPTIONS = [
@@ -102,6 +103,8 @@ export const FlashcardsPage: React.FC = () => {
   const [folderDesc, setFolderDesc] = useState('');
   const [folderColor, setFolderColor] = useState(PALETTE_COLORS.primary);
   const [folderIsPublic, setFolderIsPublic] = useState(true);
+  const [editingFolder, setEditingFolder] = useState<Folder | null>(null);
+  const [editFolderModalOpen, setEditFolderModalOpen] = useState(false);
   const [savingFolder, setSavingFolder] = useState(false);
 
   // Card Flip Previews state
@@ -303,6 +306,16 @@ export const FlashcardsPage: React.FC = () => {
           onChange={(_e, val) => setViewMode(val)}
           indicatorColor="primary"
           textColor="primary"
+          variant="scrollable"
+          scrollButtons="auto"
+          allowScrollButtonsMobile
+          sx={{
+            '& .MuiTab-root': {
+              fontWeight: 700,
+              textTransform: 'none',
+              fontSize: { xs: '0.85rem', sm: '0.95rem' },
+            },
+          }}
         >
           <Tab
             icon={<FolderSpecialOutlinedIcon />}
@@ -347,8 +360,9 @@ export const FlashcardsPage: React.FC = () => {
           ) : filteredFolders.length > 0 ? (
             <Grid container spacing={3}>
               {filteredFolders.map((folder) => {
-                const isOwner = user?.id && folder.createdByUser?.id === user.id;
-                const canDelete = isOwner || (isAdmin && folder.isPublic);
+                const isOwner = Boolean(user?.id && folder.createdByUser?.id === user.id);
+                const canEdit = isOwner || (isAdmin && folder.isPublic !== false);
+                const canDelete = isOwner || (isAdmin && folder.isPublic !== false);
 
                 return (
                   <Grid item xs={12} sm={6} md={4} key={folder.id}>
@@ -390,6 +404,22 @@ export const FlashcardsPage: React.FC = () => {
                                 )}
                               </IconButton>
                             </Tooltip>
+
+                            {canEdit && (
+                              <Tooltip title="Editar deck">
+                                <IconButton
+                                  size="small"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setEditingFolder(folder);
+                                    setEditFolderModalOpen(true);
+                                  }}
+                                  sx={{ color: 'text.secondary', '&:hover': { color: PALETTE_COLORS.primary } }}
+                                >
+                                  <EditIcon fontSize="small" />
+                                </IconButton>
+                              </Tooltip>
+                            )}
 
                             {canDelete && (
                               <Tooltip title="Excluir pasta">
@@ -938,6 +968,17 @@ export const FlashcardsPage: React.FC = () => {
           setCardForFolder(null);
         }}
         onSavedStatusChange={loadData}
+      />
+
+      {/* Modal de Edição de Deck / Pasta */}
+      <EditFolderModal
+        open={editFolderModalOpen}
+        folder={editingFolder}
+        onClose={() => {
+          setEditFolderModalOpen(false);
+          setEditingFolder(null);
+        }}
+        onUpdated={() => loadData()}
       />
     </Box>
   );
