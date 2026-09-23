@@ -32,6 +32,7 @@ import {
   FlashcardRequest,
   FlashcardSession,
   FlashcardSessionRequest,
+  QuestionAttemptHistory,
 } from '../types';
 
 const apiClient = axios.create({
@@ -738,4 +739,61 @@ export const getMyFlashcardSessions = async (): Promise<FlashcardSession[]> => {
     return [];
   }
 };
+
+// Histórico de Questões do Usuário (Tentativas)
+export const getUserQuestionAttempts = async (userId: number): Promise<QuestionAttemptHistory[]> => {
+  try {
+    const response = await apiClient.get<QuestionAttemptHistory[]>(`/users/${userId}/question-attempts`);
+    return Array.isArray(response.data) ? response.data : [];
+  } catch (err) {
+    console.warn(`API /users/${userId}/question-attempts error:`, err);
+    return [];
+  }
+};
+
+// Flashcards em Pastas (N:N)
+export const addFlashcardToFolder = async (
+  folderId: number,
+  flashcardId: number,
+  notes?: string
+): Promise<void> => {
+  await apiClient.post(`/folders/${folderId}/flashcards/${flashcardId}`, null, { params: { notes } });
+};
+
+export const removeFlashcardFromFolder = async (
+  folderId: number,
+  flashcardId: number
+): Promise<void> => {
+  await apiClient.delete(`/folders/${folderId}/flashcards/${flashcardId}`);
+};
+
+export const getFolderIdsForFlashcard = async (flashcardId: number): Promise<number[]> => {
+  try {
+    const response = await apiClient.get<number[]>(`/folders/by-flashcard/${flashcardId}`);
+    return Array.isArray(response.data) ? response.data : [];
+  } catch (err) {
+    console.warn(`API /folders/by-flashcard/${flashcardId} error:`, err);
+    return [];
+  }
+};
+
+// Questões em Provas/Simulados (N:N)
+export const addQuestionToTest = async (testId: number, questionId: number): Promise<void> => {
+  await apiClient.post(`/tests/${testId}/questions/${questionId}`);
+};
+
+export const removeQuestionFromTest = async (testId: number, questionId: number): Promise<void> => {
+  await apiClient.delete(`/tests/${testId}/questions/${questionId}`);
+};
+
+export const getTestIdsForQuestion = async (questionId: number): Promise<number[]> => {
+  try {
+    const response = await apiClient.get<number[]>(`/tests/by-question/${questionId}`);
+    return Array.isArray(response.data) ? response.data : [];
+  } catch (err) {
+    console.warn(`API /tests/by-question/${questionId} error:`, err);
+    return [];
+  }
+};
+
 

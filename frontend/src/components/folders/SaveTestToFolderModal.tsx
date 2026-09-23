@@ -13,6 +13,8 @@ import {
   CircularProgress,
   Divider,
   Paper,
+  FormControlLabel,
+  Switch,
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import CheckIcon from '@mui/icons-material/Check';
@@ -24,6 +26,7 @@ import {
   getFolders,
   removeTestFromFolder,
 } from '../../services/api';
+import { useAuth } from '../../context/AuthContext';
 import { PALETTE_COLORS } from '../../theme/theme';
 
 interface SaveTestToFolderModalProps {
@@ -49,6 +52,7 @@ export const SaveTestToFolderModal: React.FC<SaveTestToFolderModalProps> = ({
   test,
   onSavedStatusChange,
 }) => {
+  const { user } = useAuth();
   const [folders, setFolders] = useState<Folder[]>([]);
   const [savedFolderIds, setSavedFolderIds] = useState<Set<number>>(new Set());
   const [loading, setLoading] = useState<boolean>(false);
@@ -58,20 +62,21 @@ export const SaveTestToFolderModal: React.FC<SaveTestToFolderModalProps> = ({
   const [newFolderName, setNewFolderName] = useState<string>('');
   const [newFolderDesc, setNewFolderDesc] = useState<string>('');
   const [newFolderColor, setNewFolderColor] = useState<string>(PALETTE_COLORS.primary);
+  const [newFolderIsPublic, setNewFolderIsPublic] = useState<boolean>(true);
   const [creatingFolder, setCreatingFolder] = useState<boolean>(false);
 
   useEffect(() => {
     if (open && test) {
       loadFoldersAndStatus();
     }
-  }, [open, test]);
+  }, [open, test, user]);
 
   const loadFoldersAndStatus = async () => {
     if (!test) return;
     setLoading(true);
     try {
       const [allFolders, activeFolderIds] = await Promise.all([
-        getFolders('TEST'),
+        getFolders('TEST', user?.id),
         getFolderIdsForTest(test.id),
       ]);
       setFolders(allFolders);
@@ -120,9 +125,10 @@ export const SaveTestToFolderModal: React.FC<SaveTestToFolderModalProps> = ({
     try {
       const created = await createFolder({
         name: newFolderName.trim(),
-        description: newFolderDesc.trim(),
+        description: newFolderDesc.trim() || undefined,
         color: newFolderColor,
         folderType: 'TEST',
+        isPublic: newFolderIsPublic,
       });
       setFolders((prev) => [...prev, created]);
       setNewFolderName('');
@@ -278,6 +284,21 @@ export const SaveTestToFolderModal: React.FC<SaveTestToFolderModalProps> = ({
                       </Box>
                     ))}
                   </Box>
+
+                  <FormControlLabel
+                    control={
+                      <Switch
+                        checked={newFolderIsPublic}
+                        onChange={(e) => setNewFolderIsPublic(e.target.checked)}
+                        color="success"
+                      />
+                    }
+                    label={
+                      <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                        {newFolderIsPublic ? 'Pasta Pública (visível na comunidade)' : 'Pasta Privada (apenas para você)'}
+                      </Typography>
+                    }
+                  />
 
                   <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end', pt: 1 }}>
                     <Button size="small" onClick={() => setShowCreateFolder(false)}>

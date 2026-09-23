@@ -7,6 +7,7 @@ import {
   Button,
   Box,
   Typography,
+  Checkbox,
   Stack,
   TextField,
   CircularProgress,
@@ -23,9 +24,11 @@ import PublicIcon from '@mui/icons-material/Public';
 import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
 import { Flashcard, Folder } from '../../types';
 import {
+  addFlashcardToFolder,
   createFolder,
+  getFolderIdsForFlashcard,
   getFolders,
-  updateFlashcard,
+  removeFlashcardFromFolder,
 } from '../../services/api';
 import { PALETTE_COLORS } from '../../theme/theme';
 import { useAuth } from '../../context/AuthContext';
@@ -55,9 +58,8 @@ export const SaveFlashcardToFolderModal: React.FC<SaveFlashcardToFolderModalProp
 }) => {
   const { user } = useAuth();
   const [folders, setFolders] = useState<Folder[]>([]);
-  const [selectedFolderId, setSelectedFolderId] = useState<number | null>(null);
+  const [savedFolderIds, setSavedFolderIds] = useState<Set<number>>(new Set());
   const [loading, setLoading] = useState<boolean>(false);
-  const [saving, setSaving] = useState<boolean>(false);
 
   // Formulário inline para nova pasta / deck
   const [showCreateFolder, setShowCreateFolder] = useState<boolean>(false);
@@ -69,16 +71,20 @@ export const SaveFlashcardToFolderModal: React.FC<SaveFlashcardToFolderModalProp
 
   useEffect(() => {
     if (open && flashcard) {
-      setSelectedFolderId(flashcard.folderId ?? null);
-      loadFolders();
+      loadFoldersAndStatus();
     }
   }, [open, flashcard]);
 
-  const loadFolders = async () => {
+  const loadFoldersAndStatus = async () => {
+    if (!flashcard) return;
     setLoading(true);
     try {
-      const allFolders = await getFolders('FLASHCARD', user?.id);
+      const [allFolders, activeFolderIds] = await Promise.all([
+        getFolders('FLASHCARD', user?.id),
+        getFolderIdsForFlashcard(flashcard.id),
+      ]);
       setFolders(allFolders);
+      setSavedFolderIds(new Set(activeFolderIds));
     } catch (err) {
       console.error('Erro ao carregar pastas de flashcards:', err);
     } finally {
@@ -86,25 +92,34 @@ export const SaveFlashcardToFolderModal: React.FC<SaveFlashcardToFolderModalProp
     }
   };
 
-  const handleSelectFolder = async (folderId: number | null) => {
+  const handleToggleFolder = async (folderId: number) => {
     if (!flashcard) return;
-    setSaving(true);
-    try {
-      await updateFlashcard(flashcard.id, {
-        front: flashcard.front,
-        back: flashcard.back,
-        areaId: flashcard.areaId,
-        subjectId: flashcard.subjectId,
-        folderId: folderId ?? undefined,
-        isPublic: flashcard.isPublic,
-      });
-      setSelectedFolderId(folderId);
-      if (onSavedStatusChange) onSavedStatusChange();
-      onClose();
-    } catch (err) {
-      console.error('Erro ao mover flashcard para a pasta:', err);
-    } finally {
-      setSaving(false);
+
+    const isCurrentlySaved = savedFolderIds.has(folderId);
+    const newSavedSet = new Set(savedFolderIds);
+
+    if (isCurrentlySaved) {
+      newSavedSet.delete(folderId);
+      setSavedFolderIds(newSavedSet);
+      try {
+        await removeFlashcardFromFolder(folderId, flashcard.id);
+        if (onSavedStatusChange) onSavedStatusChange();
+      } catch (err) {
+        console.error('Erro ao remover flashcard da pasta:', err);
+        newSavedSet.add(folderId);
+        setSavedFolderIds(newSavedSet);
+      }
+    } else {
+      newSavedSet.add(folderId);
+      setSavedFolderIds(newSavedSet);
+      try {
+        await addFlashcardToFolder(folderId, flashcard.id);
+        if (onSavedStatusChange) onSavedStatusChange();
+      } catch (err) {
+        console.error('Erro ao adicionar flashcard na pasta:', err);
+        newSavedSet.delete(folderId);
+        setSavedFolderIds(newSavedSet);
+      }
     }
   };
 
@@ -125,7 +140,7 @@ export const SaveFlashcardToFolderModal: React.FC<SaveFlashcardToFolderModalProp
       setShowCreateFolder(false);
 
       // Associa o flashcard à nova pasta criada
-      await handleSelectFolder(created.id);
+      await handleToggleFolder(created.id);
     } catch (err) {
       console.error('Erro ao criar deck de flashcard:', err);
     } finally {
@@ -138,11 +153,11 @@ export const SaveFlashcardToFolderModal: React.FC<SaveFlashcardToFolderModalProp
   return (
     <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
       <DialogTitle sx={{ fontWeight: 700, pb: 1 }}>
-        Salvar Flashcard em uma Pasta / Deck
+        Salvar Flashcard em Pastas / Decks (N:N)
       </DialogTitle>
       <DialogContent dividers>
         <Typography variant="body2" sx={{ color: 'text.secondary', mb: 2 }}>
-          Selecione uma pasta/deck para organizar este flashcard. Você pode trocar ou remover a qualquer momento.
+          Marque as pastas nas quais deseja incluir este flashcard. Ele pode pertencer a múltiplos decks simultaneamente.
         </Typography>
 
         {loading ? (
@@ -151,58 +166,23 @@ export const SaveFlashcardToFolderModal: React.FC<SaveFlashcardToFolderModalProp
           </Box>
         ) : (
           <Stack spacing={1.5}>
-            {/* Opção: Sem pasta (Deck Avulso) */}
-            <Paper
-              variant="outlined"
-              onClick={() => !saving && handleSelectFolder(null)}
-              sx={{
-                p: 1.5,
-                borderRadius: 2,
-                cursor: saving ? 'default' : 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                borderColor: selectedFolderId === null ? PALETTE_COLORS.primary : 'divider',
-                backgroundColor:
-                  selectedFolderId === null ? 'rgba(217, 183, 99, 0.08)' : 'background.paper',
-                '&:hover': {
-                  borderColor: PALETTE_COLORS.primary,
-                },
-              }}
-            >
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                <FolderSpecialOutlinedIcon sx={{ color: 'text.secondary' }} />
-                <Box>
-                  <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
-                    Nenhuma Pasta (Deck Avulso)
-                  </Typography>
-                  <Typography variant="caption" color="text.secondary">
-                    O flashcard não pertencerá a nenhuma pasta específica.
-                  </Typography>
-                </Box>
-              </Box>
-              {selectedFolderId === null && (
-                <CheckIcon sx={{ color: PALETTE_COLORS.primary, fontSize: 20 }} />
-              )}
-            </Paper>
-
             {folders.map((folder) => {
-              const isSelected = selectedFolderId === folder.id;
+              const isSaved = savedFolderIds.has(folder.id);
               return (
                 <Paper
                   key={folder.id}
                   variant="outlined"
-                  onClick={() => !saving && handleSelectFolder(folder.id)}
+                  onClick={() => handleToggleFolder(folder.id)}
                   sx={{
                     p: 1.5,
                     borderRadius: 2,
-                    cursor: saving ? 'default' : 'pointer',
+                    cursor: 'pointer',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'space-between',
                     borderLeft: `5px solid ${folder.color || PALETTE_COLORS.primary}`,
-                    borderColor: isSelected ? PALETTE_COLORS.primary : 'divider',
-                    backgroundColor: isSelected
+                    borderColor: isSaved ? PALETTE_COLORS.primary : 'divider',
+                    backgroundColor: isSaved
                       ? 'rgba(217, 183, 99, 0.08)'
                       : 'background.paper',
                     '&:hover': {
@@ -211,6 +191,17 @@ export const SaveFlashcardToFolderModal: React.FC<SaveFlashcardToFolderModalProp
                   }}
                 >
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, minWidth: 0, flex: 1 }}>
+                    <Checkbox
+                      checked={isSaved}
+                      onChange={() => handleToggleFolder(folder.id)}
+                      onClick={(e) => e.stopPropagation()}
+                      sx={{
+                        color: PALETTE_COLORS.primary,
+                        '&.Mui-checked': {
+                          color: PALETTE_COLORS.primary,
+                        },
+                      }}
+                    />
                     <FolderSpecialOutlinedIcon
                       sx={{ color: folder.color || PALETTE_COLORS.primary, flexShrink: 0 }}
                     />
@@ -231,7 +222,7 @@ export const SaveFlashcardToFolderModal: React.FC<SaveFlashcardToFolderModalProp
                       </Stack>
                     </Box>
                   </Box>
-                  {isSelected && (
+                  {isSaved && (
                     <CheckIcon sx={{ color: PALETTE_COLORS.primary, fontSize: 20 }} />
                   )}
                 </Paper>
@@ -348,7 +339,7 @@ export const SaveFlashcardToFolderModal: React.FC<SaveFlashcardToFolderModalProp
       </DialogContent>
       <DialogActions sx={{ p: 2 }}>
         <Button onClick={onClose} sx={{ fontWeight: 600 }}>
-          Fechar
+          Concluir
         </Button>
       </DialogActions>
     </Dialog>

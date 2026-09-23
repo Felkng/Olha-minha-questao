@@ -577,4 +577,29 @@ export interface TestWithQuestionsRequest {
   }[];
 }
 
+export interface QuestionAttemptHistory {
+  id: number;
+  questionId: number;
+  questionEnunciado: string;
+  questionIdentifier?: string;
+  year?: number;
+  originId?: number;
+  originName?: string;
+  subjectId?: number;
+  subjectName?: string;
+  areaId?: number;
+  areaName?: string;
+  selectedAlternativeId?: number;
+  selectedAlternativeLetter?: string;
+  selectedAlternativeText?: string;
+  correctAlternativeId?: number;
+  correctAlternativeLetter?: string;
+  correctAlternativeText?: string;
+  isCorrect: boolean;
+  isFirstAttempt: boolean;
+  timeSpentSeconds?: number;
+  sessionId?: string;
+  createdAt: string;
+}
+
 

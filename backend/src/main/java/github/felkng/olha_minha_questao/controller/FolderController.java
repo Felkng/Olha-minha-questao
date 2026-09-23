@@ -80,6 +80,28 @@ public class FolderController {
         return ResponseEntity.ok(folderService.getFlashcardsInFolder(id));
     }
 
+    @PostMapping("/{id}/flashcards/{flashcardId}")
+    public ResponseEntity<Void> addFlashcardToFolder(
+            @PathVariable Long id,
+            @PathVariable Long flashcardId,
+            @RequestParam(required = false) String notes) {
+        folderService.addFlashcardToFolder(id, flashcardId, notes);
+        return ResponseEntity.status(HttpStatus.CREATED).build();
+    }
+
+    @DeleteMapping("/{id}/flashcards/{flashcardId}")
+    public ResponseEntity<Void> removeFlashcardFromFolder(
+            @PathVariable Long id,
+            @PathVariable Long flashcardId) {
+        folderService.removeFlashcardFromFolder(id, flashcardId);
+        return ResponseEntity.noContent().build();
+    }
+
+    @GetMapping("/by-flashcard/{flashcardId}")
+    public ResponseEntity<List<Long>> getFolderIdsForFlashcard(@PathVariable Long flashcardId) {
+        return ResponseEntity.ok(folderService.getFolderIdsForFlashcard(flashcardId));
+    }
+
     // Questões Salvas
     @GetMapping("/{id}/questions")
     public ResponseEntity<List<QuestionResponseDTO>> getQuestionsInFolder(@PathVariable Long id) {

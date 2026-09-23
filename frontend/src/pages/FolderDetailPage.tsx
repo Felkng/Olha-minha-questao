@@ -42,6 +42,7 @@ import { useAuth } from '../context/AuthContext';
 import { useAppTheme } from '../theme/ThemeContext';
 import { SaveFlashcardToFolderModal } from '../components/folders/SaveFlashcardToFolderModal';
 import { EditFlashcardModal } from '../components/crud/EditFlashcardModal';
+import { EditFolderModal } from '../components/crud/EditFolderModal';
 
 interface FolderDetailPageProps {
   onBookmarkQuestion?: (question: Question) => void;
@@ -69,6 +70,7 @@ export const FolderDetailPage: React.FC<FolderDetailPageProps> = ({
   const [selectedCardForFolder, setSelectedCardForFolder] = useState<Flashcard | null>(null);
   const [editModalOpen, setEditModalOpen] = useState<boolean>(false);
   const [cardToEdit, setCardToEdit] = useState<Flashcard | null>(null);
+  const [editFolderModalOpen, setEditFolderModalOpen] = useState<boolean>(false);
 
   useEffect(() => {
     if (id) {
@@ -175,7 +177,7 @@ export const FolderDetailPage: React.FC<FolderDetailPageProps> = ({
           Voltar para Pastas
         </Button>
 
-        <Stack direction="row" spacing={1.5}>
+        <Stack direction="row" spacing={1.5} alignItems="center">
           {isFlashcardFolder && (
             <Button
               variant="contained"
@@ -190,6 +192,17 @@ export const FolderDetailPage: React.FC<FolderDetailPageProps> = ({
               }}
             >
               Praticar Deck ({flashcards.length})
+            </Button>
+          )}
+
+          {(isAdmin || (user && folder.createdByUser?.id === user.id)) && (
+            <Button
+              variant="outlined"
+              startIcon={<EditIcon />}
+              onClick={() => setEditFolderModalOpen(true)}
+              sx={{ borderRadius: 2, fontWeight: 700 }}
+            >
+              {isFlashcardFolder ? 'Editar Deck' : 'Editar Pasta'}
             </Button>
           )}
 
@@ -494,6 +507,16 @@ export const FolderDetailPage: React.FC<FolderDetailPageProps> = ({
           setCardToEdit(null);
         }}
         onUpdated={() => {
+          if (id) loadFolderData(Number(id));
+        }}
+      />
+
+      <EditFolderModal
+        open={editFolderModalOpen}
+        folder={folder}
+        onClose={() => setEditFolderModalOpen(false)}
+        onUpdated={(updated) => {
+          setFolder(updated);
           if (id) loadFolderData(Number(id));
         }}
       />
