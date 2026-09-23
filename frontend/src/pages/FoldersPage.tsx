@@ -14,7 +14,6 @@ import {
   DialogContent,
   DialogActions,
   TextField,
-  CircularProgress,
   Tabs,
   Tab,
   FormControl,
@@ -24,6 +23,7 @@ import {
   Radio,
   Switch,
 } from '@mui/material';
+import { CardGridSkeleton } from '../components/skeletons';
 import FolderSpecialOutlinedIcon from '@mui/icons-material/FolderSpecialOutlined';
 import AddIcon from '@mui/icons-material/Add';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
@@ -198,9 +198,7 @@ export const FoldersPage: React.FC = () => {
       </Paper>
 
       {loading ? (
-        <Box sx={{ display: 'flex', justifyContent: 'center', py: 6 }}>
-          <CircularProgress sx={{ color: PALETTE_COLORS.primary }} />
-        </Box>
+        <CardGridSkeleton count={6} columns={{ xs: 12, sm: 6, md: 4 }} cardHeight={180} />
       ) : folders.length > 0 ? (
         <Grid container spacing={2.5}>
           {folders.map((folder) => {

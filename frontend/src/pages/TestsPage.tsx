@@ -6,7 +6,6 @@ import {
   Chip,
   Button,
   Grid,
-  CircularProgress,
   Stack,
   Alert,
   TextField,
@@ -38,6 +37,7 @@ import { useAppTheme } from '../theme/ThemeContext';
 import { useAuth } from '../context/AuthContext';
 import { CreateTestWizardModal } from '../components/crud/CreateTestWizardModal';
 import { EditTestModal } from '../components/crud/EditTestModal';
+import { CardGridSkeleton } from '../components/skeletons';
 
 export const TestsPage: React.FC = () => {
   const navigate = useNavigate();
@@ -130,8 +130,18 @@ export const TestsPage: React.FC = () => {
 
   if (loading) {
     return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
-        <CircularProgress sx={{ color: PALETTE_COLORS.primary }} />
+      <Box sx={{ mb: 6 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 3, flexWrap: 'wrap', gap: 2 }}>
+          <Box>
+            <Typography variant="h5" sx={{ fontWeight: 800, mb: 0.5 }}>
+              Provas & Simulados
+            </Typography>
+            <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+              Selecione uma prova para iniciar a avaliação com cronômetro personalizado e feedback de desempenho.
+            </Typography>
+          </Box>
+        </Box>
+        <CardGridSkeleton count={6} columns={{ xs: 12, sm: 12, md: 6 }} cardHeight={220} />
       </Box>
     );
   }

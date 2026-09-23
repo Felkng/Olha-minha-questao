@@ -14,12 +14,12 @@ import {
   DialogContent,
   DialogContentText,
   DialogActions,
-  CircularProgress,
   IconButton,
   Tooltip,
   TextField,
   InputAdornment,
 } from '@mui/material';
+import { DetailPageSkeleton } from '../components/skeletons';
 import TimerOutlinedIcon from '@mui/icons-material/TimerOutlined';
 import PauseCircleOutlineIcon from '@mui/icons-material/PauseCircleOutline';
 import PlayCircleOutlineIcon from '@mui/icons-material/PlayCircleOutline';
@@ -233,11 +233,7 @@ export const TestEvaluationPage: React.FC = () => {
   };
 
   if (loading) {
-    return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
-        <CircularProgress sx={{ color: PALETTE_COLORS.primary }} />
-      </Box>
-    );
+    return <DetailPageSkeleton />;
   }
 
   if (!evaluation) {

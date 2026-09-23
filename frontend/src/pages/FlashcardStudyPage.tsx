@@ -9,7 +9,7 @@ import {
   LinearProgress,
   Divider,
   Grid,
-  CircularProgress,
+  Skeleton,
 } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import FlipCameraAndroidIcon from '@mui/icons-material/FlipCameraAndroid';
@@ -157,8 +157,24 @@ export const FlashcardStudyPage: React.FC = () => {
 
   if (loading) {
     return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', py: 10 }}>
-        <CircularProgress sx={{ color: PALETTE_COLORS.primary }} />
+      <Box sx={{ mb: 6, maxWidth: 800, mx: 'auto' }}>
+        <Skeleton variant="rounded" width={160} height={36} sx={{ mb: 3, borderRadius: 2 }} />
+        <Paper elevation={4} sx={{ p: { xs: 3, md: 4 }, borderRadius: 3, mb: 3 }}>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+            <Skeleton variant="rounded" width={100} height={24} sx={{ borderRadius: 1.5 }} />
+            <Skeleton variant="rounded" width={80} height={24} sx={{ borderRadius: 1.5 }} />
+          </Box>
+          <Skeleton variant="rounded" height={8} sx={{ borderRadius: 4, mb: 4 }} />
+          <Box sx={{ minHeight: 280, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', p: 3 }}>
+            <Skeleton variant="text" width="60%" height={32} sx={{ mb: 2 }} />
+            <Skeleton variant="text" width="80%" height={24} />
+            <Skeleton variant="text" width="70%" height={24} />
+          </Box>
+        </Paper>
+        <Box sx={{ display: 'flex', justifyContent: 'center', gap: 2 }}>
+          <Skeleton variant="rounded" width={140} height={44} sx={{ borderRadius: 2.5 }} />
+          <Skeleton variant="rounded" width={140} height={44} sx={{ borderRadius: 2.5 }} />
+        </Box>
       </Box>
     );
   }

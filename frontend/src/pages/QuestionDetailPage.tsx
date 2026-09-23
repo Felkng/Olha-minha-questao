@@ -2,7 +2,6 @@ import React, { useEffect, useState } from 'react';
 import {
   Box,
   Button,
-  CircularProgress,
   Alert,
 } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
@@ -11,7 +10,7 @@ import { Question } from '../types';
 import { getQuestionById } from '../services/api';
 import { QuestionCard } from '../components/questions/QuestionCard';
 import { QuestionWhiteboard } from '../components/whiteboard/QuestionWhiteboard';
-import { PALETTE_COLORS } from '../theme/theme';
+import { QuestionSkeleton } from '../components/skeletons';
 
 interface QuestionDetailPageProps {
   onBookmarkClick?: (question: Question) => void;
@@ -62,8 +61,15 @@ export const QuestionDetailPage: React.FC<QuestionDetailPageProps> = ({
 
   if (loading) {
     return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
-        <CircularProgress sx={{ color: PALETTE_COLORS.primary }} />
+      <Box sx={{ mb: 6 }}>
+        <Button
+          startIcon={<ArrowBackIcon />}
+          onClick={handleBack}
+          sx={{ mb: 3, color: 'text.secondary', fontWeight: 600 }}
+        >
+          {backLabel}
+        </Button>
+        <QuestionSkeleton />
       </Box>
     );
   }

@@ -14,7 +14,6 @@ import {
   InputLabel,
   Select,
   MenuItem,
-  CircularProgress,
   Tabs,
   Tab,
   Dialog,
@@ -22,6 +21,7 @@ import {
   DialogContent,
   DialogActions,
 } from '@mui/material';
+import { CardGridSkeleton } from '../components/skeletons';
 import AddIcon from '@mui/icons-material/Add';
 import StyleOutlinedIcon from '@mui/icons-material/StyleOutlined';
 import FolderSpecialOutlinedIcon from '@mui/icons-material/FolderSpecialOutlined';
@@ -354,9 +354,7 @@ export const FlashcardsPage: React.FC = () => {
           </Paper>
 
           {loading ? (
-            <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
-              <CircularProgress sx={{ color: PALETTE_COLORS.primary }} />
-            </Box>
+            <CardGridSkeleton count={6} columns={{ xs: 12, sm: 6, md: 4 }} cardHeight={190} />
           ) : filteredFolders.length > 0 ? (
             <Grid container spacing={3}>
               {filteredFolders.map((folder) => {
@@ -632,9 +630,7 @@ export const FlashcardsPage: React.FC = () => {
 
           {/* Flashcards List */}
           {loading ? (
-            <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
-              <CircularProgress sx={{ color: PALETTE_COLORS.primary }} />
-            </Box>
+            <CardGridSkeleton count={6} columns={{ xs: 12, sm: 6, md: 4 }} cardHeight={220} />
           ) : flashcards.length > 0 ? (
             <Grid container spacing={2.5}>
               {flashcards.map((card) => {

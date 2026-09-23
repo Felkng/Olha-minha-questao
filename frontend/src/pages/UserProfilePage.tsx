@@ -39,6 +39,7 @@ import {
   Typography,
   useTheme,
 } from '@mui/material';
+import { ProfileSkeleton, ListItemsSkeleton, CardGridSkeleton } from '../components/skeletons';
 import PersonIcon from '@mui/icons-material/Person';
 import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
@@ -471,11 +472,7 @@ export const UserProfilePage: React.FC = () => {
   };
 
   if (loading) {
-    return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
-        <CircularProgress color="secondary" />
-      </Box>
-    );
+    return <ProfileSkeleton />;
   }
 
   if (error && !profile) {
@@ -1278,9 +1275,7 @@ export const UserProfilePage: React.FC = () => {
               </Stack>
 
               {loadingQuestionAttempts ? (
-                <Box sx={{ display: 'flex', justifyContent: 'center', py: 6 }}>
-                  <CircularProgress size={32} />
-                </Box>
+                <ListItemsSkeleton count={4} />
               ) : myQuestionAttempts.length === 0 ? (
                 <Box sx={{ textAlign: 'center', py: 6 }}>
                   <Typography color="text.secondary" sx={{ mb: 2 }}>
@@ -1506,9 +1501,7 @@ export const UserProfilePage: React.FC = () => {
               />
 
               {loadingTestAttempts ? (
-                <Box sx={{ display: 'flex', justifyContent: 'center', py: 6 }}>
-                  <CircularProgress size={32} />
-                </Box>
+                <ListItemsSkeleton count={4} />
               ) : myTestAttempts.length === 0 ? (
                 <Box sx={{ textAlign: 'center', py: 6 }}>
                   <Typography color="text.secondary" sx={{ mb: 2 }}>
@@ -1707,9 +1700,7 @@ export const UserProfilePage: React.FC = () => {
               />
 
               {loadingQuestions ? (
-                <Box sx={{ display: 'flex', justifyContent: 'center', py: 6 }}>
-                  <CircularProgress size={32} />
-                </Box>
+                <ListItemsSkeleton count={4} />
               ) : myQuestions.length === 0 ? (
                 <Box sx={{ textAlign: 'center', py: 6 }}>
                   <Typography color="text.secondary" sx={{ mb: 2 }}>
@@ -1864,9 +1855,7 @@ export const UserProfilePage: React.FC = () => {
               />
 
               {loadingTests ? (
-                <Box sx={{ display: 'flex', justifyContent: 'center', py: 6 }}>
-                  <CircularProgress size={32} />
-                </Box>
+                <ListItemsSkeleton count={4} />
               ) : myTests.length === 0 ? (
                 <Box sx={{ textAlign: 'center', py: 6 }}>
                   <Typography color="text.secondary" sx={{ mb: 2 }}>
@@ -2028,9 +2017,7 @@ export const UserProfilePage: React.FC = () => {
               </Tabs>
 
               {loadingFolders ? (
-                <Box sx={{ display: 'flex', justifyContent: 'center', py: 6 }}>
-                  <CircularProgress size={32} />
-                </Box>
+                <CardGridSkeleton count={3} columns={{ xs: 12, sm: 6, md: 4 }} cardHeight={180} />
               ) : myFolders.length === 0 ? (
                 <Box sx={{ textAlign: 'center', py: 6 }}>
                   <Typography color="text.secondary" sx={{ mb: 2 }}>
@@ -2172,9 +2159,7 @@ export const UserProfilePage: React.FC = () => {
               />
 
               {loadingOrigins ? (
-                <Box sx={{ display: 'flex', justifyContent: 'center', py: 6 }}>
-                  <CircularProgress size={32} />
-                </Box>
+                <ListItemsSkeleton count={4} />
               ) : (
                 <Stack spacing={1.5}>
                   {allOrigins
@@ -2278,9 +2263,7 @@ export const UserProfilePage: React.FC = () => {
               />
 
               {loadingAreas ? (
-                <Box sx={{ display: 'flex', justifyContent: 'center', py: 6 }}>
-                  <CircularProgress size={32} />
-                </Box>
+                <ListItemsSkeleton count={4} />
               ) : (
                 <Stack spacing={1.5}>
                   {allAreas
@@ -2403,9 +2386,7 @@ export const UserProfilePage: React.FC = () => {
               </Stack>
 
               {loadingSubjects ? (
-                <Box sx={{ display: 'flex', justifyContent: 'center', py: 6 }}>
-                  <CircularProgress size={32} />
-                </Box>
+                <ListItemsSkeleton count={4} />
               ) : (
                 <Stack spacing={1.5}>
                   {allSubjects

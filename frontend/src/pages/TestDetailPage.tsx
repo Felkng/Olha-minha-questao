@@ -6,7 +6,6 @@ import {
   Button,
   Chip,
   Stack,
-  CircularProgress,
   Alert,
   Snackbar,
   ToggleButtonGroup,
@@ -18,6 +17,7 @@ import {
   DialogContentText,
   DialogActions,
 } from '@mui/material';
+import { DetailPageSkeleton } from '../components/skeletons';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
@@ -136,11 +136,7 @@ export const TestDetailPage: React.FC<TestDetailPageProps> = ({
   };
 
   if (loading) {
-    return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
-        <CircularProgress sx={{ color: PALETTE_COLORS.primary }} />
-      </Box>
-    );
+    return <DetailPageSkeleton />;
   }
 
   if (!test) {

@@ -6,13 +6,13 @@ import {
   Button,
   Chip,
   Grid,
-  CircularProgress,
   Alert,
   Snackbar,
   Stack,
   IconButton,
   Tooltip,
 } from '@mui/material';
+import { DetailPageSkeleton } from '../components/skeletons';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import ShareIcon from '@mui/icons-material/Share';
 import FolderSpecialOutlinedIcon from '@mui/icons-material/FolderSpecialOutlined';
@@ -139,11 +139,7 @@ export const FolderDetailPage: React.FC<FolderDetailPageProps> = ({
   };
 
   if (loading) {
-    return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
-        <CircularProgress sx={{ color: PALETTE_COLORS.primary }} />
-      </Box>
-    );
+    return <DetailPageSkeleton />;
   }
 
   if (!folder) {

@@ -6,7 +6,6 @@ import {
   Chip,
   Button,
   Grid,
-  CircularProgress,
   Stack,
   Alert,
   TextField,
@@ -24,6 +23,8 @@ import { OriginCard } from '../types';
 import { getOriginCards } from '../services/api';
 import { PALETTE_COLORS } from '../theme/theme';
 import { useAppTheme } from '../theme/ThemeContext';
+
+import { CardGridSkeleton } from '../components/skeletons';
 
 export const OriginsPage: React.FC = () => {
   const navigate = useNavigate();
@@ -52,8 +53,16 @@ export const OriginsPage: React.FC = () => {
 
   if (loading) {
     return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
-        <CircularProgress sx={{ color: PALETTE_COLORS.primary }} />
+      <Box sx={{ mb: 6 }}>
+        <Box sx={{ mb: 3 }}>
+          <Typography variant="h5" sx={{ fontWeight: 800, mb: 0.5 }}>
+            Bancas Examinadoras
+          </Typography>
+          <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+            Explore as questões e provas organizadas por banca organizadora em ordem alfabética.
+          </Typography>
+        </Box>
+        <CardGridSkeleton count={6} columns={{ xs: 12, sm: 6, md: 4 }} cardHeight={190} />
       </Box>
     );
   }

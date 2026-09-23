@@ -6,9 +6,9 @@ import {
   Button,
   Chip,
   Stack,
-  CircularProgress,
   Alert,
 } from '@mui/material';
+import { DetailPageSkeleton } from '../components/skeletons';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import HighlightOffIcon from '@mui/icons-material/HighlightOff';
@@ -64,11 +64,7 @@ export const TestAttemptReviewPage: React.FC = () => {
   };
 
   if (loading) {
-    return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', py: 10 }}>
-        <CircularProgress sx={{ color: PALETTE_COLORS.primary }} />
-      </Box>
-    );
+    return <DetailPageSkeleton />;
   }
 
   if (error || !attempt || !evaluation) {

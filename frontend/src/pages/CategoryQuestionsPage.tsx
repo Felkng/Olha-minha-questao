@@ -3,10 +3,10 @@ import {
   Box,
   Typography,
   Button,
-  CircularProgress,
   Alert,
   Stack,
   Chip,
+  Skeleton,
 } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import WhatshotIcon from '@mui/icons-material/Whatshot';
@@ -14,6 +14,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { Question } from '../types';
 import { getOriginQuestions, getAreaQuestions, getOrigins, getAreas } from '../services/api';
 import { QuestionCard } from '../components/questions/QuestionCard';
+import { QuestionSkeleton } from '../components/skeletons';
 import { PALETTE_COLORS } from '../theme/theme';
 
 interface CategoryQuestionsPageProps {
@@ -73,8 +74,21 @@ export const CategoryQuestionsPage: React.FC<CategoryQuestionsPageProps> = ({
 
   if (loading) {
     return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
-        <CircularProgress sx={{ color: PALETTE_COLORS.primary }} />
+      <Box sx={{ mb: 6 }}>
+        <Button
+          startIcon={<ArrowBackIcon />}
+          onClick={() => navigate(backRoute)}
+          sx={{ mb: 3, color: 'text.secondary', fontWeight: 600 }}
+        >
+          {backLabel}
+        </Button>
+        <Box sx={{ mb: 4 }}>
+          <Skeleton variant="text" width={280} height={40} sx={{ mb: 1 }} />
+          <Skeleton variant="text" width={380} height={20} />
+        </Box>
+        <QuestionSkeleton />
+        <QuestionSkeleton />
+        <QuestionSkeleton />
       </Box>
     );
   }
