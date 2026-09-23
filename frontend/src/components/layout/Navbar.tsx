@@ -15,6 +15,10 @@ import {
   Stack,
   Avatar,
   Chip,
+  Drawer,
+  List,
+  ListItemButton,
+  Divider,
 } from '@mui/material';
 import DarkModeOutlinedIcon from '@mui/icons-material/DarkModeOutlined';
 import LightModeOutlinedIcon from '@mui/icons-material/LightModeOutlined';
@@ -22,8 +26,11 @@ import QuizOutlinedIcon from '@mui/icons-material/QuizOutlined';
 import MenuBookOutlinedIcon from '@mui/icons-material/MenuBookOutlined';
 import AccountBalanceOutlinedIcon from '@mui/icons-material/AccountBalanceOutlined';
 import CategoryOutlinedIcon from '@mui/icons-material/CategoryOutlined';
+import StyleOutlinedIcon from '@mui/icons-material/StyleOutlined';
 import PersonIcon from '@mui/icons-material/Person';
 import LogoutIcon from '@mui/icons-material/Logout';
+import MenuIcon from '@mui/icons-material/Menu';
+import CloseIcon from '@mui/icons-material/Close';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAppTheme } from '../../theme/ThemeContext';
 import { PALETTE_COLORS } from '../../theme/theme';
@@ -44,16 +51,19 @@ export const Navbar: React.FC = () => {
   // Auth Modals
   const [openLogin, setOpenLogin] = useState(false);
   const [openRegister, setOpenRegister] = useState(false);
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
   const navItems = [
     { id: 'questoes', path: '/questoes', label: 'Questões', icon: <QuizOutlinedIcon fontSize="small" /> },
     { id: 'provas', path: '/provas', label: 'Provas', icon: <MenuBookOutlinedIcon fontSize="small" /> },
+    { id: 'flashcards', path: '/flashcards', label: 'Flashcards', icon: <StyleOutlinedIcon fontSize="small" /> },
     { id: 'bancas', path: '/bancas', label: 'Bancas', icon: <AccountBalanceOutlinedIcon fontSize="small" /> },
     { id: 'areas', path: '/areas', label: 'Áreas', icon: <CategoryOutlinedIcon fontSize="small" /> },
   ];
 
   const getActiveTab = () => {
     const p = location.pathname;
+    if (p.startsWith('/flashcards')) return 'flashcards';
     if (p.startsWith('/provas')) return 'provas';
     if (p.startsWith('/bancas')) return 'bancas';
     if (p.startsWith('/areas')) return 'areas';
@@ -74,7 +84,23 @@ export const Navbar: React.FC = () => {
   return (
     <AppBar position="sticky" color="inherit">
       <Container maxWidth="xl">
-        <Toolbar disableGutters sx={{ minHeight: { xs: 64, md: 72 }, gap: 2 }}>
+        <Toolbar disableGutters sx={{ minHeight: { xs: 64, md: 72 }, gap: { xs: 1, md: 2 } }}>
+          {/* Mobile Hamburger Button */}
+          <IconButton
+            onClick={() => setMobileNavOpen(true)}
+            sx={{
+              display: { xs: 'flex', md: 'none' },
+              border: '1px solid',
+              borderColor: 'divider',
+              borderRadius: 2,
+              p: 1,
+              mr: 0.5,
+            }}
+            aria-label="abrir menu de navegação"
+          >
+            <MenuIcon fontSize="small" />
+          </IconButton>
+
           {/* Logo / Brand */}
           <Box
             sx={{
@@ -295,6 +321,131 @@ export const Navbar: React.FC = () => {
         onClose={() => setOpenRegister(false)}
         onSwitchToLogin={() => setOpenLogin(true)}
       />
+
+      {/* Mobile Navigation Drawer */}
+      <Drawer
+        anchor="left"
+        open={mobileNavOpen}
+        onClose={() => setMobileNavOpen(false)}
+        PaperProps={{
+          sx: {
+            width: 280,
+            backgroundColor: 'background.paper',
+            p: 2,
+          },
+        }}
+      >
+        {/* Drawer Header */}
+        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
+          <Box
+            sx={{ display: 'flex', alignItems: 'center', gap: 1.5, cursor: 'pointer' }}
+            onClick={() => {
+              setMobileNavOpen(false);
+              navigate('/');
+            }}
+          >
+            <Box
+              sx={{
+                width: 32,
+                height: 32,
+                borderRadius: 2,
+                backgroundColor: PALETTE_COLORS.primary,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#1a1e24',
+                fontWeight: 800,
+                fontSize: '1.1rem',
+              }}
+            >
+              Q
+            </Box>
+            <Typography variant="subtitle1" sx={{ fontWeight: 800 }}>
+              Olha Minha <Box component="span" sx={{ color: PALETTE_COLORS.primary }}>Questão</Box>
+            </Typography>
+          </Box>
+          <IconButton size="small" onClick={() => setMobileNavOpen(false)}>
+            <CloseIcon fontSize="small" />
+          </IconButton>
+        </Box>
+
+        <Divider sx={{ mb: 2 }} />
+
+        {/* Navigation List */}
+        <List sx={{ p: 0 }}>
+          {navItems.map((item) => {
+            const isActive = activeTab === item.id;
+            return (
+              <ListItemButton
+                key={item.id}
+                selected={isActive}
+                onClick={() => {
+                  setMobileNavOpen(false);
+                  navigate(item.path);
+                }}
+                sx={{
+                  borderRadius: 2,
+                  mb: 0.5,
+                  color: isActive ? PALETTE_COLORS.primary : 'text.primary',
+                  backgroundColor: isActive
+                    ? isDark
+                      ? 'rgba(217, 183, 99, 0.12)'
+                      : 'rgba(217, 183, 99, 0.16)'
+                    : 'transparent',
+                  '&.Mui-selected': {
+                    backgroundColor: isDark
+                      ? 'rgba(217, 183, 99, 0.12)'
+                      : 'rgba(217, 183, 99, 0.16)',
+                  },
+                }}
+              >
+                <ListItemIcon sx={{ minWidth: 38, color: isActive ? PALETTE_COLORS.primary : 'inherit' }}>
+                  {item.icon}
+                </ListItemIcon>
+                <ListItemText
+                  primary={item.label}
+                  primaryTypographyProps={{
+                    fontWeight: isActive ? 700 : 500,
+                  }}
+                />
+              </ListItemButton>
+            );
+          })}
+        </List>
+
+        {/* User profile quick links if logged in */}
+        {user && (
+          <>
+            <Divider sx={{ my: 2 }} />
+            <List sx={{ p: 0 }}>
+              <ListItemButton
+                onClick={() => {
+                  setMobileNavOpen(false);
+                  navigate(`/perfil/${user.id}`);
+                }}
+                sx={{ borderRadius: 2, mb: 0.5 }}
+              >
+                <ListItemIcon sx={{ minWidth: 38 }}>
+                  <PersonIcon fontSize="small" />
+                </ListItemIcon>
+                <ListItemText primary="Meu Perfil" />
+              </ListItemButton>
+              <ListItemButton
+                onClick={() => {
+                  setMobileNavOpen(false);
+                  logout();
+                }}
+                sx={{ borderRadius: 2, mb: 0.5, color: 'error.main' }}
+              >
+                <ListItemIcon sx={{ minWidth: 38, color: 'error.main' }}>
+                  <LogoutIcon fontSize="small" />
+                </ListItemIcon>
+                <ListItemText primary="Sair da Conta" />
+              </ListItemButton>
+            </List>
+          </>
+        )}
+      </Drawer>
 
     </AppBar>
   );

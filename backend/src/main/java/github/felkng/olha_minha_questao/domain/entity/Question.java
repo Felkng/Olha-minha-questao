@@ -69,6 +69,10 @@ public class Question {
     @JoinColumn(name = "created_by_user_id")
     private User createdByUser;
 
+    @Column(name = "is_public", nullable = false)
+    @Builder.Default
+    private Boolean isPublic = true;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "textual_reference_id")
     private TextualReference textualReference;

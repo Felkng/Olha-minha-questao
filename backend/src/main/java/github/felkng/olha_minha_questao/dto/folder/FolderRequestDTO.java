@@ -27,4 +27,7 @@ public class FolderRequestDTO {
 
     @Builder.Default
     private FolderType folderType = FolderType.QUESTION;
+
+    @Builder.Default
+    private Boolean isPublic = true;
 }

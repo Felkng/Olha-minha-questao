@@ -36,6 +36,9 @@ public class TestWithQuestionsRequestDTO {
 
     private String description;
 
+    @Builder.Default
+    private Boolean isPublic = true;
+
     @Valid
     @Builder.Default
     private List<github.felkng.olha_minha_questao.dto.reference.TextualReferenceRequestDTO> textualReferences = new ArrayList<>();

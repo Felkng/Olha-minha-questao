@@ -102,6 +102,8 @@ export const QuestionDetailPage: React.FC<QuestionDetailPageProps> = ({
         question={question}
         onBookmarkClick={onBookmarkClick}
         showViewDetails={false}
+        onDelete={() => navigate('/questoes')}
+        onUpdated={() => id && loadQuestion(Number(id))}
       />
 
       {/* Lousa de Raciocínio Interativa */}

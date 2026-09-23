@@ -21,21 +21,35 @@ import ShareOutlinedIcon from '@mui/icons-material/ShareOutlined';
 import VisibilityOutlinedIcon from '@mui/icons-material/VisibilityOutlined';
 import RestartAltIcon from '@mui/icons-material/RestartAlt';
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
+import PublicIcon from '@mui/icons-material/Public';
+import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
+import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
+import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import MenuBookIcon from '@mui/icons-material/MenuBook';
 import BorderColorIcon from '@mui/icons-material/BorderColor';
 import { Link, useLocation } from 'react-router-dom';
 import { DifficultyLevel, Question } from '../../types';
 import { PALETTE_COLORS } from '../../theme/theme';
 import { useAppTheme } from '../../theme/ThemeContext';
-import { submitQuestionAttempt } from '../../services/api';
+import { submitQuestionAttempt, deleteQuestion, toggleQuestionVisibility } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
 import { TextualReferenceDrawer } from './TextualReferenceDrawer';
+import { EditQuestionModal } from '../crud/EditQuestionModal';
+import {
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogContentText,
+  DialogActions,
+} from '@mui/material';
 
 interface QuestionCardProps {
   question: Question;
   onBookmarkClick?: (question: Question) => void;
   isSavedInAnyFolder?: boolean;
   showViewDetails?: boolean;
+  onDelete?: (questionId: number) => void;
+  onUpdated?: () => void;
 }
 
 const getSessionId = (): string => {
@@ -52,10 +66,12 @@ export const QuestionCard: React.FC<QuestionCardProps> = ({
   onBookmarkClick,
   isSavedInAnyFolder = false,
   showViewDetails = true,
+  onDelete,
+  onUpdated,
 }) => {
   const { mode } = useAppTheme();
   const isDark = mode === 'dark';
-  const { attemptedQuestionIds, markQuestionAttempted } = useAuth();
+  const { user, isAdmin, attemptedQuestionIds, markQuestionAttempted } = useAuth();
   const location = useLocation();
 
   const [selectedAlternativeId, setSelectedAlternativeId] = useState<number | null>(null);
@@ -64,6 +80,40 @@ export const QuestionCard: React.FC<QuestionCardProps> = ({
   const [hasAttemptedBefore, setHasAttemptedBefore] = useState<boolean>(false);
   const [copiedToastOpen, setCopiedToastOpen] = useState<boolean>(false);
   const [isTextualDrawerOpen, setIsTextualDrawerOpen] = useState<boolean>(false);
+
+  // Privacy and Moderation
+  const [isPublicState, setIsPublicState] = useState<boolean>(
+    question.isPublic !== undefined ? question.isPublic : true
+  );
+  const [editModalOpen, setEditModalOpen] = useState<boolean>(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState<boolean>(false);
+  const [isDeleting, setIsDeleting] = useState<boolean>(false);
+
+  const isOwner = Boolean(user?.id && question.createdByUser?.id && user.id === question.createdByUser.id);
+  const canDelete = isOwner || (isAdmin && isPublicState);
+
+  const handleToggleVisibility = async () => {
+    try {
+      const res = await toggleQuestionVisibility(question.id);
+      setIsPublicState(Boolean(res.isPublic));
+      if (onUpdated) onUpdated();
+    } catch (err) {
+      console.error('Erro ao alternar visibilidade da questão:', err);
+    }
+  };
+
+  const handleConfirmDelete = async () => {
+    setIsDeleting(true);
+    try {
+      await deleteQuestion(question.id);
+      setDeleteDialogOpen(false);
+      if (onDelete) onDelete(question.id);
+    } catch (err) {
+      console.error('Erro ao excluir questão:', err);
+    } finally {
+      setIsDeleting(false);
+    }
+  };
 
   const isAttemptedByCurrentUser = attemptedQuestionIds.has(question.id);
 
@@ -296,6 +346,28 @@ export const QuestionCard: React.FC<QuestionCardProps> = ({
               Adicionado por {question.createdByUser.name}
             </Typography>
           )}
+
+          {isPublicState !== undefined && (
+            <Tooltip title={isOwner ? "Clique para alternar visibilidade (Pública/Privada)" : (isPublicState ? "Questão pública" : "Questão privada")}>
+              <Chip
+                size="small"
+                icon={isPublicState ? <PublicIcon fontSize="inherit" /> : <LockOutlinedIcon fontSize="inherit" />}
+                label={isPublicState ? 'Pública' : 'Privada'}
+                onClick={isOwner ? handleToggleVisibility : undefined}
+                clickable={isOwner}
+                sx={{
+                  backgroundColor: isPublicState
+                    ? (isDark ? 'rgba(75, 241, 81, 0.12)' : 'rgba(75, 241, 81, 0.15)')
+                    : (isDark ? 'rgba(250, 66, 75, 0.12)' : 'rgba(250, 66, 75, 0.15)'),
+                  color: isPublicState ? PALETTE_COLORS.success : PALETTE_COLORS.danger,
+                  border: '1px solid',
+                  borderColor: isPublicState ? PALETTE_COLORS.success : PALETTE_COLORS.danger,
+                  fontWeight: 700,
+                  cursor: isOwner ? 'pointer' : 'default',
+                }}
+              />
+            </Tooltip>
+          )}
         </Stack>
 
         {/* Actions: View Details, Bookmark and Share */}
@@ -319,6 +391,36 @@ export const QuestionCard: React.FC<QuestionCardProps> = ({
                 }}
               >
                 <VisibilityOutlinedIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+          )}
+
+          {isOwner && (
+            <Tooltip title="Editar questão">
+              <IconButton
+                size="small"
+                onClick={() => setEditModalOpen(true)}
+                sx={{
+                  color: 'text.secondary',
+                  '&:hover': { color: PALETTE_COLORS.primary },
+                }}
+              >
+                <EditOutlinedIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+          )}
+
+          {canDelete && (
+            <Tooltip title={isAdmin && !isOwner ? "Moderar / Excluir questão pública (Admin)" : "Excluir questão"}>
+              <IconButton
+                size="small"
+                onClick={() => setDeleteDialogOpen(true)}
+                sx={{
+                  color: 'text.secondary',
+                  '&:hover': { color: PALETTE_COLORS.danger },
+                }}
+              >
+                <DeleteOutlineIcon fontSize="small" />
               </IconButton>
             </Tooltip>
           )}
@@ -652,6 +754,51 @@ export const QuestionCard: React.FC<QuestionCardProps> = ({
         onClose={() => setCopiedToastOpen(false)}
         message="Link da questão copiado para a área de transferência!"
       />
+
+      {/* Modal de Edição */}
+      <EditQuestionModal
+        open={editModalOpen}
+        question={question}
+        onClose={() => setEditModalOpen(false)}
+        onUpdated={() => {
+          if (onUpdated) onUpdated();
+        }}
+      />
+
+      {/* Confirmação de Exclusão */}
+      <Dialog
+        open={deleteDialogOpen}
+        onClose={() => !isDeleting && setDeleteDialogOpen(false)}
+      >
+        <DialogTitle sx={{ fontWeight: 700 }}>
+          {isAdmin && !isOwner ? 'Moderação: Excluir Questão Pública' : 'Excluir Questão'}
+        </DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            {isAdmin && !isOwner
+              ? 'Como Administrador, você está prestes a remover esta questão pública criada por outro usuário. Deseja continuar?'
+              : 'Tem certeza que deseja excluir esta questão? Esta ação não pode ser desfeita.'}
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions sx={{ p: 2 }}>
+          <Button
+            onClick={() => setDeleteDialogOpen(false)}
+            disabled={isDeleting}
+            sx={{ color: 'text.secondary' }}
+          >
+            Cancelar
+          </Button>
+          <Button
+            variant="contained"
+            color="error"
+            onClick={handleConfirmDelete}
+            disabled={isDeleting}
+            sx={{ fontWeight: 700 }}
+          >
+            {isDeleting ? 'Excluindo...' : 'Excluir Questão'}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Paper>
   );
 };

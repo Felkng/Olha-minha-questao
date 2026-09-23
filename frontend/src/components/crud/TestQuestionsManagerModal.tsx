@@ -13,13 +13,23 @@ import {
   Tooltip,
   CircularProgress,
   Alert,
+  TextField,
+  InputAdornment,
 } from '@mui/material';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import LinkOffIcon from '@mui/icons-material/LinkOff';
 import AddIcon from '@mui/icons-material/Add';
+import SearchIcon from '@mui/icons-material/Search';
+import BookmarkAddIcon from '@mui/icons-material/BookmarkAdd';
 import { Question, Test, TestCard } from '../../types';
-import { deleteQuestion, getQuestions, updateQuestion } from '../../services/api';
+import {
+  addQuestionToTest,
+  deleteQuestion,
+  getQuestions,
+  getTestEvaluation,
+  removeQuestionFromTest,
+} from '../../services/api';
 import { PALETTE_COLORS } from '../../theme/theme';
 import { EditQuestionModal } from './EditQuestionModal';
 import { CreateQuestionModal } from './CreateQuestionModal';
@@ -45,6 +55,13 @@ export const TestQuestionsManagerModal: React.FC<TestQuestionsManagerModalProps>
   const [selectedQuestionForEdit, setSelectedQuestionForEdit] = useState<Question | null>(null);
   const [openCreateQuestion, setOpenCreateQuestion] = useState(false);
 
+  // Diálogo de vincular questão existente (N:N)
+  const [openLinkExistingDialog, setOpenLinkExistingDialog] = useState(false);
+  const [existingSearch, setExistingSearch] = useState('');
+  const [existingQuestions, setExistingQuestions] = useState<Question[]>([]);
+  const [loadingExisting, setLoadingExisting] = useState(false);
+  const [linkingQuestionId, setLinkingQuestionId] = useState<number | null>(null);
+
   // Confirmação de exclusão
   const [deleteConfirmQuestionId, setDeleteConfirmQuestionId] = useState<number | null>(null);
   const [deleting, setDeleting] = useState(false);
@@ -54,8 +71,8 @@ export const TestQuestionsManagerModal: React.FC<TestQuestionsManagerModalProps>
     setLoading(true);
     setErrorMessage(null);
     try {
-      const res = await getQuestions({ testId: test.id, size: 100 });
-      setQuestions(res.content || []);
+      const res = await getTestEvaluation(test.id);
+      setQuestions(res.questions || []);
     } catch (err: any) {
       console.error(err);
       setErrorMessage('Erro ao carregar questões da prova.');
@@ -70,22 +87,45 @@ export const TestQuestionsManagerModal: React.FC<TestQuestionsManagerModalProps>
     }
   }, [open, test]);
 
-  const handleUnlinkFromTest = async (q: Question) => {
+  const handleSearchExistingQuestions = async () => {
+    setLoadingExisting(true);
     try {
-      await updateQuestion(q.id, {
-        enunciado: q.enunciado,
-        identifier: q.identifier,
-        year: q.year || new Date().getFullYear(),
-        originId: q.originId,
-        areaId: q.areaId || 1,
-        subjectId: q.subjectId,
-        testId: undefined, // desvincula da prova
-        alternatives: q.alternatives.map((a) => ({
-          identifier: a.identifier,
-          text: a.text,
-          isCorrect: a.isCorrect || a.id === q.correctAlternativeId,
-        })),
+      const res = await getQuestions({
+        search: existingSearch.trim() || undefined,
+        size: 20,
       });
+      setExistingQuestions(res.content || []);
+    } catch (err) {
+      console.error('Erro ao buscar questões existentes:', err);
+    } finally {
+      setLoadingExisting(false);
+    }
+  };
+
+  useEffect(() => {
+    if (openLinkExistingDialog) {
+      handleSearchExistingQuestions();
+    }
+  }, [openLinkExistingDialog]);
+
+  const handleLinkQuestion = async (qId: number) => {
+    if (!test) return;
+    setLinkingQuestionId(qId);
+    try {
+      await addQuestionToTest(test.id, qId);
+      await loadQuestions();
+      if (onUpdated) onUpdated();
+    } catch (err) {
+      console.error('Erro ao vincular questão à prova:', err);
+    } finally {
+      setLinkingQuestionId(null);
+    }
+  };
+
+  const handleUnlinkFromTest = async (q: Question) => {
+    if (!test) return;
+    try {
+      await removeQuestionFromTest(test.id, q.id);
       loadQuestions();
       if (onUpdated) onUpdated();
     } catch (err: any) {
@@ -109,25 +149,38 @@ export const TestQuestionsManagerModal: React.FC<TestQuestionsManagerModalProps>
     }
   };
 
+  const currentQuestionIds = new Set(questions.map((q) => q.id));
+
   return (
     <>
       <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
-        <DialogTitle sx={{ fontWeight: 700, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <DialogTitle sx={{ fontWeight: 700, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 1 }}>
           <Box>
             Gerenciar Questões da Prova: {test?.name} ({test?.year})
             <Typography variant="body2" color="text.secondary">
               Total de questões: {questions.length}
             </Typography>
           </Box>
-          <Button
-            variant="contained"
-            size="small"
-            startIcon={<AddIcon />}
-            onClick={() => setOpenCreateQuestion(true)}
-            sx={{ fontWeight: 700, backgroundColor: PALETTE_COLORS.primary, color: '#1a1e24' }}
-          >
-            Nova Questão nesta Prova
-          </Button>
+          <Stack direction="row" spacing={1}>
+            <Button
+              variant="outlined"
+              size="small"
+              startIcon={<BookmarkAddIcon />}
+              onClick={() => setOpenLinkExistingDialog(true)}
+              sx={{ fontWeight: 700, textTransform: 'none' }}
+            >
+              Vincular Questão Existente
+            </Button>
+            <Button
+              variant="contained"
+              size="small"
+              startIcon={<AddIcon />}
+              onClick={() => setOpenCreateQuestion(true)}
+              sx={{ fontWeight: 700, backgroundColor: PALETTE_COLORS.primary, color: '#1a1e24', textTransform: 'none' }}
+            >
+              Nova Questão
+            </Button>
+          </Stack>
         </DialogTitle>
 
         <DialogContent dividers sx={{ minHeight: 350, maxHeight: '60vh', overflowY: 'auto' }}>
@@ -198,7 +251,7 @@ export const TestQuestionsManagerModal: React.FC<TestQuestionsManagerModalProps>
                       </IconButton>
                     </Tooltip>
 
-                    <Tooltip title="Desvincular questão desta prova (mantém como avulsa)">
+                    <Tooltip title="Desvincular questão desta prova (mantém no repositório)">
                       <IconButton
                         size="small"
                         color="warning"
@@ -226,6 +279,118 @@ export const TestQuestionsManagerModal: React.FC<TestQuestionsManagerModalProps>
 
         <DialogActions sx={{ p: 2 }}>
           <Button onClick={onClose} sx={{ color: 'text.secondary' }}>
+            Fechar
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Modal para Vincular Questões Existentes (N:N) */}
+      <Dialog
+        open={openLinkExistingDialog}
+        onClose={() => setOpenLinkExistingDialog(false)}
+        maxWidth="md"
+        fullWidth
+      >
+        <DialogTitle sx={{ fontWeight: 700 }}>
+          Vincular Questão Existente ao Simulado / Prova
+        </DialogTitle>
+        <DialogContent dividers>
+          <Box sx={{ display: 'flex', gap: 1, mb: 2 }}>
+            <TextField
+              size="small"
+              fullWidth
+              placeholder="Buscar por texto do enunciado ou identificador..."
+              value={existingSearch}
+              onChange={(e) => setExistingSearch(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleSearchExistingQuestions()}
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <SearchIcon fontSize="small" />
+                  </InputAdornment>
+                ),
+              }}
+            />
+            <Button
+              variant="contained"
+              onClick={handleSearchExistingQuestions}
+              disabled={loadingExisting}
+              sx={{ backgroundColor: PALETTE_COLORS.primary, color: '#1a1e24', fontWeight: 700 }}
+            >
+              Buscar
+            </Button>
+          </Box>
+
+          {loadingExisting ? (
+            <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+              <CircularProgress size={28} />
+            </Box>
+          ) : existingQuestions.length === 0 ? (
+            <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center', py: 4 }}>
+              Nenhuma questão encontrada. Digite um termo e clique em Buscar.
+            </Typography>
+          ) : (
+            <Stack spacing={1.5}>
+              {existingQuestions.map((eq) => {
+                const isAlreadyLinked = currentQuestionIds.has(eq.id);
+                return (
+                  <Paper
+                    key={eq.id}
+                    variant="outlined"
+                    sx={{
+                      p: 2,
+                      borderRadius: 2,
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      gap: 2,
+                    }}
+                  >
+                    <Box sx={{ flex: 1, minWidth: 0 }}>
+                      <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
+                        {eq.identifier ? `Questão ${eq.identifier}` : `Questão #${eq.id}`}
+                        {eq.areaName && ` • ${eq.areaName}`}
+                        {eq.subjectName && ` / ${eq.subjectName}`}
+                        {eq.year && ` (${eq.year})`}
+                      </Typography>
+                      <Typography
+                        variant="body2"
+                        color="text.secondary"
+                        sx={{
+                          display: '-webkit-box',
+                          WebkitLineClamp: 2,
+                          WebkitBoxOrient: 'vertical',
+                          overflow: 'hidden',
+                          mt: 0.5,
+                        }}
+                      >
+                        {eq.enunciado}
+                      </Typography>
+                    </Box>
+
+                    <Button
+                      size="small"
+                      variant={isAlreadyLinked ? 'outlined' : 'contained'}
+                      disabled={isAlreadyLinked || linkingQuestionId === eq.id}
+                      onClick={() => handleLinkQuestion(eq.id)}
+                      sx={{
+                        fontWeight: 700,
+                        textTransform: 'none',
+                        ...(isAlreadyLinked
+                          ? {}
+                          : { backgroundColor: PALETTE_COLORS.primary, color: '#1a1e24' }),
+                      }}
+                    >
+                      {isAlreadyLinked ? 'Já Vinculada' : linkingQuestionId === eq.id ? 'Vinculando...' : 'Vincular'}
+                    </Button>
+                  </Paper>
+                );
+              })}
+            </Stack>
+          )}
+        </DialogContent>
+        <DialogActions sx={{ p: 2 }}>
+          <Button onClick={() => setOpenLinkExistingDialog(false)}>
             Fechar
           </Button>
         </DialogActions>

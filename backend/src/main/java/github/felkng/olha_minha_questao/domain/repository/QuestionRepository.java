@@ -15,6 +15,10 @@ public interface QuestionRepository extends JpaRepository<Question, Long>, JpaSp
     Page<Question> findByTestId(Long testId, Pageable pageable);
     java.util.List<Question> findByTestId(Long testId);
     java.util.List<Question> findByTestIdOrderByIdAsc(Long testId);
+    
+    @org.springframework.data.jpa.repository.Query("SELECT DISTINCT q FROM Question q LEFT JOIN TestQuestion tq ON tq.question = q WHERE q.test.id = :testId OR tq.test.id = :testId ORDER BY q.id ASC")
+    java.util.List<Question> findAllQuestionsByTestId(@org.springframework.data.repository.query.Param("testId") Long testId);
+
     long countByOriginId(Long originId);
     long countByAreaId(Long areaId);
     long countByTestId(Long testId);

@@ -13,6 +13,8 @@ import { AreasPage } from './pages/AreasPage';
 import { CategoryQuestionsPage } from './pages/CategoryQuestionsPage';
 import { FoldersPage } from './pages/FoldersPage';
 import { FolderDetailPage } from './pages/FolderDetailPage';
+import { FlashcardsPage } from './pages/FlashcardsPage';
+import { FlashcardStudyPage } from './pages/FlashcardStudyPage';
 import { UserProfilePage } from './pages/UserProfilePage';
 import { SaveToFolderModal } from './components/folders/SaveToFolderModal';
 import { Question } from './types';
@@ -51,6 +53,9 @@ export const App: React.FC = () => {
               path="/provas/:testId/tentativas/:attemptId"
               element={<TestAttemptReviewPage />}
             />
+            <Route path="/flashcards" element={<FlashcardsPage />} />
+            <Route path="/flashcards/estudo" element={<FlashcardStudyPage />} />
+            <Route path="/flashcards/estudar" element={<FlashcardStudyPage />} />
             <Route path="/bancas" element={<OriginsPage />} />
             <Route
               path="/bancas/:id"

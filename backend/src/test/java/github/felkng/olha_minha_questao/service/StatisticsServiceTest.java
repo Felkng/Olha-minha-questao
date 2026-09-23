@@ -289,5 +289,12 @@ class StatisticsServiceTest {
         assertThat(userAttempts.get(0).getQuestion().getId()).isEqualTo(q1.getId());
         assertThat(userAttempts.get(0).getUser().getId()).isEqualTo(user.getId());
         assertThat(userAttempts.get(0).getIsCorrect()).isTrue();
+
+        // Testa busca de histórico de tentativas do usuário
+        List<github.felkng.olha_minha_questao.dto.question.QuestionAttemptHistoryDTO> history = statisticsService.getUserQuestionAttempts(user.getId());
+        assertThat(history).hasSize(1);
+        assertThat(history.get(0).getQuestionId()).isEqualTo(q1.getId());
+        assertThat(history.get(0).getIsCorrect()).isTrue();
+        assertThat(history.get(0).getQuestionEnunciado()).isEqualTo("Qual a velocidade da luz?");
     }
 }

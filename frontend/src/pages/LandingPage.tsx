@@ -12,6 +12,7 @@ import {
 } from '@mui/material';
 import QuizOutlinedIcon from '@mui/icons-material/QuizOutlined';
 import MenuBookOutlinedIcon from '@mui/icons-material/MenuBookOutlined';
+import StyleOutlinedIcon from '@mui/icons-material/StyleOutlined';
 import TimerOutlinedIcon from '@mui/icons-material/TimerOutlined';
 import DrawOutlinedIcon from '@mui/icons-material/DrawOutlined';
 import FolderSpecialOutlinedIcon from '@mui/icons-material/FolderSpecialOutlined';
@@ -21,6 +22,7 @@ import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 import LayersOutlinedIcon from '@mui/icons-material/LayersOutlined';
+import FlipCameraAndroidIcon from '@mui/icons-material/FlipCameraAndroid';
 import { useNavigate } from 'react-router-dom';
 import { getPlatformSummary } from '../services/api';
 import { PlatformSummary } from '../types';
@@ -39,12 +41,14 @@ export const LandingPage: React.FC = () => {
   const [stats, setStats] = useState<PlatformSummary>({
     totalQuestions: 0,
     totalTests: 0,
+    totalFlashcards: 0,
     activeUsersLast5Days: 0,
     totalAttempts: 0,
     totalOrigins: 0,
     totalAreas: 0,
   });
   const [openRegister, setOpenRegister] = useState<boolean>(false);
+  const [interactiveFlipped, setInteractiveFlipped] = useState<boolean>(false);
 
   useEffect(() => {
     loadPlatformStats();
@@ -60,6 +64,12 @@ export const LandingPage: React.FC = () => {
   };
 
   const features = [
+    {
+      icon: <StyleOutlinedIcon sx={{ fontSize: 36, color: '#b388ff' }} />,
+      title: 'Flashcards & Decks de Memorização',
+      description:
+        'Crie cartões de pergunta e resposta, organize em pastas temáticas, estude com repetição ativa e acompanhe estatísticas de acertos e erros.',
+    },
     {
       icon: <TimerOutlinedIcon sx={{ fontSize: 36, color: PALETTE_COLORS.primary }} />,
       title: 'Simulados Reais com Cronômetro',
@@ -82,7 +92,7 @@ export const LandingPage: React.FC = () => {
       icon: <FolderSpecialOutlinedIcon sx={{ fontSize: 36, color: PALETTE_COLORS.warning }} />,
       title: 'Organização em Pastas Personalizadas',
       description:
-        'Crie pastas com cores exclusivas para separar questões favoritas, provas para refazer e pontos fracos para revisão espaçada.',
+        'Crie pastas com cores exclusivas para separar questões favoritas, provas para refazer e decks de flashcards para revisão espaçada.',
     },
     {
       icon: <FileDownloadOutlinedIcon sx={{ fontSize: 36, color: PALETTE_COLORS.primary }} />,
@@ -111,7 +121,7 @@ export const LandingPage: React.FC = () => {
         {/* Badge de Destaque */}
         <Chip
           icon={<AutoAwesomeIcon sx={{ fontSize: '1rem !important', color: PALETTE_COLORS.primary }} />}
-          label="Plataforma de Estudos & Simulados para Concursos e Vestibulares"
+          label="Plataforma de Estudos, Simulados & Flashcards com Repetição Ativa"
           sx={{
             fontWeight: 700,
             mb: 3,
@@ -133,13 +143,13 @@ export const LandingPage: React.FC = () => {
             letterSpacing: '-0.02em',
             lineHeight: 1.15,
             mb: 2.5,
-            maxWidth: 900,
+            maxWidth: 950,
             mx: 'auto',
           }}
         >
-          Treine com foco, resolva provas reais e conquiste sua{' '}
+          Treine com foco, resolva provas reais e memorize com{' '}
           <Box component="span" sx={{ color: PALETTE_COLORS.primary }}>
-            Aprovação
+            Flashcards
           </Box>
         </Typography>
 
@@ -148,7 +158,7 @@ export const LandingPage: React.FC = () => {
           component="p"
           sx={{
             color: 'text.secondary',
-            maxWidth: 780,
+            maxWidth: 820,
             mx: 'auto',
             mb: 4.5,
             fontWeight: 400,
@@ -156,7 +166,7 @@ export const LandingPage: React.FC = () => {
             fontSize: { xs: '1rem', md: '1.2rem' },
           }}
         >
-          O <strong>Olha Minha Questão</strong> oferece um ambiente moderno e sem distrações para resolução de questões avulsas, realização de simulados completos com cronômetro, lousa de raciocínio interativa e relatórios detalhados de desempenho.
+          O <strong>Olha Minha Questão</strong> oferece um ambiente moderno e sem distrações para resolução de questões avulsas, simulados completos com cronômetro, <strong>flashcards interativos de repetição ativa</strong>, lousa digital e relatórios detalhados de desempenho.
         </Typography>
 
         {/* Action Buttons */}
@@ -173,9 +183,9 @@ export const LandingPage: React.FC = () => {
             startIcon={<QuizOutlinedIcon />}
             onClick={() => navigate('/questoes')}
             sx={{
-              px: 4,
-              py: 1.6,
-              fontSize: '1.05rem',
+              px: 3.5,
+              py: 1.5,
+              fontSize: '1rem',
               fontWeight: 800,
               borderRadius: 2.5,
               backgroundColor: PALETTE_COLORS.primary,
@@ -189,14 +199,35 @@ export const LandingPage: React.FC = () => {
           </Button>
 
           <Button
+            variant="contained"
+            size="large"
+            startIcon={<StyleOutlinedIcon />}
+            onClick={() => navigate('/flashcards')}
+            sx={{
+              px: 3.5,
+              py: 1.5,
+              fontSize: '1rem',
+              fontWeight: 800,
+              borderRadius: 2.5,
+              backgroundColor: '#b388ff',
+              color: '#1a1e24',
+              '&:hover': {
+                backgroundColor: '#9d6efd',
+              },
+            }}
+          >
+            Praticar Flashcards
+          </Button>
+
+          <Button
             variant="outlined"
             size="large"
             startIcon={<MenuBookOutlinedIcon />}
             onClick={() => navigate('/provas')}
             sx={{
-              px: 4,
-              py: 1.6,
-              fontSize: '1.05rem',
+              px: 3.5,
+              py: 1.5,
+              fontSize: '1rem',
               fontWeight: 700,
               borderRadius: 2.5,
               borderColor: PALETTE_COLORS.primary,
@@ -207,7 +238,7 @@ export const LandingPage: React.FC = () => {
               },
             }}
           >
-            Ver Provas & Simulados
+            Provas & Simulados
           </Button>
 
           {!user && (
@@ -216,8 +247,8 @@ export const LandingPage: React.FC = () => {
               size="large"
               onClick={() => setOpenRegister(true)}
               sx={{
-                px: 3,
-                py: 1.6,
+                px: 2.5,
+                py: 1.5,
                 fontWeight: 700,
                 color: 'text.secondary',
                 '&:hover': { color: 'text.primary' },
@@ -229,7 +260,7 @@ export const LandingPage: React.FC = () => {
         </Stack>
       </Box>
 
-      {/* 2. DYNAMIC ANIMATED COUNTERS SECTION */}
+      {/* 2. DYNAMIC ANIMATED COUNTERS SECTION (5 Cards) */}
       <Paper
         elevation={6}
         sx={{
@@ -255,9 +286,9 @@ export const LandingPage: React.FC = () => {
           </Typography>
         </Box>
 
-        <Grid container spacing={3}>
+        <Grid container spacing={2.5}>
           {/* Total de Questões */}
-          <Grid item xs={12} sm={6} md={3}>
+          <Grid item xs={12} sm={6} md={2.4}>
             <Box
               sx={{
                 textAlign: 'center',
@@ -275,8 +306,8 @@ export const LandingPage: React.FC = () => {
             >
               <Box
                 sx={{
-                  width: 48,
-                  height: 48,
+                  width: 44,
+                  height: 44,
                   borderRadius: 2.5,
                   backgroundColor: 'rgba(217, 183, 99, 0.15)',
                   color: PALETTE_COLORS.primary,
@@ -291,21 +322,21 @@ export const LandingPage: React.FC = () => {
               <AnimatedCounter
                 value={stats.totalQuestions}
                 typographyProps={{
-                  variant: 'h3',
+                  variant: 'h4',
                   sx: { fontWeight: 900, color: PALETTE_COLORS.primary, lineHeight: 1.1 },
                 }}
               />
               <Typography variant="subtitle2" sx={{ fontWeight: 800, mt: 1, color: 'text.primary' }}>
-                Questões Cadastradas
+                Questões
               </Typography>
               <Typography variant="caption" sx={{ color: 'text.secondary', mt: 0.5 }}>
-                Categorizadas por banca, ano e área de conhecimento
+                Categorizadas por banca e área
               </Typography>
             </Box>
           </Grid>
 
           {/* Provas e Concursos */}
-          <Grid item xs={12} sm={6} md={3}>
+          <Grid item xs={12} sm={6} md={2.4}>
             <Box
               sx={{
                 textAlign: 'center',
@@ -323,8 +354,8 @@ export const LandingPage: React.FC = () => {
             >
               <Box
                 sx={{
-                  width: 48,
-                  height: 48,
+                  width: 44,
+                  height: 44,
                   borderRadius: 2.5,
                   backgroundColor: 'rgba(90, 166, 226, 0.15)',
                   color: PALETTE_COLORS.secondary,
@@ -339,7 +370,7 @@ export const LandingPage: React.FC = () => {
               <AnimatedCounter
                 value={stats.totalTests}
                 typographyProps={{
-                  variant: 'h3',
+                  variant: 'h4',
                   sx: { fontWeight: 900, color: PALETTE_COLORS.secondary, lineHeight: 1.1 },
                 }}
               />
@@ -347,13 +378,13 @@ export const LandingPage: React.FC = () => {
                 Provas & Simulados
               </Typography>
               <Typography variant="caption" sx={{ color: 'text.secondary', mt: 0.5 }}>
-                Exames completos extraídos e prontos para realização
+                Exames prontos para realização
               </Typography>
             </Box>
           </Grid>
 
-          {/* Usuários Ativos (Últimos 5 Dias) */}
-          <Grid item xs={12} sm={6} md={3}>
+          {/* Flashcards Cadastrados (NOVO) */}
+          <Grid item xs={12} sm={6} md={2.4}>
             <Box
               sx={{
                 textAlign: 'center',
@@ -371,8 +402,56 @@ export const LandingPage: React.FC = () => {
             >
               <Box
                 sx={{
-                  width: 48,
-                  height: 48,
+                  width: 44,
+                  height: 44,
+                  borderRadius: 2.5,
+                  backgroundColor: 'rgba(179, 136, 255, 0.15)',
+                  color: '#b388ff',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  mb: 1.5,
+                }}
+              >
+                <StyleOutlinedIcon fontSize="medium" />
+              </Box>
+              <AnimatedCounter
+                value={stats.totalFlashcards ?? 0}
+                typographyProps={{
+                  variant: 'h4',
+                  sx: { fontWeight: 900, color: '#b388ff', lineHeight: 1.1 },
+                }}
+              />
+              <Typography variant="subtitle2" sx={{ fontWeight: 800, mt: 1, color: 'text.primary' }}>
+                Flashcards
+              </Typography>
+              <Typography variant="caption" sx={{ color: 'text.secondary', mt: 0.5 }}>
+                Cartões de memorização ativa
+              </Typography>
+            </Box>
+          </Grid>
+
+          {/* Usuários Ativos (Últimos 5 Dias) */}
+          <Grid item xs={12} sm={6} md={2.4}>
+            <Box
+              sx={{
+                textAlign: 'center',
+                p: 2.5,
+                borderRadius: 3,
+                backgroundColor: isDark ? 'rgba(255, 255, 255, 0.02)' : 'rgba(0, 0, 0, 0.02)',
+                border: '1px solid',
+                borderColor: 'divider',
+                height: '100%',
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'center',
+                alignItems: 'center',
+              }}
+            >
+              <Box
+                sx={{
+                  width: 44,
+                  height: 44,
                   borderRadius: 2.5,
                   backgroundColor: 'rgba(75, 241, 81, 0.15)',
                   color: PALETTE_COLORS.success,
@@ -387,7 +466,7 @@ export const LandingPage: React.FC = () => {
               <AnimatedCounter
                 value={stats.activeUsersLast5Days}
                 typographyProps={{
-                  variant: 'h3',
+                  variant: 'h4',
                   sx: { fontWeight: 900, color: PALETTE_COLORS.success, lineHeight: 1.1 },
                 }}
               />
@@ -395,13 +474,13 @@ export const LandingPage: React.FC = () => {
                 Usuários Ativos
               </Typography>
               <Typography variant="caption" sx={{ color: 'text.secondary', mt: 0.5 }}>
-                Estudantes que resolveram questões nos últimos 5 dias
+                Estudantes nos últimos 5 dias
               </Typography>
             </Box>
           </Grid>
 
           {/* Total de Resoluções / Tentativas */}
-          <Grid item xs={12} sm={6} md={3}>
+          <Grid item xs={12} sm={6} md={2.4}>
             <Box
               sx={{
                 textAlign: 'center',
@@ -419,8 +498,8 @@ export const LandingPage: React.FC = () => {
             >
               <Box
                 sx={{
-                  width: 48,
-                  height: 48,
+                  width: 44,
+                  height: 44,
                   borderRadius: 2.5,
                   backgroundColor: 'rgba(243, 255, 61, 0.15)',
                   color: isDark ? PALETTE_COLORS.warning : '#a69200',
@@ -435,7 +514,7 @@ export const LandingPage: React.FC = () => {
               <AnimatedCounter
                 value={stats.totalAttempts}
                 typographyProps={{
-                  variant: 'h3',
+                  variant: 'h4',
                   sx: {
                     fontWeight: 900,
                     color: isDark ? PALETTE_COLORS.warning : '#8a7700',
@@ -444,17 +523,174 @@ export const LandingPage: React.FC = () => {
                 }}
               />
               <Typography variant="subtitle2" sx={{ fontWeight: 800, mt: 1, color: 'text.primary' }}>
-                Questões Respondidas
+                Resoluções
               </Typography>
               <Typography variant="caption" sx={{ color: 'text.secondary', mt: 0.5 }}>
-                Resoluções computadas com métricas de assertividade
+                Resoluções computadas
               </Typography>
             </Box>
           </Grid>
         </Grid>
       </Paper>
 
-      {/* 3. SOBRE A PLATAFORMA */}
+      {/* 3. NOVO: DEMONSTRAÇÃO INTERATIVA DE FLASHCARD */}
+      <Paper
+        elevation={3}
+        sx={{
+          p: { xs: 3, md: 5 },
+          borderRadius: 4,
+          mb: 8,
+          border: '1px solid',
+          borderColor: isDark ? 'rgba(179, 136, 255, 0.25)' : 'rgba(179, 136, 255, 0.35)',
+          background: isDark
+            ? 'linear-gradient(135deg, rgba(30, 24, 44, 0.6) 0%, rgba(26, 30, 36, 0.95) 100%)'
+            : 'linear-gradient(135deg, #faf7ff 0%, #ffffff 100%)',
+        }}
+      >
+        <Grid container spacing={4} alignItems="center">
+          <Grid item xs={12} md={6}>
+            <Chip
+              icon={<AutoAwesomeIcon sx={{ fontSize: '0.9rem !important', color: '#b388ff' }} />}
+              label="Novidade na Plataforma"
+              size="small"
+              sx={{
+                fontWeight: 800,
+                mb: 2,
+                backgroundColor: 'rgba(179, 136, 255, 0.15)',
+                color: '#b388ff',
+                borderColor: '#b388ff',
+                border: '1px solid',
+              }}
+            />
+            <Typography variant="h4" sx={{ fontWeight: 900, mb: 2 }}>
+              Memorização Rápida com Flashcards & Decks
+            </Typography>
+            <Typography variant="body1" sx={{ color: 'text.secondary', lineHeight: 1.7, mb: 3 }}>
+              Combine a resolução de simulados com a técnica de <strong>repetição ativa</strong>. Crie flashcards avulsos ou organize decks temáticos para fixar artigos de lei, fórmulas matemáticas, vocabulário e regras gramaticais.
+            </Typography>
+
+            <Stack direction="row" spacing={2}>
+              <Button
+                variant="contained"
+                startIcon={<StyleOutlinedIcon />}
+                onClick={() => navigate('/flashcards')}
+                sx={{
+                  backgroundColor: '#b388ff',
+                  color: '#1a1e24',
+                  fontWeight: 800,
+                  borderRadius: 2.5,
+                  px: 3,
+                  py: 1.2,
+                  '&:hover': { backgroundColor: '#9d6efd' },
+                }}
+              >
+                Acessar Flashcards
+              </Button>
+            </Stack>
+          </Grid>
+
+          {/* Interactive Card Flip Preview */}
+          <Grid item xs={12} md={6}>
+            <Box
+              sx={{
+                perspective: '1000px',
+                maxWidth: 440,
+                mx: 'auto',
+                cursor: 'pointer',
+              }}
+              onClick={() => setInteractiveFlipped(!interactiveFlipped)}
+            >
+              <Box
+                sx={{
+                  position: 'relative',
+                  width: '100%',
+                  minHeight: 220,
+                  transformStyle: 'preserve-3d',
+                  transition: 'transform 0.5s cubic-bezier(0.4, 0, 0.2, 1)',
+                  transform: interactiveFlipped ? 'rotateY(180deg)' : 'rotateY(0deg)',
+                }}
+              >
+                {/* Frente */}
+                <Paper
+                  elevation={4}
+                  sx={{
+                    position: 'absolute',
+                    width: '100%',
+                    height: '100%',
+                    backfaceVisibility: 'hidden',
+                    borderRadius: 3.5,
+                    p: 3,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'space-between',
+                    boxSizing: 'border-box',
+                    border: '2px solid',
+                    borderColor: PALETTE_COLORS.primary,
+                    backgroundColor: isDark ? '#1e242c' : '#ffffff',
+                  }}
+                >
+                  <Box>
+                    <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1.5 }}>
+                      <Chip label="Direito Constitucional" size="small" sx={{ fontWeight: 700 }} />
+                      <Chip label="FRENTE (PERGUNTA)" size="small" sx={{ fontWeight: 800, color: PALETTE_COLORS.primary }} />
+                    </Stack>
+                    <Typography variant="h6" sx={{ fontWeight: 700, mt: 1 }}>
+                      Qual é o princípio fundamental que assegura a dignidade da pessoa humana?
+                    </Typography>
+                  </Box>
+
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, color: 'text.secondary' }}>
+                    <FlipCameraAndroidIcon fontSize="small" />
+                    <Typography variant="caption" sx={{ fontWeight: 600 }}>
+                      Clique para virar o cartão
+                    </Typography>
+                  </Box>
+                </Paper>
+
+                {/* Verso */}
+                <Paper
+                  elevation={4}
+                  sx={{
+                    position: 'absolute',
+                    width: '100%',
+                    height: '100%',
+                    backfaceVisibility: 'hidden',
+                    transform: 'rotateY(180deg)',
+                    borderRadius: 3.5,
+                    p: 3,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'space-between',
+                    boxSizing: 'border-box',
+                    border: '2px solid',
+                    borderColor: '#b388ff',
+                    backgroundColor: isDark ? '#1c1926' : '#faf5ff',
+                  }}
+                >
+                  <Box>
+                    <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1.5 }}>
+                      <Chip label="Art. 1º, III da CF/88" size="small" variant="outlined" sx={{ fontWeight: 700 }} />
+                      <Chip label="VERSO (RESPOSTA)" size="small" sx={{ fontWeight: 800, backgroundColor: '#b388ff', color: '#1a1e24' }} />
+                    </Stack>
+                    <Typography variant="body1" sx={{ fontWeight: 600, mt: 1, lineHeight: 1.6 }}>
+                      Art. 1º, III — A dignidade da pessoa humana é um dos fundamentos da República Federativa do Brasil.
+                    </Typography>
+                  </Box>
+
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, color: 'text.secondary' }}>
+                    <FlipCameraAndroidIcon fontSize="small" />
+                    <Typography variant="caption" sx={{ fontWeight: 600 }}>
+                      Clique para voltar à pergunta
+                    </Typography>
+                  </Box>
+                </Paper>
+              </Box>
+            </Box>
+          </Grid>
+        </Grid>
+      </Paper>
+
+      {/* 4. SOBRE A PLATAFORMA */}
       <Box sx={{ mb: 8, textAlign: 'center' }}>
         <Typography variant="overline" sx={{ color: PALETTE_COLORS.primary, fontWeight: 800, letterSpacing: 1.5 }}>
           CONHEÇA O SISTEMA
@@ -474,11 +710,11 @@ export const LandingPage: React.FC = () => {
         >
           O <strong>Olha Minha Questão</strong> nasceu com a missão de eliminar atritos no processo de estudo.
           Em vez de plataformas lentas e poluídas por anúncios, oferecemos uma experiência ágil, com carregamento
-          instantâneo, ferramentas de anotação na própria tela e simulados que refletem o ambiente real de prova.
+          instantâneo, ferramentas de anotação na própria tela, simulados que refletem o ambiente real de prova e flashcards inteligentes.
         </Typography>
       </Box>
 
-      {/* 4. VITRINE DE FUNCIONALIDADES (FEATURE GRID) */}
+      {/* 5. VITRINE DE FUNCIONALIDADES (FEATURE GRID) */}
       <Box sx={{ mb: 8 }}>
         <Grid container spacing={3}>
           {features.map((feature, idx) => (
@@ -516,7 +752,7 @@ export const LandingPage: React.FC = () => {
         </Grid>
       </Box>
 
-      {/* 5. SEÇÃO DE COMO FUNCIONA (PASSO A PASSO) */}
+      {/* 6. SEÇÃO DE COMO FUNCIONA (PASSO A PASSO) */}
       <Paper
         elevation={2}
         sx={{
@@ -557,10 +793,10 @@ export const LandingPage: React.FC = () => {
                 1
               </Box>
               <Typography variant="h6" sx={{ fontWeight: 800, mb: 1 }}>
-                Filtre ou Escolha a Prova
+                Filtre Questões, Provas ou Flashcards
               </Typography>
               <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                Navegue por bancas examinadoras, anos e áreas temáticas ou abra uma prova de concurso na íntegra.
+                Navegue por bancas examinadoras, áreas temáticas, provas na íntegra ou pratique decks de flashcards focados.
               </Typography>
             </Box>
           </Grid>
@@ -589,7 +825,7 @@ export const LandingPage: React.FC = () => {
                 Resolva no Modo Foco
               </Typography>
               <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                Utilize o cronômetro, faça anotações na lousa digital e consulte textos de apoio com marcação inteligente.
+                Utilize o cronômetro, faça anotações na lousa digital, consulte textos de apoio e treine a repetição ativa com cards 3D.
               </Typography>
             </Box>
           </Grid>
@@ -618,14 +854,14 @@ export const LandingPage: React.FC = () => {
                 Analise & Exporte
               </Typography>
               <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                Veja seu gabarito comentado, acompanhe seu percentil global e baixe relatórios em CSV para controle total.
+                Veja seu gabarito comentado, acompanhe seu percentil global, revise acertos/erros de flashcards e baixe relatórios em CSV.
               </Typography>
             </Box>
           </Grid>
         </Grid>
       </Paper>
 
-      {/* 6. CTA FINAL BANNER */}
+      {/* 7. CTA FINAL BANNER */}
       <Paper
         elevation={6}
         sx={{
@@ -643,7 +879,7 @@ export const LandingPage: React.FC = () => {
           Pronto para acelerar seus resultados?
         </Typography>
         <Typography variant="body1" sx={{ color: 'text.secondary', maxWidth: 620, mx: 'auto', mb: 4, fontSize: '1.1rem' }}>
-          Comece agora mesmo a resolver questões e simulados na plataforma. É gratuito, rápido e direto ao ponto.
+          Comece agora mesmo a resolver questões, simulados e flashcards na plataforma. É gratuito, rápido e direto ao ponto.
         </Typography>
         <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} justifyContent="center">
           <Button
@@ -665,6 +901,26 @@ export const LandingPage: React.FC = () => {
             }}
           >
             Começar a Praticar Agora
+          </Button>
+          <Button
+            variant="contained"
+            size="large"
+            startIcon={<StyleOutlinedIcon />}
+            onClick={() => navigate('/flashcards')}
+            sx={{
+              px: 3.5,
+              py: 1.5,
+              fontSize: '1.05rem',
+              fontWeight: 800,
+              borderRadius: 2.5,
+              backgroundColor: '#b388ff',
+              color: '#1a1e24',
+              '&:hover': {
+                backgroundColor: '#9d6efd',
+              },
+            }}
+          >
+            Treinar Flashcards
           </Button>
           <Button
             variant="outlined"

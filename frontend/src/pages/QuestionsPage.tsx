@@ -212,6 +212,8 @@ export const QuestionsPage: React.FC<QuestionsPageProps> = ({
                 question={q}
                 onBookmarkClick={onBookmarkClick}
                 isSavedInAnyFolder={savedQuestionIds.has(q.id)}
+                onDelete={() => loadQuestionsData(page)}
+                onUpdated={() => loadQuestionsData(page)}
               />
             ))}
           </Stack>

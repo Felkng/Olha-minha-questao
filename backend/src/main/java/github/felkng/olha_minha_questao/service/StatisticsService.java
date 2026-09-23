@@ -10,6 +10,7 @@ import github.felkng.olha_minha_questao.domain.entity.TestAttempt;
 import github.felkng.olha_minha_questao.domain.entity.TestStatistic;
 import github.felkng.olha_minha_questao.domain.entity.User;
 import github.felkng.olha_minha_questao.domain.repository.AreaRepository;
+import github.felkng.olha_minha_questao.domain.repository.FlashcardRepository;
 import github.felkng.olha_minha_questao.domain.repository.OriginRepository;
 import github.felkng.olha_minha_questao.domain.repository.QuestionAttemptRepository;
 import github.felkng.olha_minha_questao.domain.repository.QuestionRepository;
@@ -18,6 +19,7 @@ import github.felkng.olha_minha_questao.domain.repository.TestAttemptRepository;
 import github.felkng.olha_minha_questao.domain.repository.TestRepository;
 import github.felkng.olha_minha_questao.domain.repository.TestStatisticRepository;
 import github.felkng.olha_minha_questao.domain.repository.UserRepository;
+import github.felkng.olha_minha_questao.dto.question.QuestionAttemptHistoryDTO;
 import github.felkng.olha_minha_questao.dto.question.QuestionAttemptRequestDTO;
 import github.felkng.olha_minha_questao.dto.question.QuestionAttemptResponseDTO;
 import github.felkng.olha_minha_questao.dto.statistics.PlatformSummaryDTO;
@@ -45,6 +47,7 @@ public class StatisticsService {
     private final UserRepository userRepository;
     private final OriginRepository originRepository;
     private final AreaRepository areaRepository;
+    private final FlashcardRepository flashcardRepository;
 
     @Transactional
     public QuestionAttemptResponseDTO registerQuestionAttempt(Long questionId, QuestionAttemptRequestDTO dto) {
@@ -278,6 +281,54 @@ public class StatisticsService {
     }
 
     @Transactional(readOnly = true)
+    public List<QuestionAttemptHistoryDTO> getUserQuestionAttempts(Long userId) {
+        List<QuestionAttempt> attempts = questionAttemptRepository.findByUserIdOrderByCreatedAtDesc(userId);
+        return attempts.stream().map(this::toQuestionAttemptHistoryDTO).toList();
+    }
+
+    private QuestionAttemptHistoryDTO toQuestionAttemptHistoryDTO(QuestionAttempt qa) {
+        Question q = qa.getQuestion();
+        Alternative selectedAlt = qa.getSelectedAlternative();
+
+        Alternative correctAlt = null;
+        if (q != null) {
+            if (q.getCorrectAlternative() != null) {
+                correctAlt = q.getCorrectAlternative();
+            } else if (q.getAlternatives() != null) {
+                correctAlt = q.getAlternatives().stream()
+                        .filter(a -> Boolean.TRUE.equals(a.getIsCorrect()))
+                        .findFirst()
+                        .orElse(null);
+            }
+        }
+
+        return QuestionAttemptHistoryDTO.builder()
+                .id(qa.getId())
+                .questionId(q != null ? q.getId() : null)
+                .questionEnunciado(q != null ? q.getEnunciado() : null)
+                .questionIdentifier(q != null ? q.getIdentifier() : null)
+                .year(q != null ? q.getYear() : null)
+                .originId(q != null && q.getOrigin() != null ? q.getOrigin().getId() : null)
+                .originName(q != null && q.getOrigin() != null ? q.getOrigin().getName() : null)
+                .subjectId(q != null && q.getSubject() != null ? q.getSubject().getId() : null)
+                .subjectName(q != null && q.getSubject() != null ? q.getSubject().getName() : null)
+                .areaId(q != null && q.getArea() != null ? q.getArea().getId() : null)
+                .areaName(q != null && q.getArea() != null ? q.getArea().getName() : null)
+                .selectedAlternativeId(selectedAlt != null ? selectedAlt.getId() : null)
+                .selectedAlternativeLetter(selectedAlt != null ? selectedAlt.getIdentifier() : null)
+                .selectedAlternativeText(selectedAlt != null ? selectedAlt.getText() : null)
+                .correctAlternativeId(correctAlt != null ? correctAlt.getId() : null)
+                .correctAlternativeLetter(correctAlt != null ? correctAlt.getIdentifier() : null)
+                .correctAlternativeText(correctAlt != null ? correctAlt.getText() : null)
+                .isCorrect(qa.getIsCorrect())
+                .isFirstAttempt(qa.getIsFirstAttempt())
+                .timeSpentSeconds(qa.getTimeSpentSeconds())
+                .sessionId(qa.getSessionId())
+                .createdAt(qa.getCreatedAt())
+                .build();
+    }
+
+    @Transactional(readOnly = true)
     public List<github.felkng.olha_minha_questao.dto.test.TestAttemptSummaryDTO> getUserTestAttempts(Long userId) {
         List<TestAttempt> attempts = testAttemptRepository.findByUserIdOrderByCreatedAtDesc(userId);
         return attempts.stream().map(this::toSummaryDTO).toList();
@@ -383,6 +434,7 @@ public class StatisticsService {
     public PlatformSummaryDTO getPlatformSummary() {
         long totalQuestions = questionRepository.count();
         long totalTests = testRepository.count();
+        long totalFlashcards = flashcardRepository.count();
         java.time.Instant fiveDaysAgo = java.time.Instant.now().minus(5, java.time.temporal.ChronoUnit.DAYS);
         long activeUsers = questionAttemptRepository.countDistinctActiveUsersSince(fiveDaysAgo);
         long totalOrigins = originRepository.count();
@@ -392,6 +444,7 @@ public class StatisticsService {
         return PlatformSummaryDTO.builder()
                 .totalQuestions(totalQuestions)
                 .totalTests(totalTests)
+                .totalFlashcards(totalFlashcards)
                 .activeUsersLast5Days(activeUsers)
                 .totalOrigins(totalOrigins)
                 .totalAreas(totalAreas)

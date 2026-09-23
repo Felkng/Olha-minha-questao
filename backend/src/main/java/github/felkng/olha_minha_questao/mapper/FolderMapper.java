@@ -16,6 +16,7 @@ public interface FolderMapper {
     @Mapping(target = "updatedAt", ignore = true)
     @Mapping(target = "savedQuestions", ignore = true)
     @Mapping(target = "savedTests", ignore = true)
+    @Mapping(target = "isPublic", defaultValue = "true")
     Folder toEntity(FolderRequestDTO dto);
 
     @Mapping(target = "questionCount", expression = "java(entity.getSavedQuestions() != null ? entity.getSavedQuestions().size() : 0L)")

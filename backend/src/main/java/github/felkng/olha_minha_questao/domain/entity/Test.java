@@ -52,6 +52,10 @@ public class Test {
     @JoinColumn(name = "created_by_user_id")
     private User createdByUser;
 
+    @Column(name = "is_public", nullable = false)
+    @Builder.Default
+    private Boolean isPublic = true;
+
     @OneToOne(mappedBy = "test", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private TestStatistic statistic;
 

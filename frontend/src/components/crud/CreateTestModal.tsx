@@ -11,6 +11,11 @@ import {
   InputLabel,
   Select,
   MenuItem,
+  Switch,
+  FormControlLabel,
+  Box,
+  Paper,
+  Typography,
 } from '@mui/material';
 import { Area, Origin } from '../../types';
 import { createTest, getAreas, getOrigins } from '../../services/api';
@@ -32,6 +37,7 @@ export const CreateTestModal: React.FC<CreateTestModalProps> = ({
   const [originId, setOriginId] = useState<number | ''>('');
   const [areaId, setAreaId] = useState<number | ''>('');
   const [description, setDescription] = useState('');
+  const [isPublic, setIsPublic] = useState(true);
 
   const [origins, setOrigins] = useState<Origin[]>([]);
   const [areas, setAreas] = useState<Area[]>([]);
@@ -63,11 +69,13 @@ export const CreateTestModal: React.FC<CreateTestModalProps> = ({
         originId: Number(originId),
         areaId: Number(areaId),
         description: description.trim(),
+        isPublic,
       });
       setName('');
       setDescription('');
       setOriginId('');
       setAreaId('');
+      setIsPublic(true);
       onClose();
       if (onCreated) onCreated();
     } catch (err) {
@@ -142,6 +150,41 @@ export const CreateTestModal: React.FC<CreateTestModalProps> = ({
             rows={3}
             size="small"
           />
+
+          <Paper
+            elevation={0}
+            sx={{
+              p: 1.5,
+              borderRadius: 2,
+              border: '1px solid',
+              borderColor: 'divider',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+            }}
+          >
+            <Box>
+              <Typography variant="body2" sx={{ fontWeight: 700 }}>
+                Visibilidade: {isPublic ? 'Pública' : 'Privada'}
+              </Typography>
+              <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                {isPublic
+                  ? 'Visível para todos os usuários da plataforma'
+                  : 'Visível apenas para você'}
+              </Typography>
+            </Box>
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={isPublic}
+                  onChange={(e) => setIsPublic(e.target.checked)}
+                  color="primary"
+                />
+              }
+              label={isPublic ? 'Pública' : 'Privada'}
+              sx={{ m: 0 }}
+            />
+          </Paper>
         </Stack>
       </DialogContent>
       <DialogActions sx={{ p: 2 }}>

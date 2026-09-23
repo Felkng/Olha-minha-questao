@@ -1,5 +1,5 @@
 export type DifficultyLevel = 'FACIL' | 'MEDIA' | 'DIFICIL' | 'SEM_DADOS';
-export type FolderType = 'QUESTION' | 'TEST';
+export type FolderType = 'QUESTION' | 'TEST' | 'FLASHCARD';
 
 export interface PageResponse<T> {
   content: T[];
@@ -125,6 +125,7 @@ export interface Test {
   areaName?: string;
   questionCount?: number;
   createdByUser?: UserSummary;
+  isPublic?: boolean;
   textualReferences?: TextualReference[];
 }
 
@@ -154,6 +155,7 @@ export interface Question {
   accuracyPercentage?: number;
   totalAttempts?: number;
   createdByUser?: UserSummary;
+  isPublic?: boolean;
 }
 
 export interface FilterState {
@@ -174,11 +176,68 @@ export interface Folder {
   description?: string;
   color: string;
   folderType: FolderType;
+  isPublic?: boolean;
   questionCount?: number;
   testCount?: number;
+  flashcardCount?: number;
   createdAt?: string;
   updatedAt?: string;
   createdByUser?: UserSummary;
+}
+
+export interface Flashcard {
+  id: number;
+  front: string;
+  back: string;
+  areaId?: number;
+  areaName?: string;
+  subjectId?: number;
+  subjectName?: string;
+  folderId?: number;
+  folderName?: string;
+  folderColor?: string;
+  createdByUser?: UserSummary;
+  isPublic: boolean;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export interface FlashcardRequest {
+  front: string;
+  back: string;
+  areaId?: number;
+  subjectId?: number;
+  folderId?: number;
+  isPublic?: boolean;
+}
+
+export type FlashcardItemStatus = 'CORRECT' | 'WRONG' | 'SKIPPED';
+
+export interface FlashcardSessionItem {
+  id?: number;
+  flashcardId: number;
+  flashcardFront?: string;
+  flashcardBack?: string;
+  status: FlashcardItemStatus;
+}
+
+export interface FlashcardSessionRequest {
+  folderId?: number;
+  items: FlashcardSessionItem[];
+}
+
+export interface FlashcardSession {
+  id: number;
+  user?: UserSummary;
+  folderId?: number;
+  folderName?: string;
+  totalCards: number;
+  correctCount: number;
+  wrongCount: number;
+  skippedCount: number;
+  accuracyPercentage: number;
+  createdAt: string;
+  items: FlashcardSessionItem[];
 }
 
 export interface SavedQuestion {
@@ -213,6 +272,8 @@ export interface TestCard {
   difficultyLevel: DifficultyLevel;
   averageScore: number;
   totalAttempts: number;
+  createdByUser?: UserSummary;
+  isPublic?: boolean;
 }
 
 export interface OriginCard {
@@ -288,6 +349,7 @@ export interface TestSubmissionResponse {
 export interface PlatformSummary {
   totalQuestions: number;
   totalTests: number;
+  totalFlashcards?: number;
   activeUsersLast5Days: number;
   totalAttempts: number;
   totalOrigins: number;
@@ -486,6 +548,7 @@ export interface TestWithQuestionsRequest {
   originId?: number | null;
   areaId?: number | null;
   description?: string;
+  isPublic?: boolean;
   textualReferences?: {
     title?: string;
     subtitle?: string;
@@ -512,6 +575,31 @@ export interface TestWithQuestionsRequest {
       isCorrect?: boolean;
     }[];
   }[];
+}
+
+export interface QuestionAttemptHistory {
+  id: number;
+  questionId: number;
+  questionEnunciado: string;
+  questionIdentifier?: string;
+  year?: number;
+  originId?: number;
+  originName?: string;
+  subjectId?: number;
+  subjectName?: string;
+  areaId?: number;
+  areaName?: string;
+  selectedAlternativeId?: number;
+  selectedAlternativeLetter?: string;
+  selectedAlternativeText?: string;
+  correctAlternativeId?: number;
+  correctAlternativeLetter?: string;
+  correctAlternativeText?: string;
+  isCorrect: boolean;
+  isFirstAttempt: boolean;
+  timeSpentSeconds?: number;
+  sessionId?: string;
+  createdAt: string;
 }
 
 

@@ -33,8 +33,9 @@ public class FolderController {
     @GetMapping
     public ResponseEntity<List<FolderResponseDTO>> findAll(
             @RequestParam(required = false) FolderType type,
-            @RequestParam(required = false) Long createdByUserId) {
-        return ResponseEntity.ok(folderService.findAll(type, createdByUserId));
+            @RequestParam(required = false) Long createdByUserId,
+            @org.springframework.web.bind.annotation.RequestHeader(name = "X-User-Id", required = false) Long currentUserId) {
+        return ResponseEntity.ok(folderService.findAll(type, createdByUserId, currentUserId));
     }
 
     @GetMapping("/{id}")
@@ -51,14 +52,54 @@ public class FolderController {
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<FolderResponseDTO> update(@PathVariable Long id, @Valid @RequestBody FolderRequestDTO dto) {
-        return ResponseEntity.ok(folderService.update(id, dto));
+    public ResponseEntity<FolderResponseDTO> update(
+            @PathVariable Long id,
+            @Valid @RequestBody FolderRequestDTO dto,
+            @org.springframework.web.bind.annotation.RequestHeader(name = "X-User-Id", required = false) Long userId) {
+        return ResponseEntity.ok(folderService.update(id, dto, userId));
+    }
+
+    @org.springframework.web.bind.annotation.PatchMapping("/{id}/visibility")
+    public ResponseEntity<FolderResponseDTO> toggleVisibility(
+            @PathVariable Long id,
+            @org.springframework.web.bind.annotation.RequestHeader(name = "X-User-Id", required = false) Long userId) {
+        return ResponseEntity.ok(folderService.toggleVisibility(id, userId));
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> delete(@PathVariable Long id) {
-        folderService.delete(id);
+    public ResponseEntity<Void> delete(
+            @PathVariable Long id,
+            @org.springframework.web.bind.annotation.RequestHeader(name = "X-User-Id", required = false) Long userId) {
+        folderService.delete(id, userId);
         return ResponseEntity.noContent().build();
+    }
+
+    // Flashcards na Pasta
+    @GetMapping("/{id}/flashcards")
+    public ResponseEntity<List<github.felkng.olha_minha_questao.dto.flashcard.FlashcardResponseDTO>> getFlashcardsInFolder(@PathVariable Long id) {
+        return ResponseEntity.ok(folderService.getFlashcardsInFolder(id));
+    }
+
+    @PostMapping("/{id}/flashcards/{flashcardId}")
+    public ResponseEntity<Void> addFlashcardToFolder(
+            @PathVariable Long id,
+            @PathVariable Long flashcardId,
+            @RequestParam(required = false) String notes) {
+        folderService.addFlashcardToFolder(id, flashcardId, notes);
+        return ResponseEntity.status(HttpStatus.CREATED).build();
+    }
+
+    @DeleteMapping("/{id}/flashcards/{flashcardId}")
+    public ResponseEntity<Void> removeFlashcardFromFolder(
+            @PathVariable Long id,
+            @PathVariable Long flashcardId) {
+        folderService.removeFlashcardFromFolder(id, flashcardId);
+        return ResponseEntity.noContent().build();
+    }
+
+    @GetMapping("/by-flashcard/{flashcardId}")
+    public ResponseEntity<List<Long>> getFolderIdsForFlashcard(@PathVariable Long flashcardId) {
+        return ResponseEntity.ok(folderService.getFolderIdsForFlashcard(flashcardId));
     }
 
     // Questões Salvas

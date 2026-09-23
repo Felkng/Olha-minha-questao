@@ -16,4 +16,6 @@ public interface SavedTestRepository extends JpaRepository<SavedTest, Long> {
 
     @Query("SELECT st.folder.id FROM SavedTest st WHERE st.test.id = :testId")
     List<Long> findFolderIdsByTestId(@Param("testId") Long testId);
+
+    long countByFolderId(Long folderId);
 }

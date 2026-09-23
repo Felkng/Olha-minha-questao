@@ -42,13 +42,22 @@ public class FolderService {
     private final TestMapper testMapper;
     private final SavedQuestionMapper savedQuestionMapper;
 
+    private final github.felkng.olha_minha_questao.domain.repository.FlashcardRepository flashcardRepository;
+    private final github.felkng.olha_minha_questao.domain.repository.SavedFlashcardRepository savedFlashcardRepository;
+    private final github.felkng.olha_minha_questao.mapper.FlashcardMapper flashcardMapper;
+
     @Transactional(readOnly = true)
     public List<FolderResponseDTO> findAll(FolderType type) {
-        return findAll(type, null);
+        return findAll(type, null, null);
     }
 
     @Transactional(readOnly = true)
     public List<FolderResponseDTO> findAll(FolderType type, Long createdByUserId) {
+        return findAll(type, createdByUserId, null);
+    }
+
+    @Transactional(readOnly = true)
+    public List<FolderResponseDTO> findAll(FolderType type, Long createdByUserId, Long currentUserId) {
         List<Folder> folders;
         if (createdByUserId != null) {
             if (type != null) {
@@ -63,16 +72,35 @@ public class FolderService {
                 folders = folderRepository.findAllByOrderByNameAsc();
             }
         }
+
         return folders.stream()
-                .map(folderMapper::toDTO)
+                .filter(f -> {
+                    if (createdByUserId != null && createdByUserId.equals(currentUserId)) {
+                        return true;
+                    }
+                    return Boolean.TRUE.equals(f.getIsPublic()) || (currentUserId != null && f.getCreatedByUser() != null && f.getCreatedByUser().getId().equals(currentUserId));
+                })
+                .map(this::toDTOWithCounts)
                 .toList();
+    }
+
+    private FolderResponseDTO toDTOWithCounts(Folder folder) {
+        FolderResponseDTO dto = folderMapper.toDTO(folder);
+        if (folder != null && folder.getId() != null) {
+            long directCount = flashcardRepository.countByFolderId(folder.getId());
+            long savedCount = savedFlashcardRepository.countByFolderId(folder.getId());
+            dto.setFlashcardCount(Math.max(directCount, savedCount));
+            dto.setQuestionCount(savedQuestionRepository.countByFolderId(folder.getId()));
+            dto.setTestCount(savedTestRepository.countByFolderId(folder.getId()));
+        }
+        return dto;
     }
 
     @Transactional(readOnly = true)
     public FolderResponseDTO findById(Long id) {
         Folder folder = folderRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Pasta não encontrada com o id: " + id));
-        return folderMapper.toDTO(folder);
+        return toDTOWithCounts(folder);
     }
 
     @Transactional
@@ -95,25 +123,164 @@ public class FolderService {
         if (folder.getFolderType() == null) {
             folder.setFolderType(FolderType.QUESTION);
         }
+        if (folder.getIsPublic() == null) {
+            folder.setIsPublic(dto.getIsPublic() != null ? dto.getIsPublic() : true);
+        }
         Folder saved = folderRepository.save(folder);
-        return folderMapper.toDTO(saved);
+        return toDTOWithCounts(saved);
     }
 
     @Transactional
     public FolderResponseDTO update(Long id, FolderRequestDTO dto) {
+        return update(id, dto, null);
+    }
+
+    @Transactional
+    public FolderResponseDTO update(Long id, FolderRequestDTO dto, Long currentUserId) {
         Folder folder = folderRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Pasta não encontrada com o id: " + id));
+
+        if (currentUserId != null) {
+            github.felkng.olha_minha_questao.domain.entity.User user = userRepository.findById(currentUserId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado com id: " + currentUserId));
+
+            if (user.getRole() != github.felkng.olha_minha_questao.domain.entity.UserRole.ADMIN) {
+                if (folder.getCreatedByUser() == null || !folder.getCreatedByUser().getId().equals(user.getId())) {
+                    throw new org.springframework.web.server.ResponseStatusException(
+                            org.springframework.http.HttpStatus.FORBIDDEN,
+                            "Você não tem permissão para editar esta pasta.");
+                }
+            }
+        }
+
         folderMapper.updateEntityFromDTO(dto, folder);
+        if (dto.getIsPublic() != null) {
+            folder.setIsPublic(dto.getIsPublic());
+        }
         Folder updated = folderRepository.save(folder);
-        return folderMapper.toDTO(updated);
+        return toDTOWithCounts(updated);
+    }
+
+    @Transactional
+    public FolderResponseDTO toggleVisibility(Long id, Long currentUserId) {
+        Folder folder = folderRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Pasta não encontrada com o id: " + id));
+
+        if (currentUserId != null) {
+            github.felkng.olha_minha_questao.domain.entity.User user = userRepository.findById(currentUserId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado com id: " + currentUserId));
+
+            if (user.getRole() != github.felkng.olha_minha_questao.domain.entity.UserRole.ADMIN) {
+                if (folder.getCreatedByUser() == null || !folder.getCreatedByUser().getId().equals(user.getId())) {
+                    throw new org.springframework.web.server.ResponseStatusException(
+                            org.springframework.http.HttpStatus.FORBIDDEN,
+                            "Você não tem permissão para alterar a visibilidade desta pasta.");
+                }
+            }
+        }
+
+        boolean current = Boolean.TRUE.equals(folder.getIsPublic());
+        folder.setIsPublic(!current);
+        Folder saved = folderRepository.save(folder);
+        return toDTOWithCounts(saved);
     }
 
     @Transactional
     public void delete(Long id) {
-        if (!folderRepository.existsById(id)) {
-            throw new ResourceNotFoundException("Pasta não encontrada com o id: " + id);
+        delete(id, null);
+    }
+
+    @Transactional
+    public void delete(Long id, Long currentUserId) {
+        Folder folder = folderRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Pasta não encontrada com o id: " + id));
+
+        if (currentUserId != null) {
+            github.felkng.olha_minha_questao.domain.entity.User user = userRepository.findById(currentUserId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado com id: " + currentUserId));
+
+            if (user.getRole() == github.felkng.olha_minha_questao.domain.entity.UserRole.ADMIN) {
+                // Admin pode excluir qualquer pasta
+            } else {
+                // Usuário comum só pode excluir suas próprias pastas
+                if (folder.getCreatedByUser() == null || !folder.getCreatedByUser().getId().equals(user.getId())) {
+                    throw new org.springframework.web.server.ResponseStatusException(
+                            org.springframework.http.HttpStatus.FORBIDDEN,
+                            "Você não tem permissão para excluir esta pasta.");
+                }
+            }
         }
-        folderRepository.deleteById(id);
+
+        folderRepository.delete(folder);
+    }
+
+    @Transactional(readOnly = true)
+    public List<github.felkng.olha_minha_questao.dto.flashcard.FlashcardResponseDTO> getFlashcardsInFolder(Long folderId) {
+        if (!folderRepository.existsById(folderId)) {
+            throw new ResourceNotFoundException("Pasta não encontrada com o id: " + folderId);
+        }
+        List<github.felkng.olha_minha_questao.domain.entity.Flashcard> direct = flashcardRepository.findByFolderIdOrderByIdAsc(folderId);
+        List<github.felkng.olha_minha_questao.domain.entity.SavedFlashcard> saved = savedFlashcardRepository.findByFolderId(folderId);
+        java.util.Map<Long, github.felkng.olha_minha_questao.domain.entity.Flashcard> map = new java.util.LinkedHashMap<>();
+        for (github.felkng.olha_minha_questao.domain.entity.Flashcard f : direct) {
+            if (f != null && f.getId() != null) map.put(f.getId(), f);
+        }
+        for (github.felkng.olha_minha_questao.domain.entity.SavedFlashcard sf : saved) {
+            if (sf.getFlashcard() != null && sf.getFlashcard().getId() != null) {
+                map.put(sf.getFlashcard().getId(), sf.getFlashcard());
+            }
+        }
+        return map.values().stream().map(flashcardMapper::toDTO).toList();
+    }
+
+    @Transactional
+    public void addFlashcardToFolder(Long folderId, Long flashcardId, String notes) {
+        Folder folder = folderRepository.findById(folderId)
+                .orElseThrow(() -> new ResourceNotFoundException("Pasta não encontrada com o id: " + folderId));
+
+        if (folder.getFolderType() != FolderType.FLASHCARD) {
+            throw new IllegalArgumentException("Esta pasta é reservada para outro tipo de conteúdo, não Flashcards.");
+        }
+
+        github.felkng.olha_minha_questao.domain.entity.Flashcard flashcard = flashcardRepository.findById(flashcardId)
+                .orElseThrow(() -> new ResourceNotFoundException("Flashcard não encontrado com o id: " + flashcardId));
+
+        if (!savedFlashcardRepository.existsByFolderIdAndFlashcardId(folderId, flashcardId)) {
+            github.felkng.olha_minha_questao.domain.entity.SavedFlashcard sf = github.felkng.olha_minha_questao.domain.entity.SavedFlashcard.builder()
+                    .folder(folder)
+                    .flashcard(flashcard)
+                    .notes(notes)
+                    .build();
+            savedFlashcardRepository.save(sf);
+        }
+    }
+
+    @Transactional
+    public void removeFlashcardFromFolder(Long folderId, Long flashcardId) {
+        if (!folderRepository.existsById(folderId)) {
+            throw new ResourceNotFoundException("Pasta não encontrada com o id: " + folderId);
+        }
+        if (!flashcardRepository.existsById(flashcardId)) {
+            throw new ResourceNotFoundException("Flashcard não encontrado com o id: " + flashcardId);
+        }
+        savedFlashcardRepository.deleteByFolderIdAndFlashcardId(folderId, flashcardId);
+        flashcardRepository.findById(flashcardId).ifPresent(f -> {
+            if (f.getFolder() != null && f.getFolder().getId().equals(folderId)) {
+                f.setFolder(null);
+                flashcardRepository.save(f);
+            }
+        });
+    }
+
+    @Transactional(readOnly = true)
+    public List<Long> getFolderIdsForFlashcard(Long flashcardId) {
+        List<Long> savedFolderIds = new java.util.ArrayList<>(savedFlashcardRepository.findFolderIdsByFlashcardId(flashcardId));
+        flashcardRepository.findById(flashcardId).ifPresent(f -> {
+            if (f.getFolder() != null && !savedFolderIds.contains(f.getFolder().getId())) {
+                savedFolderIds.add(f.getFolder().getId());
+            }
+        });
+        return savedFolderIds;
     }
 
     // ==========================================

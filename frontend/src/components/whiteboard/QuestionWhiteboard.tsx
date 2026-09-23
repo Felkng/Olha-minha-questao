@@ -1888,8 +1888,8 @@ export const QuestionWhiteboard: React.FC<QuestionWhiteboardProps> = ({ question
       {/* Whiteboard Header / Status Bar */}
       <Box
         sx={{
-          p: 1.5,
-          px: 2,
+          p: { xs: 1, sm: 1.5 },
+          px: { xs: 1.5, sm: 2 },
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
@@ -1900,8 +1900,8 @@ export const QuestionWhiteboard: React.FC<QuestionWhiteboardProps> = ({ question
           backgroundColor: isDark ? 'rgba(255, 255, 255, 0.02)' : 'rgba(0, 0, 0, 0.02)',
         }}
       >
-        <Stack direction="row" spacing={1} alignItems="center">
-          <Typography variant="subtitle2" sx={{ fontWeight: 700, display: 'flex', alignItems: 'center', gap: 0.8 }}>
+        <Stack direction="row" spacing={1} alignItems="center" sx={{ flexWrap: 'wrap' }}>
+          <Typography variant="subtitle2" sx={{ fontWeight: 700, display: 'flex', alignItems: 'center', gap: 0.8, fontSize: { xs: '0.8rem', sm: '0.875rem' } }}>
             <BrushIcon fontSize="small" sx={{ color: PALETTE_COLORS.primary }} />
             Lousa de Raciocínio {isFullscreen && '(Tela Cheia)'}
           </Typography>
@@ -1927,24 +1927,24 @@ export const QuestionWhiteboard: React.FC<QuestionWhiteboardProps> = ({ question
           </Tooltip>
         </Stack>
 
-        <Stack direction="row" spacing={1.5} alignItems="center">
+        <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: { xs: 0.75, sm: 1.5 } }}>
           {/* Zoom controls */}
-          <Stack direction="row" spacing={0.5} alignItems="center" sx={{ mr: 1 }}>
+          <Stack direction="row" spacing={0.25} alignItems="center">
             <Tooltip title="Diminuir Zoom">
-              <IconButton size="small" onClick={() => handleZoom(-0.1)}>
+              <IconButton size="small" onClick={() => handleZoom(-0.1)} sx={{ p: 0.5 }}>
                 <ZoomOutIcon fontSize="small" />
               </IconButton>
             </Tooltip>
-            <Typography variant="caption" sx={{ minWidth: 40, textAlign: 'center', fontWeight: 700 }}>
+            <Typography variant="caption" sx={{ minWidth: 36, textAlign: 'center', fontWeight: 700, fontSize: { xs: '0.7rem', sm: '0.75rem' } }}>
               {Math.round(zoom * 100)}%
             </Typography>
             <Tooltip title="Aumentar Zoom">
-              <IconButton size="small" onClick={() => handleZoom(0.1)}>
+              <IconButton size="small" onClick={() => handleZoom(0.1)} sx={{ p: 0.5 }}>
                 <ZoomInIcon fontSize="small" />
               </IconButton>
             </Tooltip>
             <Tooltip title="Centralizar / Resetar Visão">
-              <IconButton size="small" onClick={handleResetView}>
+              <IconButton size="small" onClick={handleResetView} sx={{ p: 0.5 }}>
                 <CenterFocusStrongIcon fontSize="small" />
               </IconButton>
             </Tooltip>
@@ -1954,8 +1954,8 @@ export const QuestionWhiteboard: React.FC<QuestionWhiteboardProps> = ({ question
             <Chip
               size="small"
               icon={<CircularProgress size={14} sx={{ color: PALETTE_COLORS.secondary }} />}
-              label="Salvando na nuvem..."
-              sx={{ backgroundColor: 'transparent', fontSize: '0.75rem' }}
+              label="Salvando..."
+              sx={{ backgroundColor: 'transparent', fontSize: '0.75rem', height: 24 }}
             />
           ) : user ? (
             <Chip
@@ -1971,33 +1971,41 @@ export const QuestionWhiteboard: React.FC<QuestionWhiteboardProps> = ({ question
                 color: PALETTE_COLORS.success,
                 fontWeight: 600,
                 fontSize: '0.75rem',
+                height: 24,
               }}
             />
           ) : (
             <Chip
               size="small"
               icon={<CloudUploadOutlinedIcon fontSize="small" />}
-              label="Salvo localmente (faça login para nuvem)"
-              sx={{ fontSize: '0.75rem', color: 'text.secondary' }}
+              label="Local"
+              title="Salvo localmente (faça login para nuvem)"
+              sx={{ fontSize: '0.75rem', color: 'text.secondary', height: 24 }}
             />
           )}
 
-          <Button
-            size="small"
-            variant="contained"
-            color="primary"
-            startIcon={<SaveIcon />}
-            onClick={handleSave}
-            disabled={isSaving}
-            sx={{
-              fontWeight: 700,
-              fontSize: '0.75rem',
-              py: 0.5,
-              textTransform: 'none',
-            }}
-          >
-            Salvar
-          </Button>
+          <Tooltip title="Salvar lousa na nuvem (Ctrl+S)">
+            <Button
+              size="small"
+              variant="contained"
+              color="primary"
+              startIcon={<SaveIcon />}
+              onClick={handleSave}
+              disabled={isSaving}
+              sx={{
+                fontWeight: 700,
+                fontSize: '0.75rem',
+                py: 0.4,
+                px: { xs: 1, sm: 1.5 },
+                textTransform: 'none',
+                minWidth: 'auto',
+              }}
+            >
+              <Box component="span" sx={{ display: { xs: 'none', sm: 'inline' } }}>
+                Salvar
+              </Box>
+            </Button>
+          </Tooltip>
 
           {isFullscreen ? (
             <Tooltip title="Sair do modo Tela Cheia (Esc)">
@@ -2010,11 +2018,15 @@ export const QuestionWhiteboard: React.FC<QuestionWhiteboardProps> = ({ question
                 sx={{
                   fontWeight: 700,
                   fontSize: '0.75rem',
-                  py: 0.5,
+                  py: 0.4,
+                  px: { xs: 1, sm: 1.5 },
                   textTransform: 'none',
+                  minWidth: 'auto',
                 }}
               >
-                Sair
+                <Box component="span" sx={{ display: { xs: 'none', sm: 'inline' } }}>
+                  Sair
+                </Box>
               </Button>
             </Tooltip>
           ) : (
@@ -2027,25 +2039,29 @@ export const QuestionWhiteboard: React.FC<QuestionWhiteboardProps> = ({ question
                 sx={{
                   fontWeight: 700,
                   fontSize: '0.75rem',
-                  py: 0.5,
+                  py: 0.4,
+                  px: { xs: 1, sm: 1.5 },
                   textTransform: 'none',
+                  minWidth: 'auto',
                 }}
               >
-                Tela Cheia
+                <Box component="span" sx={{ display: { xs: 'none', sm: 'inline' } }}>
+                  Tela Cheia
+                </Box>
               </Button>
             </Tooltip>
           )}
-        </Stack>
+        </Box>
       </Box>
 
       {/* Whiteboard Primary Toolbar */}
       <Box
         sx={{
-          p: 1.5,
+          p: { xs: 1, sm: 1.5 },
           display: 'flex',
           flexWrap: 'wrap',
           alignItems: 'center',
-          gap: 1.5,
+          gap: { xs: 1, sm: 1.5 },
           borderBottom: '1px solid',
           borderColor: 'divider',
           backgroundColor: isDark ? 'rgba(255, 255, 255, 0.01)' : 'rgba(0, 0, 0, 0.01)',
@@ -2065,6 +2081,19 @@ export const QuestionWhiteboard: React.FC<QuestionWhiteboardProps> = ({ question
             }
           }}
           aria-label="ferramenta de desenho"
+          sx={{
+            flexWrap: 'wrap',
+            gap: 0.5,
+            '& .MuiToggleButtonGroup-grouped': {
+              border: '1px solid !important',
+              borderColor: isDark ? 'rgba(255, 255, 255, 0.12) !important' : 'rgba(0, 0, 0, 0.12) !important',
+              borderRadius: '8px !important',
+              m: '0 !important',
+              p: { xs: '4px 6px', sm: '6px 8px' },
+              minWidth: { xs: 32, sm: 36 },
+              height: { xs: 32, sm: 36 },
+            },
+          }}
         >
           <ToggleButton value="select" aria-label="cursor comum e seleção">
             <Tooltip title="Cursor Comum e Seleção (V ou 1)">
@@ -2127,11 +2156,11 @@ export const QuestionWhiteboard: React.FC<QuestionWhiteboardProps> = ({ question
           </ToggleButton>
         </ToggleButtonGroup>
 
-        <Divider orientation="vertical" flexItem sx={{ mx: 0.5 }} />
+        <Divider orientation="vertical" flexItem sx={{ display: { xs: 'none', md: 'block' }, mx: 0.5 }} />
 
         {/* Stroke Width Selector */}
-        <Stack direction="row" spacing={0.5} alignItems="center">
-          <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600, mr: 0.5 }}>
+        <Stack direction="row" spacing={0.5} alignItems="center" sx={{ flexWrap: 'wrap' }}>
+          <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600, mr: 0.5, fontSize: { xs: '0.7rem', sm: '0.75rem' } }}>
             Traço:
           </Typography>
           {STROKE_WIDTHS.map((sw) => (
@@ -2141,10 +2170,10 @@ export const QuestionWhiteboard: React.FC<QuestionWhiteboardProps> = ({ question
               variant={strokeWidth === sw.value ? 'contained' : 'outlined'}
               onClick={() => handleStrokeWidthChange(sw.value)}
               sx={{
-                minWidth: 32,
-                px: 1,
+                minWidth: { xs: 28, sm: 32 },
+                px: { xs: 0.75, sm: 1 },
                 py: 0.2,
-                fontSize: '0.75rem',
+                fontSize: { xs: '0.7rem', sm: '0.75rem' },
                 fontWeight: 700,
                 color: strokeWidth === sw.value ? '#1a1e24' : 'text.primary',
                 backgroundColor: strokeWidth === sw.value ? PALETTE_COLORS.primary : 'transparent',
@@ -2155,11 +2184,11 @@ export const QuestionWhiteboard: React.FC<QuestionWhiteboardProps> = ({ question
           ))}
         </Stack>
 
-        <Divider orientation="vertical" flexItem sx={{ mx: 0.5 }} />
+        <Divider orientation="vertical" flexItem sx={{ display: { xs: 'none', md: 'block' }, mx: 0.5 }} />
 
         {/* Color Palette Chips */}
-        <Stack direction="row" spacing={0.8} alignItems="center">
-          <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600, mr: 0.5 }}>
+        <Stack direction="row" spacing={0.6} alignItems="center" sx={{ flexWrap: 'wrap' }}>
+          <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600, mr: 0.5, fontSize: { xs: '0.7rem', sm: '0.75rem' } }}>
             Cor:
           </Typography>
           {SYSTEM_PALETTE.map((p) => {
@@ -2169,8 +2198,8 @@ export const QuestionWhiteboard: React.FC<QuestionWhiteboardProps> = ({ question
                 <Box
                   onClick={() => handleColorChange(p.color)}
                   sx={{
-                    width: 22,
-                    height: 22,
+                    width: { xs: 18, sm: 22 },
+                    height: { xs: 18, sm: 22 },
                     borderRadius: '50%',
                     backgroundColor: p.color,
                     cursor: 'pointer',
@@ -2190,19 +2219,19 @@ export const QuestionWhiteboard: React.FC<QuestionWhiteboardProps> = ({ question
           })}
         </Stack>
 
-        <Divider orientation="vertical" flexItem sx={{ mx: 0.5 }} />
+        <Divider orientation="vertical" flexItem sx={{ display: { xs: 'none', md: 'block' }, mx: 0.5 }} />
 
         {/* Grid and History Actions */}
-        <Stack direction="row" spacing={0.5} alignItems="center">
+        <Stack direction="row" spacing={0.5} alignItems="center" sx={{ flexWrap: 'wrap' }}>
           <Tooltip title={showGrid ? 'Ocultar grade' : 'Mostrar grade'}>
-            <IconButton size="small" onClick={() => setShowGrid(!showGrid)} color={showGrid ? 'primary' : 'default'}>
+            <IconButton size="small" onClick={() => setShowGrid(!showGrid)} color={showGrid ? 'primary' : 'default'} sx={{ p: { xs: 0.5, sm: 0.75 } }}>
               {showGrid ? <GridOnIcon fontSize="small" /> : <GridOffIcon fontSize="small" />}
             </IconButton>
           </Tooltip>
 
           <Tooltip title="Desfazer (Ctrl+Z)">
             <span>
-              <IconButton size="small" onClick={handleUndo} disabled={undoStack.length === 0}>
+              <IconButton size="small" onClick={handleUndo} disabled={undoStack.length === 0} sx={{ p: { xs: 0.5, sm: 0.75 } }}>
                 <UndoIcon fontSize="small" />
               </IconButton>
             </span>
@@ -2210,7 +2239,7 @@ export const QuestionWhiteboard: React.FC<QuestionWhiteboardProps> = ({ question
 
           <Tooltip title="Refazer (Ctrl+Y ou Ctrl+Shift+Z)">
             <span>
-              <IconButton size="small" onClick={handleRedo} disabled={redoStack.length === 0}>
+              <IconButton size="small" onClick={handleRedo} disabled={redoStack.length === 0} sx={{ p: { xs: 0.5, sm: 0.75 } }}>
                 <RedoIcon fontSize="small" />
               </IconButton>
             </span>
@@ -2218,7 +2247,7 @@ export const QuestionWhiteboard: React.FC<QuestionWhiteboardProps> = ({ question
 
           <Tooltip title="Limpar Lousa">
             <span>
-              <IconButton size="small" onClick={handleClear} disabled={elements.length === 0} color="error">
+              <IconButton size="small" onClick={handleClear} disabled={elements.length === 0} color="error" sx={{ p: { xs: 0.5, sm: 0.75 } }}>
                 <DeleteOutlineIcon fontSize="small" />
               </IconButton>
             </span>
