@@ -26,6 +26,7 @@ import EditIcon from '@mui/icons-material/Edit';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import PublicIcon from '@mui/icons-material/Public';
 import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
+import ShuffleIcon from '@mui/icons-material/Shuffle';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Flashcard, Folder, Question, TestCard } from '../types';
 import {
@@ -173,22 +174,41 @@ export const FolderDetailPage: React.FC<FolderDetailPageProps> = ({
           Voltar para Pastas
         </Button>
 
-        <Stack direction="row" spacing={1.5} alignItems="center">
+        <Stack direction="row" spacing={1.5} alignItems="center" flexWrap="wrap">
           {isFlashcardFolder && (
-            <Button
-              variant="contained"
-              startIcon={<PlayArrowIcon />}
-              onClick={() => navigate(`/flashcards/estudo?folderId=${folder.id}`)}
-              disabled={flashcards.length === 0}
-              sx={{
-                borderRadius: 2,
-                fontWeight: 700,
-                backgroundColor: PALETTE_COLORS.success,
-                color: '#0f2910',
-              }}
-            >
-              Praticar Deck ({flashcards.length})
-            </Button>
+            <Stack direction="row" spacing={1} alignItems="center">
+              <Button
+                variant="contained"
+                startIcon={<PlayArrowIcon />}
+                onClick={() => navigate(`/flashcards/estudo?folderId=${folder.id}`)}
+                disabled={flashcards.length === 0}
+                sx={{
+                  borderRadius: 2,
+                  fontWeight: 700,
+                  backgroundColor: PALETTE_COLORS.success,
+                  color: '#0f2910',
+                }}
+              >
+                Praticar Deck ({flashcards.length})
+              </Button>
+
+              <Tooltip title="Praticar em ordem aleatória">
+                <span>
+                  <Button
+                    variant="outlined"
+                    startIcon={<ShuffleIcon />}
+                    onClick={() => navigate(`/flashcards/estudo?folderId=${folder.id}&shuffle=true`)}
+                    disabled={flashcards.length === 0}
+                    sx={{
+                      borderRadius: 2,
+                      fontWeight: 700,
+                    }}
+                  >
+                    Aleatório
+                  </Button>
+                </span>
+              </Tooltip>
+            </Stack>
           )}
 
           {(isAdmin || (user && folder.createdByUser?.id === user.id)) && (
@@ -435,6 +455,9 @@ export const FolderDetailPage: React.FC<FolderDetailPageProps> = ({
                             fontWeight: isFlipped ? 500 : 700,
                             minHeight: 64,
                             lineHeight: 1.5,
+                            wordBreak: 'break-word',
+                            overflowWrap: 'break-word',
+                            whiteSpace: 'pre-line',
                           }}
                         >
                           {isFlipped ? card.back : card.front}

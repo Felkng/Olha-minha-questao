@@ -10,6 +10,7 @@ import {
   Divider,
   Grid,
   Skeleton,
+  Tooltip,
 } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import FlipCameraAndroidIcon from '@mui/icons-material/FlipCameraAndroid';
@@ -21,6 +22,7 @@ import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
 import FolderSpecialOutlinedIcon from '@mui/icons-material/FolderSpecialOutlined';
 import KeyboardIcon from '@mui/icons-material/Keyboard';
 import VisibilityIcon from '@mui/icons-material/Visibility';
+import ShuffleIcon from '@mui/icons-material/Shuffle';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Flashcard, FlashcardItemStatus, FlashcardSessionItem } from '../types';
 import { getFlashcards, getFlashcardsInFolder, submitFlashcardSession } from '../services/api';
@@ -28,19 +30,31 @@ import { PALETTE_COLORS } from '../theme/theme';
 import { useAppTheme } from '../theme/ThemeContext';
 import { useAuth } from '../context/AuthContext';
 
+const shuffleArray = <T,>(array: T[]): T[] => {
+  const arr = [...array];
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+};
+
 export const FlashcardStudyPage: React.FC = () => {
   const { mode } = useAppTheme();
   const isDark = mode === 'dark';
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { user } = useAuth();
 
   const folderIdParam = searchParams.get('folderId');
   const areaIdParam = searchParams.get('areaId');
   const subjectIdParam = searchParams.get('subjectId');
+  const shuffleParam = searchParams.get('shuffle') === 'true' || searchParams.get('random') === 'true';
   const folderId = folderIdParam ? Number(folderIdParam) : undefined;
 
   const [cards, setCards] = useState<Flashcard[]>([]);
+  const [originalCards, setOriginalCards] = useState<Flashcard[]>([]);
+  const [isRandomMode, setIsRandomMode] = useState<boolean>(shuffleParam);
   const [loading, setLoading] = useState(true);
 
   // Session State
@@ -56,17 +70,19 @@ export const FlashcardStudyPage: React.FC = () => {
   const loadCards = async () => {
     setLoading(true);
     try {
+      let fetchedCards: Flashcard[] = [];
       if (folderId) {
-        const folderCards = await getFlashcardsInFolder(folderId);
-        setCards(folderCards);
+        fetchedCards = await getFlashcardsInFolder(folderId);
       } else {
         const res = await getFlashcards({
           areaId: areaIdParam ? Number(areaIdParam) : '',
           subjectId: subjectIdParam ? Number(subjectIdParam) : '',
           size: 100,
         });
-        setCards(res.content);
+        fetchedCards = res.content;
       }
+      setOriginalCards(fetchedCards);
+      setCards(isRandomMode ? shuffleArray(fetchedCards) : fetchedCards);
     } catch (err) {
       console.error('Erro ao carregar flashcards para estudo:', err);
     } finally {
@@ -77,6 +93,29 @@ export const FlashcardStudyPage: React.FC = () => {
   useEffect(() => {
     loadCards();
   }, [folderIdParam, areaIdParam, subjectIdParam]);
+
+  const toggleRandomMode = () => {
+    const nextRandom = !isRandomMode;
+    setIsRandomMode(nextRandom);
+
+    // Update URL param without refreshing
+    const newParams = new URLSearchParams(searchParams);
+    if (nextRandom) {
+      newParams.set('shuffle', 'true');
+    } else {
+      newParams.delete('shuffle');
+      newParams.delete('random');
+    }
+    setSearchParams(newParams, { replace: true });
+
+    // Reset and apply shuffling or original order
+    const baseCards = originalCards.length > 0 ? originalCards : cards;
+    setCards(nextRandom ? shuffleArray(baseCards) : baseCards);
+    setCurrentIndex(0);
+    setIsFlipped(false);
+    setSessionResults([]);
+    setIsFinished(false);
+  };
 
   const currentCard = cards[currentIndex];
 
@@ -136,6 +175,9 @@ export const FlashcardStudyPage: React.FC = () => {
   }, [handleKeyDown]);
 
   const handleRestartFull = () => {
+    if (isRandomMode && originalCards.length > 0) {
+      setCards(shuffleArray(originalCards));
+    }
     setCurrentIndex(0);
     setIsFlipped(false);
     setSessionResults([]);
@@ -148,7 +190,7 @@ export const FlashcardStudyPage: React.FC = () => {
       .map((r) => r.card);
     if (missedCards.length === 0) return;
 
-    setCards(missedCards);
+    setCards(isRandomMode ? shuffleArray(missedCards) : missedCards);
     setCurrentIndex(0);
     setIsFlipped(false);
     setSessionResults([]);
@@ -451,14 +493,46 @@ export const FlashcardStudyPage: React.FC = () => {
   return (
     <Box sx={{ maxWidth: 850, mx: 'auto', mb: 6 }}>
       {/* Header & Controls */}
-      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
-        <Button
-          startIcon={<ArrowBackIcon />}
-          onClick={() => navigate('/flashcards')}
-          sx={{ color: 'text.secondary', fontWeight: 600 }}
-        >
-          Sair do Estudo
-        </Button>
+      <Box
+        sx={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          mb: 2,
+          flexWrap: 'wrap',
+          gap: 1.5,
+        }}
+      >
+        <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
+          <Button
+            startIcon={<ArrowBackIcon />}
+            onClick={() => navigate('/flashcards')}
+            sx={{ color: 'text.secondary', fontWeight: 600 }}
+          >
+            Sair do Estudo
+          </Button>
+
+          <Tooltip title={isRandomMode ? 'Modo aleatório ativado. Clique para desativar' : 'Ativar modo aleatório (embaralhar cards)'}>
+            <Button
+              size="small"
+              variant={isRandomMode ? 'contained' : 'outlined'}
+              startIcon={<ShuffleIcon />}
+              onClick={toggleRandomMode}
+              sx={{
+                borderRadius: 2,
+                fontWeight: 700,
+                textTransform: 'none',
+                fontSize: '0.82rem',
+                borderColor: 'divider',
+                ...(isRandomMode
+                  ? { backgroundColor: PALETTE_COLORS.primary, color: '#1a1e24' }
+                  : { color: 'text.secondary' }),
+              }}
+            >
+              Modo Aleatório: {isRandomMode ? 'Ativado' : 'Desativado'}
+            </Button>
+          </Tooltip>
+        </Stack>
 
         <Stack direction="row" spacing={1.5} alignItems="center">
           <Chip
@@ -506,7 +580,8 @@ export const FlashcardStudyPage: React.FC = () => {
         sx={{
           perspective: '1200px',
           width: '100%',
-          minHeight: 380,
+          minHeight: { xs: 360, sm: 400 },
+          height: { xs: 380, sm: 420 },
           mb: 3,
         }}
       >
@@ -515,7 +590,7 @@ export const FlashcardStudyPage: React.FC = () => {
           sx={{
             position: 'relative',
             width: '100%',
-            minHeight: 380,
+            height: '100%',
             transformStyle: 'preserve-3d',
             transition: 'transform 0.5s cubic-bezier(0.4, 0, 0.2, 1)',
             transform: isFlipped ? 'rotateY(180deg)' : 'rotateY(0deg)',
@@ -527,78 +602,162 @@ export const FlashcardStudyPage: React.FC = () => {
             elevation={6}
             sx={{
               position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
               width: '100%',
               height: '100%',
               backfaceVisibility: 'hidden',
               borderRadius: 4,
-              p: { xs: 3, sm: 5 },
+              p: { xs: 2.5, sm: 4 },
               display: 'flex',
               flexDirection: 'column',
-              justifyContent: 'space-between',
               boxSizing: 'border-box',
               border: '2px solid',
               borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)',
               backgroundColor: isDark ? '#1e242c' : '#ffffff',
+              overflow: 'hidden',
             }}
           >
-            <Box>
-              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2, flexWrap: 'wrap', gap: 1 }}>
-                <Chip
-                  label="FRENTE (PERGUNTA)"
-                  size="small"
-                  sx={{
-                    fontWeight: 800,
-                    letterSpacing: '0.05em',
-                    backgroundColor: isDark ? 'rgba(217, 183, 99, 0.15)' : 'rgba(217, 183, 99, 0.2)',
-                    color: PALETTE_COLORS.primary,
-                  }}
-                />
+            {/* Top metadata / chips with flex-wrap and responsive handling */}
+            <Box
+              sx={{
+                display: 'flex',
+                alignItems: 'flex-start',
+                justifyContent: 'space-between',
+                mb: 1.5,
+                flexWrap: 'wrap',
+                gap: 1,
+                flexShrink: 0,
+                width: '100%',
+              }}
+            >
+              <Chip
+                label="FRENTE (PERGUNTA)"
+                size="small"
+                sx={{
+                  fontWeight: 800,
+                  letterSpacing: '0.05em',
+                  backgroundColor: isDark ? 'rgba(217, 183, 99, 0.15)' : 'rgba(217, 183, 99, 0.2)',
+                  color: PALETTE_COLORS.primary,
+                  flexShrink: 0,
+                }}
+              />
 
-                <Stack direction="row" spacing={1}>
-                  {currentCard.areaName && (
-                    <Chip size="small" label={currentCard.areaName} variant="outlined" />
-                  )}
-                  {currentCard.subjectName && (
-                    <Chip size="small" label={currentCard.subjectName} variant="outlined" />
-                  )}
-                  {currentCard.folderName && (
-                    <Chip
-                      size="small"
-                      icon={<FolderSpecialOutlinedIcon style={{ color: currentCard.folderColor || PALETTE_COLORS.primary }} />}
-                      label={currentCard.folderName}
-                      sx={{ fontWeight: 600 }}
-                    />
-                  )}
-                </Stack>
+              <Box
+                sx={{
+                  display: 'flex',
+                  flexWrap: 'wrap',
+                  gap: 0.8,
+                  alignItems: 'center',
+                  justifyContent: { xs: 'flex-start', sm: 'flex-end' },
+                  maxWidth: '100%',
+                }}
+              >
+                {currentCard.areaName && (
+                  <Chip
+                    size="small"
+                    label={currentCard.areaName}
+                    variant="outlined"
+                    sx={{
+                      maxWidth: '100%',
+                      '& .MuiChip-label': {
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                      },
+                    }}
+                  />
+                )}
+                {currentCard.subjectName && (
+                  <Chip
+                    size="small"
+                    label={currentCard.subjectName}
+                    variant="outlined"
+                    sx={{
+                      maxWidth: '100%',
+                      '& .MuiChip-label': {
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                      },
+                    }}
+                  />
+                )}
+                {currentCard.folderName && (
+                  <Chip
+                    size="small"
+                    icon={<FolderSpecialOutlinedIcon style={{ color: currentCard.folderColor || PALETTE_COLORS.primary, fontSize: 16 }} />}
+                    label={currentCard.folderName}
+                    sx={{
+                      fontWeight: 600,
+                      maxWidth: '100%',
+                      '& .MuiChip-label': {
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                      },
+                    }}
+                  />
+                )}
               </Box>
+            </Box>
 
+            {/* Question Text Area with Vertical Scroll Support */}
+            <Box
+              sx={{
+                flex: 1,
+                minHeight: 0,
+                my: 1,
+                overflowY: 'auto',
+                pr: 1,
+                display: 'flex',
+                alignItems: 'flex-start',
+                '&::-webkit-scrollbar': {
+                  width: '6px',
+                },
+                '&::-webkit-scrollbar-thumb': {
+                  backgroundColor: isDark ? 'rgba(255, 255, 255, 0.2)' : 'rgba(0, 0, 0, 0.2)',
+                  borderRadius: '3px',
+                },
+              }}
+            >
               <Typography
                 variant="h5"
                 sx={{
                   fontWeight: 700,
-                  lineHeight: 1.5,
-                  mt: 3,
-                  fontSize: { xs: '1.2rem', sm: '1.45rem' },
+                  lineHeight: 1.55,
+                  fontSize: { xs: '1.08rem', sm: '1.35rem' },
                   color: 'text.primary',
+                  wordBreak: 'break-word',
+                  overflowWrap: 'break-word',
+                  whiteSpace: 'pre-line',
+                  width: '100%',
                 }}
               >
                 {currentCard.front}
               </Typography>
             </Box>
 
+            {/* Bottom Hint */}
             <Box
               sx={{
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 gap: 1,
-                mt: 4,
+                mt: 1.5,
+                pt: 1,
+                borderTop: '1px dashed',
+                borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)',
                 color: 'text.secondary',
                 userSelect: 'none',
+                flexShrink: 0,
               }}
             >
               <FlipCameraAndroidIcon sx={{ fontSize: '1.2rem', color: PALETTE_COLORS.primary }} />
-              <Typography variant="body2" sx={{ fontWeight: 600 }}>
+              <Typography variant="body2" sx={{ fontWeight: 600, fontSize: { xs: '0.78rem', sm: '0.875rem' }, textAlign: 'center' }}>
                 Clique no card ou aperte <kbd style={{ padding: '2px 6px', background: isDark ? '#333' : '#eee', borderRadius: '4px' }}>Espaço</kbd> para virar e ver a resposta
               </Typography>
             </Box>
@@ -609,66 +768,109 @@ export const FlashcardStudyPage: React.FC = () => {
             elevation={6}
             sx={{
               position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
               width: '100%',
               height: '100%',
               backfaceVisibility: 'hidden',
               transform: 'rotateY(180deg)',
               borderRadius: 4,
-              p: { xs: 3, sm: 5 },
+              p: { xs: 2.5, sm: 4 },
               display: 'flex',
               flexDirection: 'column',
-              justifyContent: 'space-between',
               boxSizing: 'border-box',
               border: '2px solid',
               borderColor: PALETTE_COLORS.primary,
               backgroundColor: isDark ? '#1a222d' : '#fffdfa',
+              overflow: 'hidden',
             }}
           >
-            <Box>
-              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
-                <Chip
-                  label="VERSO (RESPOSTA)"
-                  size="small"
-                  sx={{
-                    fontWeight: 800,
-                    letterSpacing: '0.05em',
-                    backgroundColor: PALETTE_COLORS.primary,
-                    color: '#1a1e24',
-                  }}
-                />
+            {/* Top metadata / chips with flex-wrap */}
+            <Box
+              sx={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                mb: 1.5,
+                flexWrap: 'wrap',
+                gap: 1,
+                flexShrink: 0,
+                width: '100%',
+              }}
+            >
+              <Chip
+                label="VERSO (RESPOSTA)"
+                size="small"
+                sx={{
+                  fontWeight: 800,
+                  letterSpacing: '0.05em',
+                  backgroundColor: PALETTE_COLORS.primary,
+                  color: '#1a1e24',
+                  flexShrink: 0,
+                }}
+              />
 
-                <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600 }}>
-                  Resposta Revelada
-                </Typography>
-              </Box>
+              <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600 }}>
+                Resposta Revelada
+              </Typography>
+            </Box>
 
+            {/* Answer Text Area with Vertical Scroll Support */}
+            <Box
+              sx={{
+                flex: 1,
+                minHeight: 0,
+                my: 1,
+                overflowY: 'auto',
+                pr: 1,
+                display: 'flex',
+                alignItems: 'flex-start',
+                '&::-webkit-scrollbar': {
+                  width: '6px',
+                },
+                '&::-webkit-scrollbar-thumb': {
+                  backgroundColor: isDark ? 'rgba(255, 255, 255, 0.2)' : 'rgba(0, 0, 0, 0.2)',
+                  borderRadius: '3px',
+                },
+              }}
+            >
               <Typography
                 variant="h6"
                 sx={{
                   fontWeight: 600,
                   lineHeight: 1.6,
-                  mt: 3,
-                  fontSize: { xs: '1.1rem', sm: '1.3rem' },
+                  fontSize: { xs: '1.02rem', sm: '1.25rem' },
                   color: 'text.primary',
+                  wordBreak: 'break-word',
+                  overflowWrap: 'break-word',
+                  whiteSpace: 'pre-line',
+                  width: '100%',
                 }}
               >
                 {currentCard.back}
               </Typography>
             </Box>
 
+            {/* Bottom Hint */}
             <Box
               sx={{
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 gap: 1,
-                mt: 4,
+                mt: 1.5,
+                pt: 1,
+                borderTop: '1px dashed',
+                borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)',
                 color: 'text.secondary',
                 userSelect: 'none',
+                flexShrink: 0,
               }}
             >
               <FlipCameraAndroidIcon sx={{ fontSize: '1.2rem' }} />
-              <Typography variant="body2" sx={{ fontWeight: 600 }}>
+              <Typography variant="body2" sx={{ fontWeight: 600, fontSize: { xs: '0.78rem', sm: '0.875rem' }, textAlign: 'center' }}>
                 Clique para voltar para a pergunta
               </Typography>
             </Box>

@@ -35,6 +35,7 @@ import SearchIcon from '@mui/icons-material/Search';
 import BookmarkBorderIcon from '@mui/icons-material/BookmarkBorder';
 import BookmarkIcon from '@mui/icons-material/Bookmark';
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
+import ShuffleIcon from '@mui/icons-material/Shuffle';
 import { useNavigate } from 'react-router-dom';
 import { Area, Flashcard, Folder, Subject } from '../types';
 import {
@@ -235,12 +236,13 @@ export const FlashcardsPage: React.FC = () => {
     }
   };
 
-  const handleStartStudy = (fId?: number) => {
+  const handleStartStudy = (fId?: number, shuffle?: boolean) => {
     let url = '/flashcards/estudo';
     const params = new URLSearchParams();
     if (fId) params.append('folderId', String(fId));
     if (selectedAreaId) params.append('areaId', String(selectedAreaId));
     if (selectedSubjectId) params.append('subjectId', String(selectedSubjectId));
+    if (shuffle) params.append('shuffle', 'true');
 
     const qs = params.toString();
     if (qs) url += `?${qs}`;
@@ -473,7 +475,7 @@ export const FlashcardsPage: React.FC = () => {
                           )}
                         </Stack>
 
-                        <Stack direction="row" spacing={1}>
+                        <Stack direction="row" spacing={1} alignItems="center">
                           <Button
                             size="small"
                             variant="outlined"
@@ -502,6 +504,25 @@ export const FlashcardsPage: React.FC = () => {
                           >
                             Praticar
                           </Button>
+
+                          <Tooltip title="Praticar em ordem aleatória">
+                            <span>
+                              <IconButton
+                                size="small"
+                                onClick={() => handleStartStudy(folder.id, true)}
+                                disabled={!folder.flashcardCount || folder.flashcardCount === 0}
+                                sx={{
+                                  borderRadius: 2,
+                                  border: '1px solid',
+                                  borderColor: 'divider',
+                                  color: folder.color || PALETTE_COLORS.primary,
+                                  p: 0.8,
+                                }}
+                              >
+                                <ShuffleIcon fontSize="small" />
+                              </IconButton>
+                            </span>
+                          </Tooltip>
                         </Stack>
                       </Box>
                     </Paper>
@@ -539,7 +560,7 @@ export const FlashcardsPage: React.FC = () => {
           {/* Filters Bar */}
           <Paper elevation={3} sx={{ p: 2.5, borderRadius: 3, mb: 3 }}>
             <Grid container spacing={2} alignItems="center">
-              <Grid item xs={12} md={4}>
+              <Grid item xs={12} md={3.5}>
                 <Box component="form" onSubmit={handleSearchSubmit}>
                   <TextField
                     fullWidth
@@ -554,7 +575,7 @@ export const FlashcardsPage: React.FC = () => {
                 </Box>
               </Grid>
 
-              <Grid item xs={6} md={2}>
+              <Grid item xs={6} sm={4} md={2}>
                 <FormControl fullWidth size="small">
                   <InputLabel>Área</InputLabel>
                   <Select
@@ -572,7 +593,7 @@ export const FlashcardsPage: React.FC = () => {
                 </FormControl>
               </Grid>
 
-              <Grid item xs={6} md={2}>
+              <Grid item xs={6} sm={4} md={2}>
                 <FormControl fullWidth size="small">
                   <InputLabel>Matéria</InputLabel>
                   <Select
@@ -590,7 +611,7 @@ export const FlashcardsPage: React.FC = () => {
                 </FormControl>
               </Grid>
 
-              <Grid item xs={6} md={2}>
+              <Grid item xs={12} sm={4} md={2}>
                 <FormControl fullWidth size="small">
                   <InputLabel>Pasta / Deck</InputLabel>
                   <Select
@@ -608,22 +629,44 @@ export const FlashcardsPage: React.FC = () => {
                 </FormControl>
               </Grid>
 
-              <Grid item xs={6} md={2}>
-                <Button
-                  variant="contained"
-                  fullWidth
-                  startIcon={<PlayArrowIcon />}
-                  onClick={() => handleStartStudy()}
-                  disabled={flashcards.length === 0}
-                  sx={{
-                    fontWeight: 700,
-                    borderRadius: 2,
-                    backgroundColor: PALETTE_COLORS.success,
-                    color: '#0f2910',
-                  }}
-                >
-                  Praticar ({flashcards.length})
-                </Button>
+              <Grid item xs={12} md={2.5}>
+                <Stack direction="row" spacing={1} alignItems="center">
+                  <Button
+                    variant="contained"
+                    fullWidth
+                    startIcon={<PlayArrowIcon />}
+                    onClick={() => handleStartStudy()}
+                    disabled={flashcards.length === 0}
+                    sx={{
+                      fontWeight: 700,
+                      borderRadius: 2,
+                      backgroundColor: PALETTE_COLORS.success,
+                      color: '#0f2910',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    Praticar ({flashcards.length})
+                  </Button>
+
+                  <Tooltip title="Praticar em ordem aleatória">
+                    <span>
+                      <Button
+                        variant="outlined"
+                        onClick={() => handleStartStudy(undefined, true)}
+                        disabled={flashcards.length === 0}
+                        sx={{
+                          borderRadius: 2,
+                          minWidth: 44,
+                          px: 1.5,
+                          borderColor: 'divider',
+                          color: PALETTE_COLORS.primary,
+                        }}
+                      >
+                        <ShuffleIcon fontSize="small" />
+                      </Button>
+                    </span>
+                  </Tooltip>
+                </Stack>
               </Grid>
             </Grid>
           </Paper>
@@ -778,6 +821,9 @@ export const FlashcardsPage: React.FC = () => {
                               fontWeight: isFlipped ? 500 : 700,
                               minHeight: 64,
                               lineHeight: 1.5,
+                              wordBreak: 'break-word',
+                              overflowWrap: 'break-word',
+                              whiteSpace: 'pre-line',
                             }}
                           >
                             {isFlipped ? card.back : card.front}
