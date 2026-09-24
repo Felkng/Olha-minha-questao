@@ -128,10 +128,14 @@ class TestPdfParser(unittest.TestCase):
         E) reminiscência
         """
         mock_p1 = MagicMock()
+        mock_p1.width = 0
+        mock_p1.height = 0
         mock_p1.extract_words.return_value = []
         mock_p1.extract_text.return_value = sample_page1
         
         mock_p2 = MagicMock()
+        mock_p2.width = 0
+        mock_p2.height = 0
         mock_p2.extract_words.return_value = []
         mock_p2.extract_text.return_value = sample_page2
 

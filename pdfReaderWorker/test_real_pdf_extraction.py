@@ -10,13 +10,24 @@ class TestRealPdfExtraction(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        cls.exam_pdf_path = os.path.join(base_dir, 'backend', 'src', 'test', 'prova_pdf', 'analise_de_sistema_seguranca_cibernetica_e_da_informacao.pdf')
-        cls.answer_key_pdf_path = os.path.join(base_dir, 'backend', 'src', 'test', 'prova_pdf', 'gabarito (1).pdf')
+        possible_exam_paths = [
+            os.path.join(base_dir, 'backend', 'src', 'test', 'prova_pdf', 'analise_de_sistema_seguranca_cibernetica_e_da_informacao.pdf'),
+            os.path.join(os.path.dirname(os.path.abspath(__file__)), 'prova_pdf', 'analise_de_sistema_seguranca_cibernetica_e_da_informacao.pdf'),
+            '/app/prova_pdf/analise_de_sistema_seguranca_cibernetica_e_da_informacao.pdf',
+        ]
+        possible_key_paths = [
+            os.path.join(base_dir, 'backend', 'src', 'test', 'prova_pdf', 'gabarito (1).pdf'),
+            os.path.join(os.path.dirname(os.path.abspath(__file__)), 'prova_pdf', 'gabarito (1).pdf'),
+            '/app/prova_pdf/gabarito (1).pdf',
+        ]
 
-        if not os.path.exists(cls.exam_pdf_path):
-            raise FileNotFoundError(f"Arquivo da prova não encontrado em: {cls.exam_pdf_path}")
-        if not os.path.exists(cls.answer_key_pdf_path):
-            raise FileNotFoundError(f"Arquivo do gabarito não encontrado em: {cls.answer_key_pdf_path}")
+        cls.exam_pdf_path = next((p for p in possible_exam_paths if os.path.exists(p)), None)
+        cls.answer_key_pdf_path = next((p for p in possible_key_paths if os.path.exists(p)), None)
+
+        if not cls.exam_pdf_path:
+            raise FileNotFoundError(f"Arquivo da prova não encontrado. Procurado em: {possible_exam_paths}")
+        if not cls.answer_key_pdf_path:
+            raise FileNotFoundError(f"Arquivo do gabarito não encontrado. Procurado em: {possible_key_paths}")
 
         with open(cls.exam_pdf_path, 'rb') as f:
             cls.exam_bytes = f.read()
@@ -25,7 +36,9 @@ class TestRealPdfExtraction(unittest.TestCase):
             cls.answer_key_bytes = f.read()
 
     def test_extract_real_exam_pdf(self):
-        questions = parse_exam_pdf(self.exam_bytes)
+        parsed = parse_exam_pdf(self.exam_bytes)
+        questions = parsed["questions"]
+        textual_references = parsed["textualReferences"]
 
         # 1. Total questions count
         self.assertEqual(len(questions), 70, f"Deveriam ser extraídas 70 questões, mas foram extraídas {len(questions)}")
@@ -56,8 +69,35 @@ class TestRealPdfExtraction(unittest.TestCase):
         self.assertTrue(len(q70["enunciado"]) > 10)
         self.assertEqual(len(q70["alternatives"]), 5)
 
+        # 6. Verify textual references (multi-column and multi-paragraph extraction)
+        self.assertEqual(len(textual_references), 2, "Devem ser extraídas 2 referências textuais completas")
+
+        # Ref 1: Língua Portuguesa (spans across column 1 and column 2)
+        ref1 = textual_references[0]
+        self.assertIn("LÍNGUA PORTUGUESA", ref1["title"])
+        self.assertIn("À moda brasileira", ref1["title"])
+        self.assertIn("TELLES, Lygia Fagundes", ref1["author"] or ref1["source"])
+        # Check paragraphs from column 1
+        self.assertIn("Estou me vendo debaixo de uma árvore", ref1["content"])
+        self.assertIn("Olavo Bilac", ref1["content"])
+        # Check paragraphs from column 2 (which previously failed due to column separation)
+        self.assertIn("Fechei o livro e recuei", ref1["content"])
+        self.assertIn("Tantos anos depois, quando me avisaram", ref1["content"])
+
+        # Ref 2: Língua Inglesa (spans across column 1 and column 2)
+        ref2 = textual_references[1]
+        self.assertIn("LÍNGUA INGLESA", ref2["title"])
+        self.assertIn("How space technology is bringing", ref2["title"])
+        self.assertIn("cgi.com", ref2["reference"] or ref2["source"])
+        # Check paragraphs from column 1
+        self.assertIn("Space technology is developing fast", ref2["content"])
+        self.assertIn("The benefits of space technology", ref2["content"])
+        # Check paragraphs from column 2 (which previously failed due to column separation)
+        self.assertIn("Satellite technology will increasingly be a part", ref2["content"])
+        self.assertIn("At our company, we have been deeply embedded", ref2["content"])
+
     def test_extract_real_answer_key_pdf(self):
-        answers = parse_answer_key_pdf(self.answer_key_bytes, prova_name="PROVA 5")
+        answers = parse_answer_key_pdf(self.answer_key_bytes, prova_name="PROVA 5")["answers"]
 
         # 1. Total answers count
         self.assertEqual(len(answers), 70, f"Deveriam ser extraídas 70 respostas do gabarito, mas foram extraídas {len(answers)}")
@@ -91,8 +131,8 @@ class TestRealPdfExtraction(unittest.TestCase):
         self.assertEqual(ans_map.get("70"), "E")
 
     def test_match_exam_with_answer_key(self):
-        questions = parse_exam_pdf(self.exam_bytes)
-        answers = parse_answer_key_pdf(self.answer_key_bytes, prova_name="PROVA 5")
+        questions = parse_exam_pdf(self.exam_bytes)["questions"]
+        answers = parse_answer_key_pdf(self.answer_key_bytes, prova_name="PROVA 5")["answers"]
 
         ans_map = {a["identifier"]: a["correctAlternative"] for a in answers}
 

@@ -166,102 +166,166 @@ def parse_column_text(text: str) -> List[Dict[str, Any]]:
 
     return raw_questions
 
+def format_body_paragraphs(body_lines: List[str]) -> str:
+    """
+    Groups and formats narrative / reference lines into clean, distinct paragraphs.
+    Correctly merges multi-line sentences, handles line-break hyphenation (e.g. 'repen-' + 'te' -> 'repente'),
+    and separates distinct paragraphs with double newlines.
+    """
+    paragraphs: List[List[str]] = []
+    current_lines: List[str] = []
+    
+    # Pattern indicating start of a new numbered paragraph e.g. '1 ', '2 ', '10 ', 'I ', '§ '
+    new_p_pattern = re.compile(r'^(?:[0-9]{1,3}\s+[A-ZÀ-Úa-zà-ú]|§\s*\d+|[IVXLCDM]+\s*[\.\-–\s]+[A-ZÀ-Ú])')
+    
+    for line in body_lines:
+        line = line.strip()
+        if not line:
+            if current_lines:
+                paragraphs.append(current_lines)
+                current_lines = []
+            continue
+            
+        if new_p_pattern.match(line):
+            if current_lines:
+                paragraphs.append(current_lines)
+            current_lines = [line]
+        else:
+            if not current_lines:
+                current_lines = [line]
+            else:
+                prev_line = current_lines[-1]
+                if prev_line.endswith('-') and not prev_line.endswith(' -'):
+                    current_lines[-1] = prev_line[:-1] + line
+                elif prev_line.endswith('–') or prev_line.endswith('—'):
+                    current_lines[-1] = prev_line + ' ' + line
+                else:
+                    current_lines[-1] = prev_line + ' ' + line
+                    
+    if current_lines:
+        paragraphs.append(current_lines)
+        
+    formatted = []
+    for p in paragraphs:
+        p_text = ' '.join(p)
+        p_text = re.sub(r'[ \t]+', ' ', p_text).strip()
+        if p_text:
+            formatted.append(p_text)
+            
+    return '\n\n'.join(formatted)
+
 def extract_textual_references_from_pdf(pdf: pdfplumber.PDF) -> List[Dict[str, Any]]:
     """
     Identifies reading passages / text references in the PDF (e.g. Portuguese / English texts).
-    Does NOT assign them to questions, according to business rules.
+    Accurately handles multi-column and multi-page texts, correctly reconstructing complete paragraphs
+    and extracting title, subtitle, author, and citation sources.
     """
     noise_pattern = re.compile(
-        r'(?i)^(?:pcimarkpci.*|transpetro|enem\s+\d{4}|vestibular|caderno\s+de\s+quest|confidencial|www\.pciconcursos|terra\s+prova|petro|transp).*$'
+        r'(?i)^(?:pcimarkpci.*|transpetro|enem\s+\d{4}|vestibular|caderno\s+de\s+quest.*|confidencial|www\.pciconcursos.*|terra\s+prova|petro|transp|terra|prova\s*\d+\s*[-–].*)$'
     )
-    q_pattern_explicit = re.compile(r'^(?:QUEST[ÃA]O|ITEM)\s*([0-9]{1,3})[:\.\-\s]*(.*)$', re.IGNORECASE)
-    q_pattern_numbered = re.compile(r'^([0-9]{1,3})[\.\-\)]\s+(.*)$')
-    q_pattern_standalone = re.compile(r'^([0-9]{1,3})$')
-
-    all_streams: List[str] = []
-    for p in pdf.pages:
-        text = p.extract_text() or ""
-        if re.search(r'(?i)LEIA ATENTAMENTE AS INSTRU[ÇC][ÕO]ES', text):
-            continue
-        width, height = p.width, p.height
-        midpoint = width / 2
-        words = p.extract_words()
-        left_words = [w for w in words if w['x1'] <= midpoint + 20]
-        right_words = [w for w in words if w['x0'] >= midpoint - 20]
-        if len(left_words) > 15 and len(right_words) > 15:
-            try:
-                left_crop = p.crop((0, 0, midpoint, height))
-                right_crop = p.crop((midpoint, 0, width, height))
-                all_streams.append(left_crop.extract_text() or "")
-                all_streams.append(right_crop.extract_text() or "")
-                continue
-            except Exception:
-                pass
-        all_streams.append(text)
-
     passage_header_pattern = re.compile(
         r'^(?:L[ÍI]NGUA\s+INGLESA|L[ÍI]NGUA\s+PORTUGUESA|L[ÍI]NGUA\s+ESPANHOLA|TEXTO\s+[I|V|X|\d]+|TEXTO\s+PARA\s+AS\s+QUEST[ÕO]ES|LEIA\s+O\s+TEXTO|TEXTO\s+\d+|INGL[ÊE]S|PORTUGU[ÊE]S|REDA[ÇC][ÃA]O|CONHECIMENTOS\s+B[ÁA]SICOS|CONHECIMENTOS\s+ESPEC[ÍI]FICOS)\b',
         re.I
     )
+    q_explicit_pattern = re.compile(r'^(?:QUEST[ÃA]O|ITEM)\s*([0-9]{1,3})[:\.\-\s]*(.*)$', re.IGNORECASE)
+    alt_pattern = re.compile(r'^[(\[]?([A-Ea-e])[)\]\.\-]\s*(.*)$')
 
-    raw_blocks: List[List[str]] = []
-    current_block: List[str] = []
-    in_question = False
+    # Step 1: Collect sequential line streams across all pages and columns
+    flat_lines: List[str] = []
+    for p in pdf.pages:
+        text = p.extract_text() or ""
+        if re.search(r'(?i)LEIA ATENTAMENTE AS INSTRU[ÇC][ÕO]ES', text):
+            continue
+        width = getattr(p, 'width', 0)
+        height = getattr(p, 'height', 0)
+        
+        col_texts = []
+        if isinstance(width, (int, float)) and isinstance(height, (int, float)) and width > 0 and height > 0:
+            midpoint = width / 2
+            top_m = 35
+            bot_m = height - 40
+            words = p.extract_words() if hasattr(p, 'extract_words') else []
+            left_words = [w for w in words if w['x1'] <= midpoint + 20 and top_m <= w['top'] <= bot_m]
+            right_words = [w for w in words if w['x0'] >= midpoint - 20 and top_m <= w['top'] <= bot_m]
 
-    for stream in all_streams:
-        for line in stream.splitlines():
-            line_s = line.strip()
-            if not line_s or noise_pattern.match(line_s):
-                continue
-            
-            line_s = sanitize_text_noise(line_s)
-            if not line_s:
-                continue
-
-            is_q = bool(
-                q_pattern_explicit.match(line_s) or 
-                q_pattern_numbered.match(line_s) or 
-                (q_pattern_standalone.match(line_s) and 1 <= int(q_pattern_standalone.match(line_s).group(1)) <= 200)
-            )
-            if is_q:
-                in_question = True
-                if len(current_block) >= 5:
-                    raw_blocks.append(current_block)
-                current_block = []
+            if len(left_words) > 15 and len(right_words) > 15:
+                try:
+                    l_crop = p.crop((0, top_m, midpoint, bot_m))
+                    r_crop = p.crop((midpoint, top_m, width, bot_m))
+                    col_texts = [l_crop.extract_text() or "", r_crop.extract_text() or ""]
+                except Exception:
+                    col_texts = [p.crop((0, top_m, width, bot_m)).extract_text() or ""]
             else:
-                if not in_question:
-                    current_block.append(line_s)
-                else:
-                    # Check if a new reading passage or language section starts
-                    if passage_header_pattern.match(line_s):
-                        in_question = False
-                        current_block = [line_s]
+                try:
+                    col_texts = [p.crop((0, top_m, width, bot_m)).extract_text() or ""]
+                except Exception:
+                    col_texts = [text]
+        else:
+            col_texts = [text]
 
-    if len(current_block) >= 5:
-        raw_blocks.append(current_block)
+        for col_t in col_texts:
+            lines = [sanitize_text_noise(l) for l in col_t.splitlines()]
+            valid_lines = [l for l in lines if l and not noise_pattern.match(l)]
+            # If the very last line of the column is just the page number (e.g. '2', '4'), filter it out
+            if valid_lines and re.match(r'^\d{1,3}$', valid_lines[-1]):
+                valid_lines.pop()
+            flat_lines.extend(valid_lines)
 
+    # Step 2: Separate passages and questions
+    raw_passages: List[List[str]] = []
+    current_passage: List[str] = []
+    in_passage = False
+
+    for i, line in enumerate(flat_lines):
+        is_passage_start = bool(passage_header_pattern.match(line))
+        is_q_explicit = bool(q_explicit_pattern.match(line))
+        is_q_numbered = False
+        m_num = re.match(r'^([0-9]{1,3})[\.\-\)]?\s*(.*)$', line)
+        if m_num and not is_passage_start:
+            num_val = int(m_num.group(1))
+            if 1 <= num_val <= 200:
+                has_alts = any(alt_pattern.match(flat_lines[j]) for j in range(i + 1, min(i + 10, len(flat_lines))))
+                if has_alts:
+                    is_q_numbered = True
+
+        is_question = is_q_explicit or is_q_numbered
+
+        if is_passage_start:
+            if current_passage and len(current_passage) >= 5:
+                raw_passages.append(current_passage)
+            current_passage = [line]
+            in_passage = True
+            continue
+
+        if is_question:
+            if in_passage:
+                if len(current_passage) >= 5:
+                    raw_passages.append(current_passage)
+                current_passage = []
+                in_passage = False
+            continue
+
+        if in_passage:
+            current_passage.append(line)
+
+    if current_passage and len(current_passage) >= 5:
+        raw_passages.append(current_passage)
+
+    # Step 3: Parse metadata and structured body from each passage
     references: List[Dict[str, Any]] = []
-    for idx, block in enumerate(raw_blocks):
-        # Determine Title, Author/Source, and Body Content
-        title = ""
-        author = ""
-        source = ""
-        body_lines: List[str] = []
-
-        # Check section header in first lines (e.g. LÍNGUA PORTUGUESA / CONHECIMENTOS BÁSICOS)
+    for idx, block in enumerate(raw_passages):
         start_idx = 0
         section_prefix = ""
         while start_idx < min(4, len(block)):
-            candidate = block[start_idx]
-            if re.match(r'^(?:CONHECIMENTOS\s+B[ÁA]SICOS|CONHECIMENTOS\s+ESPEC[ÍI]FICOS)\b', candidate, re.I):
+            cand = block[start_idx]
+            if re.match(r'^(?:CONHECIMENTOS\s+B[ÁA]SICOS|CONHECIMENTOS\s+ESPEC[ÍI]FICOS)\b', cand, re.I):
                 start_idx += 1
-            elif re.match(r'^(?:L[ÍI]NGUA\s+PORTUGUESA|L[ÍI]NGUA\s+INGLESA|TEXTO\s+[I|V|X|\d]+)\b', candidate, re.I):
-                section_prefix = candidate
+            elif re.match(r'^(?:L[ÍI]NGUA\s+PORTUGUESA|L[ÍI]NGUA\s+INGLESA|L[ÍI]NGUA\s+ESPANHOLA|TEXTO\s+[I|V|X|\d]+)\b', cand, re.I):
+                section_prefix = cand
                 start_idx += 1
             else:
                 break
 
-        # Next line(s) usually form the title if it doesn't start with paragraph numbering
         title_lines = []
         while start_idx < min(6, len(block)):
             cand = block[start_idx]
@@ -276,7 +340,6 @@ def extract_textual_references_from_pdf(pdf: pdfplumber.PDF) -> List[Dict[str, A
         else:
             title = section_prefix if section_prefix else f"Texto {idx + 1}"
 
-        # Check for Subtitle: a secondary heading line before paragraph text
         subtitle = ""
         if start_idx < len(block):
             cand = block[start_idx]
@@ -287,21 +350,24 @@ def extract_textual_references_from_pdf(pdf: pdfplumber.PDF) -> List[Dict[str, A
                 subtitle = cand
                 start_idx += 1
 
-        # Check the end lines for bibliographic citations (Author / Source / Reference URL)
         end_idx = len(block)
         citation_lines = []
         while end_idx > start_idx and len(citation_lines) < 4:
             cand = block[end_idx - 1]
-            if re.search(r'(?i)(?:dispon[íi]vel\s+em|available\s+at|retrieved\s+on|fragmento\s+adaptado|adaptad[oa]|rio\s+de\s+janeiro|s[ãa]o\s+paulo|ed\.|p\.\d+|\.com|\.org|https?://)', cand) or re.match(r'^[A-ZÀ-Ú\s,]{4,}\.', cand):
+            if (re.search(r'(?i)(?:dispon[íi]vel\s+em|available\s+at|retrieved\s+on|fragmento\s+adaptado|adaptad[oa]|rio\s+de\s+janeiro|s[ãa]o\s+paulo|ed\.|p\.\s*\d+|\.com|\.org|https?://)', cand) 
+                    or re.match(r'^[A-ZÀ-Ú]{2,}(?:,\s+[A-ZÀ-Úa-zà-ú\s\.]+)\.', cand)
+                    or re.match(r'^[A-ZÀ-Ú\s,]{4,}\.', cand)):
                 citation_lines.insert(0, cand)
                 end_idx -= 1
             else:
                 break
 
+        author = ""
+        source = ""
         reference = ""
         if citation_lines:
             full_citation = " ".join(citation_lines).strip()
-            # Extract URL if present
+            full_citation = re.sub(r'(\w+)-\s+(\w+)', r'\1\2', full_citation)
             url_match = re.search(r'(https?://[^\s<>"]+|www\.[^\s<>"]+)', full_citation)
             if url_match:
                 reference = url_match.group(1).rstrip('.,;')
@@ -312,15 +378,16 @@ def extract_textual_references_from_pdf(pdf: pdfplumber.PDF) -> List[Dict[str, A
                 else:
                     reference = full_citation
 
-            # If citation has Author. Work, try splitting
-            m_auth = re.match(r'^([A-ZÀ-Ú\s,]{4,}\.)\s*(.*)$', full_citation)
+            m_auth = re.match(r'^([A-ZÀ-Ú]{2,}(?:,\s+[A-ZÀ-Úa-zà-ú\s\.]+))\.\s*(.*)$', full_citation)
+            if not m_auth:
+                m_auth = re.match(r'^([A-ZÀ-Ú\s,]{4,}\.)\s*(.*)$', full_citation)
+
             if m_auth:
                 author = m_auth.group(1).strip()
                 source = m_auth.group(2).strip()
             else:
                 source = full_citation
 
-        # The rest is the content, but check if there is a caption (Legenda)
         body_lines = block[start_idx:end_idx]
         caption = ""
         filtered_body: List[str] = []
@@ -331,13 +398,13 @@ def extract_textual_references_from_pdf(pdf: pdfplumber.PDF) -> List[Dict[str, A
             else:
                 filtered_body.append(bline)
 
-        content = "\n".join(filtered_body)
+        formatted_content = format_body_paragraphs(filtered_body)
 
         references.append({
             "id": f"ref_{idx + 1}",
             "title": clean_text(title) or None,
             "subtitle": clean_text(subtitle) or None,
-            "content": clean_text(content) or None,
+            "content": formatted_content or None,
             "author": clean_text(author) or None,
             "reference": clean_text(reference) or None,
             "caption": clean_text(caption) or None,
