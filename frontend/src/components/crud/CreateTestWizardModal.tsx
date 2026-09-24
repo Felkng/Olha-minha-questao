@@ -465,7 +465,7 @@ export const CreateTestWizardModal: React.FC<CreateTestWizardModalProps> = ({
         </Stepper>
       </Box>
 
-      <DialogContent dividers sx={{ minHeight: 420, maxHeight: '65vh', overflowY: 'auto' }}>
+      <DialogContent dividers sx={{ minHeight: 420, maxHeight: '65vh', overflowY: 'auto', overflowX: 'hidden' }}>
         {errorMessage && (
           <Alert severity="error" sx={{ mb: 2 }} onClose={() => setErrorMessage(null)}>
             {errorMessage}
@@ -615,7 +615,7 @@ export const CreateTestWizardModal: React.FC<CreateTestWizardModalProps> = ({
                 <FormControlLabel
                   value="pdf"
                   control={<Radio size="small" />}
-                  label="Importar questões automaticamente de um arquivo PDF da prova (pdfplumber)"
+                  label="Importar questões automaticamente de um arquivo PDF da prova"
                 />
               </RadioGroup>
 
@@ -665,7 +665,7 @@ export const CreateTestWizardModal: React.FC<CreateTestWizardModalProps> = ({
 
         {/* STEP 1: QUESTÕES */}
         {activeStep === 1 && (
-          <Stack spacing={2}>
+          <Stack spacing={2} sx={{ minWidth: 0, width: '100%' }}>
             {duplicates.length > 0 && (
               <Alert severity="warning" icon={<WarningAmberIcon />}>
                 Identificadores duplicados encontrados: <strong>{duplicates.join(', ')}</strong>. Cada questão dentro da mesma prova deve possuir um número/identificador exclusivo.
@@ -673,11 +673,11 @@ export const CreateTestWizardModal: React.FC<CreateTestWizardModalProps> = ({
             )}
 
             {/* Gerenciamento de Textos de Apoio / Referências Textuais */}
-            <Paper variant="outlined" sx={{ p: 2, borderRadius: 2, bgcolor: isDark ? 'background.paper' : '#fbfbfb' }}>
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
-                <Stack direction="row" spacing={1} alignItems="center">
-                  <MenuBookIcon color="primary" />
-                  <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
+            <Paper variant="outlined" sx={{ p: 2, borderRadius: 2, bgcolor: isDark ? 'background.paper' : '#fbfbfb', minWidth: 0, maxWidth: '100%', overflow: 'hidden' }}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1, minWidth: 0 }}>
+                <Stack direction="row" spacing={1} alignItems="center" sx={{ minWidth: 0, flex: 1, mr: 1 }}>
+                  <MenuBookIcon color="primary" sx={{ flexShrink: 0 }} />
+                  <Typography variant="subtitle1" sx={{ fontWeight: 700 }} noWrap>
                     Textos de Apoio / Referências Textuais ({textualReferences.length})
                   </Typography>
                 </Stack>
@@ -685,6 +685,7 @@ export const CreateTestWizardModal: React.FC<CreateTestWizardModalProps> = ({
                   variant="outlined"
                   size="small"
                   startIcon={<AddIcon />}
+                  sx={{ flexShrink: 0 }}
                   onClick={() => {
                     setEditingRefIndex(null);
                     setRefTitle('');
@@ -708,7 +709,7 @@ export const CreateTestWizardModal: React.FC<CreateTestWizardModalProps> = ({
                   Nenhum texto de apoio adicionado. Se a prova possui textos longos de leitura ou interpretação, adicione-os aqui.
                 </Typography>
               ) : (
-                <Stack spacing={1}>
+                <Stack spacing={1} sx={{ minWidth: 0, width: '100%' }}>
                   {textualReferences.map((ref, rIdx) => (
                     <Accordion
                       key={rIdx}
@@ -718,19 +719,32 @@ export const CreateTestWizardModal: React.FC<CreateTestWizardModalProps> = ({
                         borderColor: 'divider',
                         borderRadius: '8px !important',
                         mb: 1,
+                        width: '100%',
+                        maxWidth: '100%',
+                        minWidth: 0,
+                        overflow: 'hidden',
                         '&:before': { display: 'none' },
                         bgcolor: 'background.default',
                       }}
                     >
                       <AccordionSummary
-                        expandIcon={<ExpandMoreIcon />}
+                        expandIcon={<ExpandMoreIcon sx={{ flexShrink: 0 }} />}
                         sx={{
                           minHeight: 52,
-                          '& .MuiAccordionSummary-content': { my: 0.5, alignItems: 'center' },
+                          maxWidth: '100%',
+                          minWidth: 0,
+                          overflow: 'hidden',
+                          '& .MuiAccordionSummary-content': {
+                            my: 0.5,
+                            alignItems: 'center',
+                            minWidth: 0,
+                            maxWidth: '100%',
+                            overflow: 'hidden',
+                          },
                         }}
                       >
-                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', pr: 1 }}>
-                          <Box sx={{ flex: 1, minWidth: 0, mr: 2 }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', minWidth: 0, pr: 1 }}>
+                          <Box sx={{ flex: 1, minWidth: 0, mr: 2, overflow: 'hidden' }}>
                             <Typography variant="subtitle2" sx={{ fontWeight: 700 }} noWrap>
                               {ref.title || ref.subtitle || `Texto ${rIdx + 1}`}
                             </Typography>
@@ -750,7 +764,7 @@ export const CreateTestWizardModal: React.FC<CreateTestWizardModalProps> = ({
                             </Typography>
                           </Box>
 
-                          <Stack direction="row" spacing={0.5} onClick={(e) => e.stopPropagation()}>
+                          <Stack direction="row" spacing={0.5} sx={{ flexShrink: 0 }} onClick={(e) => e.stopPropagation()}>
                             <Tooltip title="Editar Referência">
                               <IconButton
                                 size="small"
@@ -794,43 +808,43 @@ export const CreateTestWizardModal: React.FC<CreateTestWizardModalProps> = ({
                         </Box>
                       </AccordionSummary>
 
-                      <AccordionDetails sx={{ pt: 1, pb: 2, px: 2, borderTop: '1px solid', borderColor: 'divider' }}>
+                      <AccordionDetails sx={{ pt: 1, pb: 2, px: 2, borderTop: '1px solid', borderColor: 'divider', minWidth: 0, maxWidth: '100%', overflow: 'hidden' }}>
                         {ref.subtitle && (
-                          <Typography variant="subtitle2" sx={{ fontStyle: 'italic', fontWeight: 600, color: 'text.secondary', mb: 1 }}>
+                          <Typography variant="subtitle2" sx={{ fontStyle: 'italic', fontWeight: 600, color: 'text.secondary', mb: 1, wordBreak: 'break-word' }}>
                             {ref.subtitle}
                           </Typography>
                         )}
 
                         {ref.caption && (
-                          <Typography variant="caption" sx={{ display: 'block', fontWeight: 600, color: PALETTE_COLORS.secondary, mb: 1 }}>
+                          <Typography variant="caption" sx={{ display: 'block', fontWeight: 600, color: PALETTE_COLORS.secondary, mb: 1, wordBreak: 'break-word' }}>
                             {ref.caption}
                           </Typography>
                         )}
 
                         {ref.content && (
-                          <Paper variant="outlined" sx={{ p: 2, bgcolor: isDark ? 'rgba(0,0,0,0.2)' : '#fff', borderRadius: 1.5, maxHeight: 300, overflowY: 'auto' }}>
-                            <Typography variant="body2" sx={{ whiteSpace: 'pre-line', lineHeight: 1.7 }}>
+                          <Paper variant="outlined" sx={{ p: 2, bgcolor: isDark ? 'rgba(0,0,0,0.2)' : '#fff', borderRadius: 1.5, maxHeight: 300, overflowY: 'auto', wordBreak: 'break-word' }}>
+                            <Typography variant="body2" sx={{ whiteSpace: 'pre-line', lineHeight: 1.7, wordBreak: 'break-word' }}>
                               {ref.content}
                             </Typography>
                           </Paper>
                         )}
 
                         {(ref.author || ref.reference || ref.source) && (
-                          <Box sx={{ mt: 1.5, pt: 1, borderTop: '1px dashed', borderColor: 'divider' }}>
+                          <Box sx={{ mt: 1.5, pt: 1, borderTop: '1px dashed', borderColor: 'divider', wordBreak: 'break-word' }}>
                             {ref.author && (
-                              <Typography variant="caption" sx={{ display: 'block', color: 'text.secondary' }}>
+                              <Typography variant="caption" sx={{ display: 'block', color: 'text.secondary', wordBreak: 'break-word' }}>
                                 <strong>Autor:</strong> {ref.author}
                               </Typography>
                             )}
                             {(ref.reference || ref.source) && (
-                              <Typography variant="caption" sx={{ display: 'block', color: 'text.secondary', mt: 0.5 }}>
+                              <Typography variant="caption" sx={{ display: 'block', color: 'text.secondary', mt: 0.5, wordBreak: 'break-all' }}>
                                 <strong>Fonte / Referência:</strong>{' '}
                                 {(() => {
                                   const url = ref.reference || ref.source || '';
                                   const isUrl = url.startsWith('http://') || url.startsWith('https://') || url.startsWith('www.');
                                   const fullUrl = url.startsWith('www.') ? `https://${url}` : url;
                                   return isUrl ? (
-                                    <a href={fullUrl} target="_blank" rel="noopener noreferrer" style={{ color: PALETTE_COLORS.primary, textDecoration: 'underline' }}>
+                                    <a href={fullUrl} target="_blank" rel="noopener noreferrer" style={{ color: PALETTE_COLORS.primary, textDecoration: 'underline', wordBreak: 'break-all' }}>
                                       {url}
                                     </a>
                                   ) : (
@@ -873,23 +887,35 @@ export const CreateTestWizardModal: React.FC<CreateTestWizardModalProps> = ({
                     borderColor: isDuplicate ? 'error.main' : 'divider',
                     borderRadius: '8px !important',
                     mb: 1.5,
+                    width: '100%',
+                    maxWidth: '100%',
+                    minWidth: 0,
+                    overflow: 'hidden',
                     '&:before': { display: 'none' },
                   }}
                 >
                   <AccordionSummary
-                    expandIcon={<ExpandMoreIcon />}
+                    expandIcon={<ExpandMoreIcon sx={{ flexShrink: 0 }} />}
                     sx={{
                       minHeight: 52,
                       height: 52,
+                      maxWidth: '100%',
+                      minWidth: 0,
+                      overflow: 'hidden',
                       '&.Mui-expanded': { minHeight: 52, height: 52 },
                       px: 2,
                       '& .MuiAccordionSummary-content': {
                         m: 0,
                         alignItems: 'center',
+                        minWidth: 0,
+                        maxWidth: '100%',
                         overflow: 'hidden',
                       },
                       '& .MuiAccordionSummary-content.Mui-expanded': {
                         m: 0,
+                        minWidth: 0,
+                        maxWidth: '100%',
+                        overflow: 'hidden',
                       },
                     }}
                   >
