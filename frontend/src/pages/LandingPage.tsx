@@ -22,7 +22,6 @@ import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 import LayersOutlinedIcon from '@mui/icons-material/LayersOutlined';
-import FlipCameraAndroidIcon from '@mui/icons-material/FlipCameraAndroid';
 import { useNavigate } from 'react-router-dom';
 import { getPlatformSummary } from '../services/api';
 import { PlatformSummary } from '../types';
@@ -48,7 +47,6 @@ export const LandingPage: React.FC = () => {
     totalAreas: 0,
   });
   const [openRegister, setOpenRegister] = useState<boolean>(false);
-  const [interactiveFlipped, setInteractiveFlipped] = useState<boolean>(false);
 
   useEffect(() => {
     loadPlatformStats();
@@ -126,7 +124,16 @@ export const LandingPage: React.FC = () => {
             fontWeight: 700,
             mb: 3,
             px: 1.5,
-            py: 0.5,
+            py: 0.75,
+            height: 'auto',
+            maxWidth: '100%',
+            whiteSpace: 'normal',
+            '& .MuiChip-label': {
+              whiteSpace: 'normal',
+              textAlign: 'center',
+              fontSize: { xs: '0.78rem', sm: '0.875rem' },
+              lineHeight: 1.3,
+            },
             backgroundColor: isDark ? 'rgba(217, 183, 99, 0.12)' : 'rgba(217, 183, 99, 0.16)',
             borderColor: PALETTE_COLORS.primary,
             border: '1px solid',
@@ -139,12 +146,14 @@ export const LandingPage: React.FC = () => {
           component="h1"
           sx={{
             fontWeight: 900,
-            fontSize: { xs: '2.2rem', sm: '3.2rem', md: '3.8rem' },
+            fontSize: { xs: '1.75rem', sm: '2.75rem', md: '3.8rem' },
             letterSpacing: '-0.02em',
             lineHeight: 1.15,
             mb: 2.5,
             maxWidth: 950,
             mx: 'auto',
+            wordBreak: 'break-word',
+            overflowWrap: 'break-word',
           }}
         >
           Treine com foco, resolva provas reais e memorize com{' '}
@@ -163,6 +172,8 @@ export const LandingPage: React.FC = () => {
             mb: 4.5,
             fontWeight: 400,
             lineHeight: 1.6,
+            wordBreak: 'break-word',
+            overflowWrap: 'break-word',
             fontSize: { xs: '1rem', md: '1.2rem' },
           }}
         >
@@ -533,169 +544,12 @@ export const LandingPage: React.FC = () => {
         </Grid>
       </Paper>
 
-      {/* 3. NOVO: DEMONSTRAÇÃO INTERATIVA DE FLASHCARD */}
-      <Paper
-        elevation={3}
-        sx={{
-          p: { xs: 3, md: 5 },
-          borderRadius: 4,
-          mb: 8,
-          border: '1px solid',
-          borderColor: isDark ? 'rgba(179, 136, 255, 0.25)' : 'rgba(179, 136, 255, 0.35)',
-          background: isDark
-            ? 'linear-gradient(135deg, rgba(30, 24, 44, 0.6) 0%, rgba(26, 30, 36, 0.95) 100%)'
-            : 'linear-gradient(135deg, #faf7ff 0%, #ffffff 100%)',
-        }}
-      >
-        <Grid container spacing={4} alignItems="center">
-          <Grid item xs={12} md={6}>
-            <Chip
-              icon={<AutoAwesomeIcon sx={{ fontSize: '0.9rem !important', color: '#b388ff' }} />}
-              label="Novidade na Plataforma"
-              size="small"
-              sx={{
-                fontWeight: 800,
-                mb: 2,
-                backgroundColor: 'rgba(179, 136, 255, 0.15)',
-                color: '#b388ff',
-                borderColor: '#b388ff',
-                border: '1px solid',
-              }}
-            />
-            <Typography variant="h4" sx={{ fontWeight: 900, mb: 2 }}>
-              Memorização Rápida com Flashcards & Decks
-            </Typography>
-            <Typography variant="body1" sx={{ color: 'text.secondary', lineHeight: 1.7, mb: 3 }}>
-              Combine a resolução de simulados com a técnica de <strong>repetição ativa</strong>. Crie flashcards avulsos ou organize decks temáticos para fixar artigos de lei, fórmulas matemáticas, vocabulário e regras gramaticais.
-            </Typography>
-
-            <Stack direction="row" spacing={2}>
-              <Button
-                variant="contained"
-                startIcon={<StyleOutlinedIcon />}
-                onClick={() => navigate('/flashcards')}
-                sx={{
-                  backgroundColor: '#b388ff',
-                  color: '#1a1e24',
-                  fontWeight: 800,
-                  borderRadius: 2.5,
-                  px: 3,
-                  py: 1.2,
-                  '&:hover': { backgroundColor: '#9d6efd' },
-                }}
-              >
-                Acessar Flashcards
-              </Button>
-            </Stack>
-          </Grid>
-
-          {/* Interactive Card Flip Preview */}
-          <Grid item xs={12} md={6}>
-            <Box
-              sx={{
-                perspective: '1000px',
-                maxWidth: 440,
-                mx: 'auto',
-                cursor: 'pointer',
-              }}
-              onClick={() => setInteractiveFlipped(!interactiveFlipped)}
-            >
-              <Box
-                sx={{
-                  position: 'relative',
-                  width: '100%',
-                  minHeight: 220,
-                  transformStyle: 'preserve-3d',
-                  transition: 'transform 0.5s cubic-bezier(0.4, 0, 0.2, 1)',
-                  transform: interactiveFlipped ? 'rotateY(180deg)' : 'rotateY(0deg)',
-                }}
-              >
-                {/* Frente */}
-                <Paper
-                  elevation={4}
-                  sx={{
-                    position: 'absolute',
-                    width: '100%',
-                    height: '100%',
-                    backfaceVisibility: 'hidden',
-                    borderRadius: 3.5,
-                    p: 3,
-                    display: 'flex',
-                    flexDirection: 'column',
-                    justifyContent: 'space-between',
-                    boxSizing: 'border-box',
-                    border: '2px solid',
-                    borderColor: PALETTE_COLORS.primary,
-                    backgroundColor: isDark ? '#1e242c' : '#ffffff',
-                  }}
-                >
-                  <Box>
-                    <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1.5 }}>
-                      <Chip label="Direito Constitucional" size="small" sx={{ fontWeight: 700 }} />
-                      <Chip label="FRENTE (PERGUNTA)" size="small" sx={{ fontWeight: 800, color: PALETTE_COLORS.primary }} />
-                    </Stack>
-                    <Typography variant="h6" sx={{ fontWeight: 700, mt: 1 }}>
-                      Qual é o princípio fundamental que assegura a dignidade da pessoa humana?
-                    </Typography>
-                  </Box>
-
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, color: 'text.secondary' }}>
-                    <FlipCameraAndroidIcon fontSize="small" />
-                    <Typography variant="caption" sx={{ fontWeight: 600 }}>
-                      Clique para virar o cartão
-                    </Typography>
-                  </Box>
-                </Paper>
-
-                {/* Verso */}
-                <Paper
-                  elevation={4}
-                  sx={{
-                    position: 'absolute',
-                    width: '100%',
-                    height: '100%',
-                    backfaceVisibility: 'hidden',
-                    transform: 'rotateY(180deg)',
-                    borderRadius: 3.5,
-                    p: 3,
-                    display: 'flex',
-                    flexDirection: 'column',
-                    justifyContent: 'space-between',
-                    boxSizing: 'border-box',
-                    border: '2px solid',
-                    borderColor: '#b388ff',
-                    backgroundColor: isDark ? '#1c1926' : '#faf5ff',
-                  }}
-                >
-                  <Box>
-                    <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1.5 }}>
-                      <Chip label="Art. 1º, III da CF/88" size="small" variant="outlined" sx={{ fontWeight: 700 }} />
-                      <Chip label="VERSO (RESPOSTA)" size="small" sx={{ fontWeight: 800, backgroundColor: '#b388ff', color: '#1a1e24' }} />
-                    </Stack>
-                    <Typography variant="body1" sx={{ fontWeight: 600, mt: 1, lineHeight: 1.6 }}>
-                      Art. 1º, III — A dignidade da pessoa humana é um dos fundamentos da República Federativa do Brasil.
-                    </Typography>
-                  </Box>
-
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, color: 'text.secondary' }}>
-                    <FlipCameraAndroidIcon fontSize="small" />
-                    <Typography variant="caption" sx={{ fontWeight: 600 }}>
-                      Clique para voltar à pergunta
-                    </Typography>
-                  </Box>
-                </Paper>
-              </Box>
-            </Box>
-          </Grid>
-        </Grid>
-      </Paper>
-
-      {/* 4. SOBRE A PLATAFORMA */}
+      {/* 3. SOBRE A PLATAFORMA */}
       <Box sx={{ mb: 8, textAlign: 'center' }}>
         <Typography variant="overline" sx={{ color: PALETTE_COLORS.primary, fontWeight: 800, letterSpacing: 1.5 }}>
           CONHEÇA O SISTEMA
         </Typography>
-        <Typography variant="h4" sx={{ fontWeight: 800, mb: 2 }}>
+        <Typography variant="h4" sx={{ fontWeight: 800, mb: 2, fontSize: { xs: '1.4rem', sm: '2rem', md: '2.125rem' }, wordBreak: 'break-word' }}>
           Desenvolvido para quem busca alta performance
         </Typography>
         <Typography
@@ -706,6 +560,8 @@ export const LandingPage: React.FC = () => {
             mx: 'auto',
             lineHeight: 1.8,
             fontSize: '1.05rem',
+            wordBreak: 'break-word',
+            overflowWrap: 'break-word',
           }}
         >
           O <strong>Olha Minha Questão</strong> nasceu com a missão de eliminar atritos no processo de estudo.
@@ -714,7 +570,7 @@ export const LandingPage: React.FC = () => {
         </Typography>
       </Box>
 
-      {/* 5. VITRINE DE FUNCIONALIDADES (FEATURE GRID) */}
+      {/* 4. VITRINE DE FUNCIONALIDADES (FEATURE GRID) */}
       <Box sx={{ mb: 8 }}>
         <Grid container spacing={3}>
           {features.map((feature, idx) => (
@@ -724,7 +580,7 @@ export const LandingPage: React.FC = () => {
                 sx={{
                   height: '100%',
                   borderRadius: 3,
-                  p: 1.5,
+                  p: { xs: 0.5, sm: 1.5 },
                   transition: 'transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease',
                   border: '1px solid',
                   borderColor: 'divider',
@@ -737,12 +593,12 @@ export const LandingPage: React.FC = () => {
                   },
                 }}
               >
-                <CardContent sx={{ p: 2.5 }}>
+                <CardContent sx={{ p: { xs: 2, sm: 2.5 } }}>
                   <Box sx={{ mb: 2 }}>{feature.icon}</Box>
-                  <Typography variant="h6" sx={{ fontWeight: 800, mb: 1.5, fontSize: '1.15rem' }}>
+                  <Typography variant="h6" sx={{ fontWeight: 800, mb: 1.5, fontSize: { xs: '1rem', sm: '1.15rem' }, wordBreak: 'break-word', overflowWrap: 'break-word' }}>
                     {feature.title}
                   </Typography>
-                  <Typography variant="body2" sx={{ color: 'text.secondary', lineHeight: 1.6 }}>
+                  <Typography variant="body2" sx={{ color: 'text.secondary', lineHeight: 1.6, wordBreak: 'break-word', overflowWrap: 'break-word' }}>
                     {feature.description}
                   </Typography>
                 </CardContent>
@@ -752,7 +608,7 @@ export const LandingPage: React.FC = () => {
         </Grid>
       </Box>
 
-      {/* 6. SEÇÃO DE COMO FUNCIONA (PASSO A PASSO) */}
+      {/* 5. SEÇÃO DE COMO FUNCIONA (PASSO A PASSO) */}
       <Paper
         elevation={2}
         sx={{
@@ -861,7 +717,7 @@ export const LandingPage: React.FC = () => {
         </Grid>
       </Paper>
 
-      {/* 7. CTA FINAL BANNER */}
+      {/* 6. CTA FINAL BANNER */}
       <Paper
         elevation={6}
         sx={{

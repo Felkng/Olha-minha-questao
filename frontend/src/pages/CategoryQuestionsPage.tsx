@@ -10,7 +10,7 @@ import {
 } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import WhatshotIcon from '@mui/icons-material/Whatshot';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { Question } from '../types';
 import { getOriginQuestions, getAreaQuestions, getOrigins, getAreas } from '../services/api';
 import { QuestionCard } from '../components/questions/QuestionCard';
@@ -30,6 +30,10 @@ export const CategoryQuestionsPage: React.FC<CategoryQuestionsPageProps> = ({
 }) => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
+
+  const stateFrom = (location.state as { from?: string; fromTitle?: string } | null)?.from;
+  const stateFromTitle = (location.state as { from?: string; fromTitle?: string } | null)?.fromTitle;
 
   const [questions, setQuestions] = useState<Question[]>([]);
   const [categoryName, setCategoryName] = useState<string>('');
@@ -69,15 +73,27 @@ export const CategoryQuestionsPage: React.FC<CategoryQuestionsPageProps> = ({
   };
 
   const backRoute = type === 'origin' ? '/bancas' : '/areas';
-  const backLabel = type === 'origin' ? 'Voltar para Bancas' : 'Voltar para Áreas';
+  const defaultBackLabel = type === 'origin' ? 'Voltar para Bancas' : 'Voltar para Áreas';
   const titlePrefix = type === 'origin' ? 'Banca' : 'Área';
+
+  const handleBack = () => {
+    if (stateFrom) {
+      navigate(stateFrom);
+    } else if (window.history.state && window.history.state.idx > 0) {
+      navigate(-1);
+    } else {
+      navigate(backRoute);
+    }
+  };
+
+  const backLabel = stateFromTitle || defaultBackLabel;
 
   if (loading) {
     return (
       <Box sx={{ mb: 6 }}>
         <Button
           startIcon={<ArrowBackIcon />}
-          onClick={() => navigate(backRoute)}
+          onClick={handleBack}
           sx={{ mb: 3, color: 'text.secondary', fontWeight: 600 }}
         >
           {backLabel}
@@ -97,7 +113,7 @@ export const CategoryQuestionsPage: React.FC<CategoryQuestionsPageProps> = ({
     <Box sx={{ mb: 6 }}>
       <Button
         startIcon={<ArrowBackIcon />}
-        onClick={() => navigate(backRoute)}
+        onClick={handleBack}
         sx={{ mb: 3, color: 'text.secondary', fontWeight: 600 }}
       >
         {backLabel}

@@ -16,7 +16,7 @@ import {
 } from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
 import ClearIcon from '@mui/icons-material/Clear';
-import { Area, FilterState, Origin, Test } from '../../types';
+import { Area, FilterState, Origin, Subject, Test } from '../../types';
 import { PALETTE_COLORS } from '../../theme/theme';
 
 interface SearchBarProps {
@@ -24,6 +24,7 @@ interface SearchBarProps {
   onFilterChange: (filters: FilterState) => void;
   origins: Origin[];
   areas: Area[];
+  subjects?: Subject[];
   tests: Test[];
   totalResults: number;
 }
@@ -33,6 +34,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
   onFilterChange,
   origins,
   areas,
+  subjects = [],
   tests,
   totalResults,
 }) => {
@@ -66,6 +68,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
     filters.type !== 'all' ||
     filters.originId !== '' ||
     filters.areaId !== '' ||
+    (filters.subjectId !== undefined && filters.subjectId !== '') ||
     filters.year !== '' ||
     filters.testId !== '' ||
     Boolean(filters.difficulty);
@@ -77,12 +80,17 @@ export const SearchBar: React.FC<SearchBarProps> = ({
       type: 'all',
       originId: '',
       areaId: '',
+      subjectId: '',
       year: '',
       testId: '',
       difficulty: '',
       sort: 'recent',
     });
   };
+
+  const availableSubjects = filters.areaId
+    ? subjects.filter((s) => s.areaId === filters.areaId)
+    : subjects;
 
   return (
     <Box sx={{ mb: 4 }}>
@@ -122,7 +130,8 @@ export const SearchBar: React.FC<SearchBarProps> = ({
             gridTemplateColumns: {
               xs: '1fr',
               sm: 'repeat(2, 1fr)',
-              md: 'repeat(6, 1fr)',
+              md: 'repeat(3, 1fr)',
+              lg: 'repeat(auto-fit, minmax(160px, 1fr))',
             },
             gap: 1.5,
           }}
@@ -198,11 +207,31 @@ export const SearchBar: React.FC<SearchBarProps> = ({
               onFilterChange({
                 ...filters,
                 areaId: newValue ? newValue.id : '',
+                subjectId: '', // Reset subject if area changes
               });
             }}
             isOptionEqualToValue={(option, value) => option.id === value.id}
             renderInput={(params) => (
               <TextField {...params} label="Área" placeholder="Todas as áreas" />
+            )}
+          />
+
+          {/* Matéria (Subject) */}
+          <Autocomplete
+            size="small"
+            fullWidth
+            options={availableSubjects}
+            getOptionLabel={(option) => (typeof option === 'string' ? option : option.name)}
+            value={availableSubjects.find((s) => s.id === filters.subjectId) || null}
+            onChange={(_e, newValue) => {
+              onFilterChange({
+                ...filters,
+                subjectId: newValue ? newValue.id : '',
+              });
+            }}
+            isOptionEqualToValue={(option, value) => option.id === value.id}
+            renderInput={(params) => (
+              <TextField {...params} label="Matéria" placeholder="Todas as matérias" />
             )}
           />
 
@@ -301,7 +330,15 @@ export const SearchBar: React.FC<SearchBarProps> = ({
               <Chip
                 size="small"
                 label={`Área: ${areas.find((a) => a.id === filters.areaId)?.name || filters.areaId}`}
-                onDelete={() => onFilterChange({ ...filters, areaId: '' })}
+                onDelete={() => onFilterChange({ ...filters, areaId: '', subjectId: '' })}
+                variant="outlined"
+              />
+            )}
+            {filters.subjectId !== undefined && filters.subjectId !== '' && (
+              <Chip
+                size="small"
+                label={`Matéria: ${subjects.find((s) => s.id === filters.subjectId)?.name || filters.subjectId}`}
+                onDelete={() => onFilterChange({ ...filters, subjectId: '' })}
                 variant="outlined"
               />
             )}

@@ -27,7 +27,7 @@ import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import PublicIcon from '@mui/icons-material/Public';
 import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
 import ShuffleIcon from '@mui/icons-material/Shuffle';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { Flashcard, Folder, Question, TestCard } from '../types';
 import {
   deleteFlashcard,
@@ -54,6 +54,7 @@ export const FolderDetailPage: React.FC<FolderDetailPageProps> = ({
 }) => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
   const { user, isAdmin } = useAuth();
   const { mode } = useAppTheme();
   const isDark = mode === 'dark';
@@ -64,6 +65,32 @@ export const FolderDetailPage: React.FC<FolderDetailPageProps> = ({
   const [flashcards, setFlashcards] = useState<Flashcard[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [toastOpen, setToastOpen] = useState<boolean>(false);
+
+  const stateFrom = (location.state as { from?: string; fromTitle?: string } | null)?.from;
+  const stateFromTitle = (location.state as { from?: string; fromTitle?: string } | null)?.fromTitle;
+
+  const isTestFolder = folder?.folderType === 'TEST';
+  const isFlashcardFolder = folder?.folderType === 'FLASHCARD';
+
+  const handleBack = () => {
+    if (stateFrom) {
+      navigate(stateFrom);
+    } else if (window.history.state && window.history.state.idx > 0) {
+      navigate(-1);
+    } else {
+      navigate(isFlashcardFolder ? '/flashcards' : '/pastas');
+    }
+  };
+
+  const backLabel =
+    stateFromTitle ||
+    (stateFrom?.includes('/flashcards')
+      ? 'Voltar para Flashcards'
+      : stateFrom?.includes('/perfil')
+      ? 'Voltar para o Perfil'
+      : isFlashcardFolder
+      ? 'Voltar para Flashcards'
+      : 'Voltar para Pastas');
 
   // Flashcards state
   const [flippedCardIds, setFlippedCardIds] = useState<Set<number>>(new Set());
@@ -148,10 +175,10 @@ export const FolderDetailPage: React.FC<FolderDetailPageProps> = ({
       <Box sx={{ mb: 6 }}>
         <Button
           startIcon={<ArrowBackIcon />}
-          onClick={() => navigate('/pastas')}
+          onClick={handleBack}
           sx={{ mb: 3, color: 'text.secondary', fontWeight: 600 }}
         >
-          Voltar para Pastas
+          {backLabel}
         </Button>
         <Alert severity="error" sx={{ borderRadius: 2 }}>
           Pasta não encontrada no sistema.
@@ -160,29 +187,47 @@ export const FolderDetailPage: React.FC<FolderDetailPageProps> = ({
     );
   }
 
-  const isTestFolder = folder.folderType === 'TEST';
-  const isFlashcardFolder = folder.folderType === 'FLASHCARD';
-
   return (
     <Box sx={{ mb: 6 }}>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+      <Box
+        sx={{
+          display: 'flex',
+          flexDirection: { xs: 'column', md: 'row' },
+          justifyContent: 'space-between',
+          alignItems: { xs: 'stretch', md: 'center' },
+          gap: 2,
+          mb: 3,
+        }}
+      >
         <Button
           startIcon={<ArrowBackIcon />}
-          onClick={() => navigate('/pastas')}
-          sx={{ color: 'text.secondary', fontWeight: 600 }}
+          onClick={handleBack}
+          sx={{ alignSelf: { xs: 'flex-start', md: 'center' }, color: 'text.secondary', fontWeight: 600 }}
         >
-          Voltar para Pastas
+          {backLabel}
         </Button>
 
-        <Stack direction="row" spacing={1.5} alignItems="center" flexWrap="wrap">
+        <Stack
+          direction="row"
+          spacing={1}
+          alignItems="center"
+          flexWrap="wrap"
+          sx={{
+            gap: 1,
+            '& > *': {
+              flexGrow: { xs: 1, sm: 0 },
+            },
+          }}
+        >
           {isFlashcardFolder && (
-            <Stack direction="row" spacing={1} alignItems="center">
+            <Stack direction="row" spacing={1} alignItems="center" sx={{ flexGrow: { xs: 1, sm: 0 } }}>
               <Button
                 variant="contained"
                 startIcon={<PlayArrowIcon />}
                 onClick={() => navigate(`/flashcards/estudo?folderId=${folder.id}`)}
                 disabled={flashcards.length === 0}
                 sx={{
+                  flexGrow: 1,
                   borderRadius: 2,
                   fontWeight: 700,
                   backgroundColor: PALETTE_COLORS.success,
@@ -216,7 +261,7 @@ export const FolderDetailPage: React.FC<FolderDetailPageProps> = ({
               variant="outlined"
               startIcon={<EditIcon />}
               onClick={() => setEditFolderModalOpen(true)}
-              sx={{ borderRadius: 2, fontWeight: 700 }}
+              sx={{ borderRadius: 2, fontWeight: 700, flexGrow: { xs: 1, sm: 0 } }}
             >
               {isFlashcardFolder ? 'Editar Deck' : 'Editar Pasta'}
             </Button>
@@ -226,7 +271,7 @@ export const FolderDetailPage: React.FC<FolderDetailPageProps> = ({
             variant="outlined"
             startIcon={<ShareIcon />}
             onClick={handleShare}
-            sx={{ borderRadius: 2, fontWeight: 700 }}
+            sx={{ borderRadius: 2, fontWeight: 700, flexGrow: { xs: 1, sm: 0 } }}
           >
             Compartilhar Pasta
           </Button>
@@ -237,17 +282,38 @@ export const FolderDetailPage: React.FC<FolderDetailPageProps> = ({
       <Paper
         elevation={4}
         sx={{
-          p: 4,
+          p: { xs: 2.5, sm: 4 },
           borderRadius: 3,
           mb: 4,
           borderLeft: `8px solid ${folder.color}`,
+          overflow: 'hidden',
         }}
       >
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 1.5 }}>
-          <FolderSpecialOutlinedIcon sx={{ color: folder.color, fontSize: 36 }} />
-          <Typography variant="h4" sx={{ fontWeight: 800 }}>
-            {folder.name}
-          </Typography>
+        <Box
+          sx={{
+            display: 'flex',
+            flexDirection: { xs: 'column', sm: 'row' },
+            alignItems: { xs: 'flex-start', sm: 'center' },
+            justifyContent: 'space-between',
+            gap: 1.5,
+            mb: 1.5,
+          }}
+        >
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, minWidth: 0, flex: 1 }}>
+            <FolderSpecialOutlinedIcon sx={{ color: folder.color, fontSize: { xs: 28, sm: 36 }, flexShrink: 0 }} />
+            <Typography
+              variant="h4"
+              sx={{
+                fontWeight: 800,
+                fontSize: { xs: '1.25rem', sm: '1.75rem', md: '2.125rem' },
+                wordBreak: 'break-word',
+                overflowWrap: 'break-word',
+                minWidth: 0,
+              }}
+            >
+              {folder.name}
+            </Typography>
+          </Box>
           <Chip
             label={
               isTestFolder
@@ -258,6 +324,7 @@ export const FolderDetailPage: React.FC<FolderDetailPageProps> = ({
             }
             size="small"
             sx={{
+              flexShrink: 0,
               backgroundColor: `${folder.color}25`,
               color: folder.color,
               fontWeight: 800,
@@ -266,7 +333,15 @@ export const FolderDetailPage: React.FC<FolderDetailPageProps> = ({
         </Box>
 
         {folder.description && (
-          <Typography variant="body1" sx={{ color: 'text.secondary', mb: 2 }}>
+          <Typography
+            variant="body1"
+            sx={{
+              color: 'text.secondary',
+              mb: 2,
+              wordBreak: 'break-word',
+              overflowWrap: 'break-word',
+            }}
+          >
             {folder.description}
           </Typography>
         )}
@@ -352,7 +427,7 @@ export const FolderDetailPage: React.FC<FolderDetailPageProps> = ({
                   >
                     <Box>
                       {/* Top Metadata & Actions */}
-                      <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', mb: 2, gap: 1 }}>
+                      <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', mb: 2, gap: 1, flexWrap: 'wrap' }}>
                         <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.8, alignItems: 'center', flex: 1, minWidth: 0 }}>
                           {card.areaName && (
                             <Chip
@@ -360,7 +435,13 @@ export const FolderDetailPage: React.FC<FolderDetailPageProps> = ({
                               label={card.areaName}
                               sx={{
                                 fontWeight: 700,
+                                maxWidth: '100%',
                                 backgroundColor: isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.06)',
+                                '& .MuiChip-label': {
+                                  overflow: 'hidden',
+                                  textOverflow: 'ellipsis',
+                                  whiteSpace: 'nowrap',
+                                },
                               }}
                             />
                           )}
@@ -369,12 +450,20 @@ export const FolderDetailPage: React.FC<FolderDetailPageProps> = ({
                               size="small"
                               label={card.subjectName}
                               variant="outlined"
-                              sx={{ fontWeight: 600 }}
+                              sx={{
+                                fontWeight: 600,
+                                maxWidth: '100%',
+                                '& .MuiChip-label': {
+                                  overflow: 'hidden',
+                                  textOverflow: 'ellipsis',
+                                  whiteSpace: 'nowrap',
+                                },
+                              }}
                             />
                           )}
                         </Box>
 
-                        <Stack direction="row" spacing={0.5} alignItems="center">
+                        <Stack direction="row" spacing={0.5} alignItems="center" sx={{ flexShrink: 0, ml: 'auto' }}>
                           {/* Salvar / Mover para Pasta */}
                           <Tooltip title={card.folderId ? `Salvo na pasta "${card.folderName}" (Clique para alterar)` : 'Salvar em Pasta / Deck'}>
                             <IconButton

@@ -14,8 +14,8 @@ import { SearchBar } from '../components/search/SearchBar';
 import { QuestionCard } from '../components/questions/QuestionCard';
 import { QuestionSkeleton } from '../components/questions/QuestionSkeleton';
 import { CreateQuestionModal } from '../components/crud/CreateQuestionModal';
-import { Area, FilterState, Origin, Question, Test } from '../types';
-import { getAreas, getOrigins, getQuestions, getTests } from '../services/api';
+import { Area, FilterState, Origin, Question, Subject, Test } from '../types';
+import { getAreas, getOrigins, getQuestions, getSubjects, getTests } from '../services/api';
 import { PALETTE_COLORS } from '../theme/theme';
 
 interface QuestionsPageProps {
@@ -36,6 +36,7 @@ export const QuestionsPage: React.FC<QuestionsPageProps> = ({
 
   const [origins, setOrigins] = useState<Origin[]>([]);
   const [areas, setAreas] = useState<Area[]>([]);
+  const [subjects, setSubjects] = useState<Subject[]>([]);
   const [tests, setTests] = useState<Test[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [createModalOpen, setCreateModalOpen] = useState<boolean>(false);
@@ -47,6 +48,7 @@ export const QuestionsPage: React.FC<QuestionsPageProps> = ({
       type: (searchParams.get('type') as 'all' | 'questions' | 'tests') || 'all',
       originId: searchParams.get('originId') ? Number(searchParams.get('originId')) : '',
       areaId: searchParams.get('areaId') ? Number(searchParams.get('areaId')) : '',
+      subjectId: searchParams.get('subjectId') ? Number(searchParams.get('subjectId')) : '',
       year: searchParams.get('year') ? Number(searchParams.get('year')) : '',
       testId: searchParams.get('testId') ? Number(searchParams.get('testId')) : '',
       difficulty: searchParams.get('difficulty') || '',
@@ -54,17 +56,19 @@ export const QuestionsPage: React.FC<QuestionsPageProps> = ({
     };
   }, [searchParams]);
 
-  // Load origins, areas, tests once
+  // Load origins, areas, subjects, tests once
   useEffect(() => {
     const fetchMetadata = async () => {
       try {
-        const [oList, aList, tList] = await Promise.all([
+        const [oList, aList, sList, tList] = await Promise.all([
           getOrigins(),
           getAreas(),
+          getSubjects(),
           getTests(),
         ]);
         setOrigins(oList);
         setAreas(aList);
+        setSubjects(sList);
         setTests(tList);
       } catch (err) {
         console.error('Erro ao carregar metadados:', err);
@@ -79,6 +83,7 @@ export const QuestionsPage: React.FC<QuestionsPageProps> = ({
       const pageRes = await getQuestions({
         originId: filters.originId,
         areaId: filters.areaId,
+        subjectId: filters.subjectId,
         testId: filters.testId,
         year: filters.year,
         difficulty: filters.difficulty,
@@ -106,6 +111,7 @@ export const QuestionsPage: React.FC<QuestionsPageProps> = ({
         const pageRes = await getQuestions({
           originId: filters.originId,
           areaId: filters.areaId,
+          subjectId: filters.subjectId,
           testId: filters.testId,
           year: filters.year,
           difficulty: filters.difficulty,
@@ -139,6 +145,7 @@ export const QuestionsPage: React.FC<QuestionsPageProps> = ({
     page,
     filters.originId,
     filters.areaId,
+    filters.subjectId,
     filters.testId,
     filters.year,
     filters.difficulty,
@@ -153,6 +160,7 @@ export const QuestionsPage: React.FC<QuestionsPageProps> = ({
     if (newFilters.type !== 'all') params.type = newFilters.type;
     if (newFilters.originId !== '') params.originId = String(newFilters.originId);
     if (newFilters.areaId !== '') params.areaId = String(newFilters.areaId);
+    if (newFilters.subjectId) params.subjectId = String(newFilters.subjectId);
     if (newFilters.year !== '') params.year = String(newFilters.year);
     if (newFilters.testId !== '') params.testId = String(newFilters.testId);
     if (newFilters.difficulty) params.difficulty = newFilters.difficulty;
@@ -173,6 +181,7 @@ export const QuestionsPage: React.FC<QuestionsPageProps> = ({
         onFilterChange={handleFilterChange}
         origins={origins}
         areas={areas}
+        subjects={subjects}
         tests={tests}
         totalResults={totalElements}
       />

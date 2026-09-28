@@ -380,7 +380,17 @@ export const QuestionCard: React.FC<QuestionCardProps> = ({
                 to={`/questoes/${question.id}`}
                 state={{
                   from: location.pathname + location.search,
-                  fromTitle: location.pathname.includes('/provas') ? 'Voltar para a Prova' : 'Voltar para Questões',
+                  fromTitle: location.pathname.startsWith('/provas')
+                    ? 'Voltar para a Prova'
+                    : location.pathname.startsWith('/pastas')
+                    ? 'Voltar para a Pasta'
+                    : location.pathname.startsWith('/perfil')
+                    ? 'Voltar para o Perfil'
+                    : location.pathname.startsWith('/bancas')
+                    ? 'Voltar para Bancas'
+                    : location.pathname.startsWith('/areas')
+                    ? 'Voltar para Áreas'
+                    : 'Voltar para Questões',
                 }}
                 sx={{
                   color: 'text.secondary',

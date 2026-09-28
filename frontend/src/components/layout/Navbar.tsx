@@ -198,41 +198,34 @@ export const Navbar: React.FC = () => {
             {/* Auth Buttons / Profile Menu */}
             {user ? (
               <>
-                <Button
-                  onClick={handleOpenUserMenu}
-                  sx={{
-                    textTransform: 'none',
-                    borderRadius: 2,
-                    py: 0.5,
-                    px: 1.5,
-                    border: '1px solid',
-                    borderColor: 'divider',
-                  }}
-                  startIcon={
+                <Tooltip title={`${user.name} (${user.role})`}>
+                  <IconButton
+                    onClick={handleOpenUserMenu}
+                    sx={{
+                      p: 0.5,
+                      border: '1.5px solid',
+                      borderColor: 'divider',
+                      '&:hover': {
+                        borderColor: PALETTE_COLORS.primary,
+                        backgroundColor: 'rgba(217, 183, 99, 0.1)',
+                      },
+                    }}
+                    aria-label="menu do usuário"
+                  >
                     <Avatar
                       sx={{
-                        width: 28,
-                        height: 28,
-                        fontSize: '0.85rem',
+                        width: 32,
+                        height: 32,
+                        fontSize: '0.95rem',
+                        fontWeight: 'bold',
                         bgcolor: 'secondary.main',
+                        color: '#ffffff',
                       }}
                     >
                       {user.name.charAt(0).toUpperCase()}
                     </Avatar>
-                  }
-                >
-                  <Box sx={{ textAlign: 'left', display: { xs: 'none', sm: 'block' } }}>
-                    <Typography variant="body2" fontWeight="bold" lineHeight={1.2}>
-                      {user.name}
-                    </Typography>
-                    <Chip
-                      label={user.role}
-                      size="small"
-                      color={user.role === 'ADMIN' ? 'error' : 'secondary'}
-                      sx={{ height: 16, fontSize: '0.65rem', fontWeight: 'bold' }}
-                    />
-                  </Box>
-                </Button>
+                  </IconButton>
+                </Tooltip>
 
                 <Menu
                   anchorEl={userMenuAnchor}
@@ -240,9 +233,23 @@ export const Navbar: React.FC = () => {
                   onClose={handleCloseUserMenu}
                   PaperProps={{
                     elevation: 4,
-                    sx: { borderRadius: 2, mt: 1, minWidth: 160 },
+                    sx: { borderRadius: 2.5, mt: 1, minWidth: 200 },
                   }}
                 >
+                  <Box sx={{ px: 2, py: 1.5, borderBottom: '1px solid', borderColor: 'divider' }}>
+                    <Typography variant="subtitle2" fontWeight="bold" noWrap>
+                      {user.name}
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.8 }} noWrap>
+                      {user.email}
+                    </Typography>
+                    <Chip
+                      label={user.role}
+                      size="small"
+                      color={user.role === 'ADMIN' ? 'error' : 'secondary'}
+                      sx={{ height: 18, fontSize: '0.65rem', fontWeight: 'bold' }}
+                    />
+                  </Box>
                   <MenuItem
                     onClick={() => {
                       handleCloseUserMenu();
@@ -253,6 +260,17 @@ export const Navbar: React.FC = () => {
                       <PersonIcon fontSize="small" />
                     </ListItemIcon>
                     <ListItemText primary="Meu Perfil" />
+                  </MenuItem>
+                  <MenuItem
+                    onClick={() => {
+                      handleCloseUserMenu();
+                      navigate(`/perfil/${user.id}?tab=flashcards`);
+                    }}
+                  >
+                    <ListItemIcon>
+                      <StyleOutlinedIcon fontSize="small" />
+                    </ListItemIcon>
+                    <ListItemText primary="Meus Flashcards" />
                   </MenuItem>
                   <MenuItem
                     onClick={() => {
@@ -429,6 +447,18 @@ export const Navbar: React.FC = () => {
                   <PersonIcon fontSize="small" />
                 </ListItemIcon>
                 <ListItemText primary="Meu Perfil" />
+              </ListItemButton>
+              <ListItemButton
+                onClick={() => {
+                  setMobileNavOpen(false);
+                  navigate(`/perfil/${user.id}?tab=flashcards`);
+                }}
+                sx={{ borderRadius: 2, mb: 0.5 }}
+              >
+                <ListItemIcon sx={{ minWidth: 38 }}>
+                  <StyleOutlinedIcon fontSize="small" />
+                </ListItemIcon>
+                <ListItemText primary="Meus Flashcards" />
               </ListItemButton>
               <ListItemButton
                 onClick={() => {

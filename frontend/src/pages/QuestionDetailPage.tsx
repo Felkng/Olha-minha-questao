@@ -36,7 +36,19 @@ export const QuestionDetailPage: React.FC<QuestionDetailPageProps> = ({
     }
   };
 
-  const backLabel = stateFromTitle || (stateFrom?.includes('/provas') ? 'Voltar para a Prova' : 'Voltar para Questões');
+  const backLabel =
+    stateFromTitle ||
+    (stateFrom?.includes('/provas')
+      ? 'Voltar para Provas'
+      : stateFrom?.includes('/pastas')
+      ? 'Voltar para a Pasta'
+      : stateFrom?.includes('/perfil')
+      ? 'Voltar para o Perfil'
+      : stateFrom?.includes('/bancas')
+      ? 'Voltar para Bancas'
+      : stateFrom?.includes('/areas')
+      ? 'Voltar para Áreas'
+      : 'Voltar para Questões');
 
   const [question, setQuestion] = useState<Question | null>(null);
   const [loading, setLoading] = useState<boolean>(true);

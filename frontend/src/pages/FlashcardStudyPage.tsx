@@ -23,7 +23,7 @@ import FolderSpecialOutlinedIcon from '@mui/icons-material/FolderSpecialOutlined
 import KeyboardIcon from '@mui/icons-material/Keyboard';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import ShuffleIcon from '@mui/icons-material/Shuffle';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import { Flashcard, FlashcardItemStatus, FlashcardSessionItem } from '../types';
 import { getFlashcards, getFlashcardsInFolder, submitFlashcardSession } from '../services/api';
 import { PALETTE_COLORS } from '../theme/theme';
@@ -43,6 +43,7 @@ export const FlashcardStudyPage: React.FC = () => {
   const { mode } = useAppTheme();
   const isDark = mode === 'dark';
   const navigate = useNavigate();
+  const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
   const { user } = useAuth();
 
@@ -51,6 +52,25 @@ export const FlashcardStudyPage: React.FC = () => {
   const subjectIdParam = searchParams.get('subjectId');
   const shuffleParam = searchParams.get('shuffle') === 'true' || searchParams.get('random') === 'true';
   const folderId = folderIdParam ? Number(folderIdParam) : undefined;
+
+  const stateFrom = (location.state as { from?: string; fromTitle?: string } | null)?.from;
+  const stateFromTitle = (location.state as { from?: string; fromTitle?: string } | null)?.fromTitle;
+
+  const handleBack = () => {
+    if (stateFrom) {
+      navigate(stateFrom);
+    } else if (window.history.state && window.history.state.idx > 0) {
+      navigate(-1);
+    } else if (folderIdParam) {
+      navigate(`/pastas/${folderIdParam}`);
+    } else {
+      navigate('/flashcards');
+    }
+  };
+
+  const backLabel =
+    stateFromTitle ||
+    (folderIdParam ? 'Voltar para o Deck' : 'Voltar para Flashcards');
 
   const [cards, setCards] = useState<Flashcard[]>([]);
   const [originalCards, setOriginalCards] = useState<Flashcard[]>([]);
@@ -226,10 +246,10 @@ export const FlashcardStudyPage: React.FC = () => {
       <Box sx={{ mb: 6, maxWidth: 800, mx: 'auto', textAlign: 'center', py: 6 }}>
         <Button
           startIcon={<ArrowBackIcon />}
-          onClick={() => navigate('/flashcards')}
+          onClick={handleBack}
           sx={{ mb: 3, color: 'text.secondary', fontWeight: 600 }}
         >
-          Voltar para Flashcards
+          {backLabel}
         </Button>
         <Paper elevation={4} sx={{ p: 6, borderRadius: 3 }}>
           <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>
@@ -240,10 +260,10 @@ export const FlashcardStudyPage: React.FC = () => {
           </Typography>
           <Button
             variant="contained"
-            onClick={() => navigate('/flashcards')}
+            onClick={handleBack}
             sx={{ fontWeight: 700, backgroundColor: PALETTE_COLORS.primary }}
           >
-            Ir para Flashcards
+            {backLabel}
           </Button>
         </Paper>
       </Box>
@@ -262,10 +282,10 @@ export const FlashcardStudyPage: React.FC = () => {
       <Box sx={{ maxWidth: 850, mx: 'auto', mb: 6 }}>
         <Button
           startIcon={<ArrowBackIcon />}
-          onClick={() => navigate('/flashcards')}
+          onClick={handleBack}
           sx={{ mb: 3, color: 'text.secondary', fontWeight: 600 }}
         >
-          Voltar para Flashcards
+          {backLabel}
         </Button>
 
         <Paper
@@ -411,7 +431,7 @@ export const FlashcardStudyPage: React.FC = () => {
 
             <Button
               variant="contained"
-              onClick={() => navigate('/flashcards')}
+              onClick={handleBack}
               sx={{ fontWeight: 700, borderRadius: 2, backgroundColor: PALETTE_COLORS.primary }}
             >
               Finalizar Estudo
@@ -506,7 +526,7 @@ export const FlashcardStudyPage: React.FC = () => {
         <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
           <Button
             startIcon={<ArrowBackIcon />}
-            onClick={() => navigate('/flashcards')}
+            onClick={handleBack}
             sx={{ color: 'text.secondary', fontWeight: 600 }}
           >
             Sair do Estudo

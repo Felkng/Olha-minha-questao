@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Alert,
   Avatar,
@@ -63,6 +63,11 @@ import SearchIcon from '@mui/icons-material/Search';
 import ShareIcon from '@mui/icons-material/Share';
 import HistoryIcon from '@mui/icons-material/History';
 import CancelOutlinedIcon from '@mui/icons-material/CancelOutlined';
+import PlayArrowIcon from '@mui/icons-material/PlayArrow';
+import FlipCameraAndroidIcon from '@mui/icons-material/FlipCameraAndroid';
+import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
+import PublicIcon from '@mui/icons-material/Public';
+import BookmarkBorderIcon from '@mui/icons-material/BookmarkBorder';
 
 import {
   getUserProfile,
@@ -84,10 +89,13 @@ import {
   getTestAttemptDetail,
   getTestEvaluation,
   getUserQuestionAttempts,
+  getFlashcards,
+  deleteFlashcard,
 } from '../services/api';
 import {
   Area,
   CategoryPerformance,
+  Flashcard,
   Folder,
   FolderType,
   Origin,
@@ -120,6 +128,9 @@ import { CreateSubjectModal } from '../components/crud/CreateSubjectModal';
 import { EditSubjectModal } from '../components/crud/EditSubjectModal';
 import { EditFolderModal } from '../components/crud/EditFolderModal';
 import { EditProfileModal } from '../components/profile/EditProfileModal';
+import { CreateFlashcardModal } from '../components/crud/CreateFlashcardModal';
+import { EditFlashcardModal } from '../components/crud/EditFlashcardModal';
+import { SaveFlashcardToFolderModal } from '../components/folders/SaveFlashcardToFolderModal';
 
 type ProfileTab =
   | 'visao_geral'
@@ -128,6 +139,7 @@ type ProfileTab =
   | 'minhas_questoes'
   | 'minhas_provas'
   | 'minhas_pastas'
+  | 'meus_flashcards'
   | 'admin_bancas'
   | 'admin_areas'
   | 'admin_materias';
@@ -140,6 +152,7 @@ export const UserProfilePage: React.FC = () => {
   const theme = useTheme();
   const isDark = theme.palette.mode === 'dark';
 
+  const [searchParams] = useSearchParams();
   const [activeNavTab, setActiveNavTab] = useState<ProfileTab>('visao_geral');
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
@@ -184,6 +197,19 @@ export const UserProfilePage: React.FC = () => {
   const [savingFolder, setSavingFolder] = useState(false);
   const [editingFolder, setEditingFolder] = useState<Folder | null>(null);
   const [editFolderModalOpen, setEditFolderModalOpen] = useState(false);
+
+  // Dados de Meus Flashcards
+  const [myFlashcards, setMyFlashcards] = useState<Flashcard[]>([]);
+  const [loadingFlashcards, setLoadingFlashcards] = useState(false);
+  const [myFlashcardFolders, setMyFlashcardFolders] = useState<Folder[]>([]);
+  const [loadingFlashcardFolders, setLoadingFlashcardFolders] = useState(false);
+  const [flashcardSearch, setFlashcardSearch] = useState('');
+  const [flashcardSubTab, setFlashcardSubTab] = useState<'DECKS' | 'CARDS'>('DECKS');
+  const [flippedProfileCards, setFlippedProfileCards] = useState<Record<number, boolean>>({});
+  const [openCreateFlashcard, setOpenCreateFlashcard] = useState(false);
+  const [selectedFlashcardForEdit, setSelectedFlashcardForEdit] = useState<Flashcard | null>(null);
+  const [saveFlashcardFolderModalOpen, setSaveFlashcardFolderModalOpen] = useState(false);
+  const [selectedFlashcardForFolder, setSelectedFlashcardForFolder] = useState<Flashcard | null>(null);
 
   // Dados de Administração (ADMIN)
   const [allOrigins, setAllOrigins] = useState<Origin[]>([]);
@@ -284,6 +310,24 @@ export const UserProfilePage: React.FC = () => {
     fetchProfile();
   }, [userId]);
 
+  // Sincronizar aba com parâmetros de URL (ex: ?tab=flashcards)
+  useEffect(() => {
+    const tabParam = searchParams.get('tab');
+    if (tabParam === 'flashcards' || tabParam === 'meus_flashcards') {
+      setActiveNavTab('meus_flashcards');
+    } else if (tabParam === 'simulados' || tabParam === 'meus_simulados') {
+      setActiveNavTab('meus_simulados');
+    } else if (tabParam === 'questoes' || tabParam === 'minhas_questoes') {
+      setActiveNavTab('minhas_questoes');
+    } else if (tabParam === 'pastas' || tabParam === 'minhas_pastas') {
+      setActiveNavTab('minhas_pastas');
+    } else if (tabParam === 'provas' || tabParam === 'minhas_provas') {
+      setActiveNavTab('minhas_provas');
+    } else if (tabParam === 'visao_geral') {
+      setActiveNavTab('visao_geral');
+    }
+  }, [searchParams]);
+
   // Carregamento sob demanda das abas selecionadas
   useEffect(() => {
     if (!userId) return;
@@ -297,6 +341,9 @@ export const UserProfilePage: React.FC = () => {
       loadMyTests();
     } else if (activeNavTab === 'minhas_pastas') {
       loadMyFolders();
+    } else if (activeNavTab === 'meus_flashcards') {
+      loadMyFlashcards();
+      loadMyFlashcardFolders();
     } else if (activeNavTab === 'admin_bancas' && isAdmin) {
       loadAllOrigins();
     } else if (activeNavTab === 'admin_areas' && isAdmin) {
@@ -370,6 +417,39 @@ export const UserProfilePage: React.FC = () => {
     } finally {
       setLoadingFolders(false);
     }
+  };
+
+  const loadMyFlashcards = async () => {
+    if (!userId) return;
+    setLoadingFlashcards(true);
+    try {
+      const res = await getFlashcards({ createdByUserId: userId, size: 100 });
+      setMyFlashcards(res.content || []);
+    } catch (err) {
+      console.error('Erro ao carregar flashcards do usuário:', err);
+    } finally {
+      setLoadingFlashcards(false);
+    }
+  };
+
+  const loadMyFlashcardFolders = async () => {
+    if (!userId) return;
+    setLoadingFlashcardFolders(true);
+    try {
+      const res = await getFolders('FLASHCARD', userId);
+      setMyFlashcardFolders(res);
+    } catch (err) {
+      console.error('Erro ao carregar decks de flashcards:', err);
+    } finally {
+      setLoadingFlashcardFolders(false);
+    }
+  };
+
+  const handleToggleProfileCardFlip = (cardId: number) => {
+    setFlippedProfileCards((prev) => ({
+      ...prev,
+      [cardId]: !prev[cardId],
+    }));
   };
 
   const loadAllOrigins = async () => {
@@ -743,6 +823,25 @@ export const UserProfilePage: React.FC = () => {
                         <FolderSpecialOutlinedIcon fontSize="small" />
                       </ListItemIcon>
                       <ListItemText primary="Minhas Pastas" primaryTypographyProps={{ fontWeight: activeNavTab === 'minhas_pastas' ? 700 : 500 }} />
+                    </ListItemButton>
+
+                    <ListItemButton
+                      selected={activeNavTab === 'meus_flashcards'}
+                      onClick={() => setActiveNavTab('meus_flashcards')}
+                      sx={{
+                        borderRadius: 2,
+                        mb: 0.5,
+                        '&.Mui-selected': {
+                          backgroundColor: isDark ? 'rgba(217, 183, 99, 0.15)' : 'rgba(217, 183, 99, 0.12)',
+                          color: PALETTE_COLORS.primary,
+                          fontWeight: 700,
+                        },
+                      }}
+                    >
+                      <ListItemIcon sx={{ minWidth: 40, color: activeNavTab === 'meus_flashcards' ? PALETTE_COLORS.primary : 'inherit' }}>
+                        <StyleOutlinedIcon fontSize="small" />
+                      </ListItemIcon>
+                      <ListItemText primary="Meus Flashcards" primaryTypographyProps={{ fontWeight: activeNavTab === 'meus_flashcards' ? 700 : 500 }} />
                     </ListItemButton>
                   </>
                 )}
@@ -2123,6 +2222,423 @@ export const UserProfilePage: React.FC = () => {
             </Paper>
           )}
 
+          {/* ABA: MEUS FLASHCARDS */}
+          {activeNavTab === 'meus_flashcards' && (
+            <Paper elevation={3} sx={{ p: { xs: 2, sm: 3 }, borderRadius: 3 }}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: { xs: 'flex-start', sm: 'center' }, mb: 3, flexWrap: 'wrap', gap: 2 }}>
+                <Box>
+                  <Typography variant="h5" fontWeight="bold">
+                    Meus Flashcards & Decks
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Crie, organize e revise seus flashcards e baralhos para memorização ativa.
+                  </Typography>
+                </Box>
+
+                <Stack direction="row" spacing={1.5} sx={{ flexWrap: 'wrap', gap: 1 }}>
+                  <Button
+                    variant="outlined"
+                    startIcon={<AddIcon />}
+                    onClick={() => {
+                      setFolderTypeTab('FLASHCARD');
+                      setOpenCreateFolderDialog(true);
+                    }}
+                    sx={{ fontWeight: 700, borderRadius: 2 }}
+                  >
+                    Novo Deck
+                  </Button>
+                  <Button
+                    variant="contained"
+                    startIcon={<AddIcon />}
+                    onClick={() => setOpenCreateFlashcard(true)}
+                    sx={{ fontWeight: 700, backgroundColor: PALETTE_COLORS.primary, color: '#1a1e24', borderRadius: 2 }}
+                  >
+                    Novo Flashcard
+                  </Button>
+                </Stack>
+              </Box>
+
+              <Tabs
+                value={flashcardSubTab}
+                onChange={(_, val) => setFlashcardSubTab(val)}
+                variant="scrollable"
+                scrollButtons="auto"
+                allowScrollButtonsMobile
+                sx={{
+                  mb: 3,
+                  borderBottom: 1,
+                  borderColor: 'divider',
+                  '& .MuiTab-root': {
+                    fontWeight: 700,
+                    textTransform: 'none',
+                    fontSize: { xs: '0.85rem', sm: '0.95rem' },
+                    minWidth: 'auto',
+                    px: { xs: 1.5, sm: 2 },
+                  },
+                }}
+              >
+                <Tab
+                  value="DECKS"
+                  label={`Decks de Flashcards (${myFlashcardFolders.length})`}
+                  icon={<FolderSpecialOutlinedIcon fontSize="small" />}
+                  iconPosition="start"
+                />
+                <Tab
+                  value="CARDS"
+                  label={`Cards Individuais (${myFlashcards.length})`}
+                  icon={<StyleOutlinedIcon fontSize="small" />}
+                  iconPosition="start"
+                />
+              </Tabs>
+
+              <TextField
+                placeholder={flashcardSubTab === 'DECKS' ? 'Buscar em meus decks...' : 'Buscar em meus flashcards...'}
+                size="small"
+                fullWidth
+                value={flashcardSearch}
+                onChange={(e) => setFlashcardSearch(e.target.value)}
+                InputProps={{
+                  startAdornment: <SearchIcon fontSize="small" sx={{ mr: 1, color: 'text.secondary' }} />,
+                }}
+                sx={{ mb: 3 }}
+              />
+
+              {flashcardSubTab === 'DECKS' && (
+                <>
+                  {loadingFlashcardFolders ? (
+                    <CardGridSkeleton count={3} columns={{ xs: 12, sm: 6, md: 4 }} cardHeight={180} />
+                  ) : myFlashcardFolders.length === 0 ? (
+                    <Box sx={{ textAlign: 'center', py: 6 }}>
+                      <Typography color="text.secondary" sx={{ mb: 2 }}>
+                        Você ainda não criou nenhum deck de flashcards.
+                      </Typography>
+                      <Button
+                        variant="outlined"
+                        startIcon={<AddIcon />}
+                        onClick={() => {
+                          setFolderTypeTab('FLASHCARD');
+                          setOpenCreateFolderDialog(true);
+                        }}
+                      >
+                        Criar Primeiro Deck
+                      </Button>
+                    </Box>
+                  ) : (
+                    <Grid container spacing={2.5}>
+                      {myFlashcardFolders
+                        .filter((f) =>
+                          flashcardSearch
+                            ? f.name.toLowerCase().includes(flashcardSearch.toLowerCase()) ||
+                              (f.description && f.description.toLowerCase().includes(flashcardSearch.toLowerCase()))
+                            : true
+                        )
+                        .map((folder) => (
+                          <Grid item xs={12} sm={6} md={4} key={folder.id}>
+                            <Paper
+                              variant="outlined"
+                              sx={{
+                                p: 2.5,
+                                borderRadius: 2.5,
+                                height: '100%',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                justifyContent: 'space-between',
+                                borderTop: `4px solid ${folder.color || PALETTE_COLORS.primary}`,
+                                '&:hover': {
+                                  boxShadow: 3,
+                                },
+                              }}
+                            >
+                              <Box>
+                                <Stack direction="row" justifyContent="space-between" alignItems="flex-start" sx={{ mb: 1 }}>
+                                  <Typography variant="h6" fontWeight="bold" sx={{ wordBreak: 'break-word' }}>
+                                    {folder.name}
+                                  </Typography>
+                                  <Stack direction="row" spacing={0.5} alignItems="center">
+                                    <Tooltip title="Editar Deck">
+                                      <IconButton
+                                        size="small"
+                                        color="primary"
+                                        onClick={() => {
+                                          setEditingFolder(folder);
+                                          setEditFolderModalOpen(true);
+                                        }}
+                                      >
+                                        <EditIcon fontSize="small" />
+                                      </IconButton>
+                                    </Tooltip>
+                                    <Tooltip title="Excluir Deck">
+                                      <IconButton
+                                        size="small"
+                                        color="error"
+                                        onClick={() =>
+                                          handleDeleteItem(
+                                            'Excluir Deck',
+                                            `Tem certeza que deseja excluir o deck "${folder.name}"? Os flashcards salvos não serão apagados do sistema.`,
+                                            async () => {
+                                              await deleteFolder(folder.id);
+                                              loadMyFlashcardFolders();
+                                            }
+                                          )
+                                        }
+                                      >
+                                        <DeleteOutlineIcon fontSize="small" />
+                                      </IconButton>
+                                    </Tooltip>
+                                  </Stack>
+                                </Stack>
+
+                                {folder.description && (
+                                  <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5, wordBreak: 'break-word' }}>
+                                    {folder.description}
+                                  </Typography>
+                                )}
+
+                                <Stack direction="row" spacing={1} alignItems="center" sx={{ flexWrap: 'wrap', gap: 0.5 }}>
+                                  <Chip
+                                    size="small"
+                                    icon={<StyleOutlinedIcon />}
+                                    label={`${folder.flashcardCount || 0} cards`}
+                                    sx={{ fontWeight: 'bold' }}
+                                  />
+                                  <Chip
+                                    size="small"
+                                    icon={folder.isPublic ? <PublicIcon /> : <LockOutlinedIcon />}
+                                    label={folder.isPublic ? 'Público' : 'Privado'}
+                                    variant="outlined"
+                                  />
+                                </Stack>
+                              </Box>
+
+                              <Box sx={{ mt: 2, pt: 1.5, borderTop: 1, borderColor: 'divider', display: 'flex', gap: 1, justifyContent: 'space-between', alignItems: 'center' }}>
+                                <Button
+                                  size="small"
+                                  variant="outlined"
+                                  onClick={() =>
+                                    navigate(`/pastas/${folder.id}`, {
+                                      state: { from: `/perfil/${userId}?tab=flashcards`, fromTitle: 'Voltar para Meus Flashcards' },
+                                    })
+                                  }
+                                  sx={{ textTransform: 'none', fontWeight: 600, borderRadius: 2 }}
+                                >
+                                  Ver Cards
+                                </Button>
+                                <Button
+                                  size="small"
+                                  variant="contained"
+                                  startIcon={<PlayArrowIcon />}
+                                  onClick={() =>
+                                    navigate(`/flashcards/estudo?folderId=${folder.id}`, {
+                                      state: { from: `/perfil/${userId}?tab=flashcards`, fromTitle: 'Voltar para Meus Flashcards' },
+                                    })
+                                  }
+                                  sx={{
+                                    textTransform: 'none',
+                                    fontWeight: 700,
+                                    borderRadius: 2,
+                                    backgroundColor: PALETTE_COLORS.primary,
+                                    color: '#1a1e24',
+                                  }}
+                                >
+                                  Estudar
+                                </Button>
+                              </Box>
+                            </Paper>
+                          </Grid>
+                        ))}
+                    </Grid>
+                  )}
+                </>
+              )}
+
+              {flashcardSubTab === 'CARDS' && (
+                <>
+                  {loadingFlashcards ? (
+                    <CardGridSkeleton count={4} columns={{ xs: 12, sm: 6, md: 4 }} cardHeight={220} />
+                  ) : myFlashcards.length === 0 ? (
+                    <Box sx={{ textAlign: 'center', py: 6 }}>
+                      <Typography color="text.secondary" sx={{ mb: 2 }}>
+                        Você ainda não criou nenhum flashcard individual.
+                      </Typography>
+                      <Button
+                        variant="outlined"
+                        startIcon={<AddIcon />}
+                        onClick={() => setOpenCreateFlashcard(true)}
+                      >
+                        Cadastrar Primeiro Flashcard
+                      </Button>
+                    </Box>
+                  ) : (
+                    <Grid container spacing={2.5}>
+                      {myFlashcards
+                        .filter((card) =>
+                          flashcardSearch
+                            ? card.front.toLowerCase().includes(flashcardSearch.toLowerCase()) ||
+                              card.back.toLowerCase().includes(flashcardSearch.toLowerCase()) ||
+                              (card.areaName && card.areaName.toLowerCase().includes(flashcardSearch.toLowerCase())) ||
+                              (card.subjectName && card.subjectName.toLowerCase().includes(flashcardSearch.toLowerCase()))
+                            : true
+                        )
+                        .map((card) => {
+                          const isFlipped = flippedProfileCards[card.id] || false;
+                          return (
+                            <Grid item xs={12} sm={6} md={4} key={card.id}>
+                              <Paper
+                                variant="outlined"
+                                sx={{
+                                  p: 2.5,
+                                  borderRadius: 2.5,
+                                  height: '100%',
+                                  display: 'flex',
+                                  flexDirection: 'column',
+                                  justifyContent: 'space-between',
+                                  position: 'relative',
+                                  '&:hover': {
+                                    borderColor: PALETTE_COLORS.primary,
+                                  },
+                                }}
+                              >
+                                <Box>
+                                  {/* Header do Card */}
+                                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 1, mb: 1.5, width: '100%' }}>
+                                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.6, alignItems: 'center', flex: 1, minWidth: 0 }}>
+                                      {card.areaName && (
+                                        <Chip
+                                          label={card.areaName}
+                                          size="small"
+                                          variant="outlined"
+                                          sx={{
+                                            fontSize: '0.72rem',
+                                            maxWidth: '100%',
+                                            '& .MuiChip-label': {
+                                              overflow: 'hidden',
+                                              textOverflow: 'ellipsis',
+                                              whiteSpace: 'nowrap',
+                                            },
+                                          }}
+                                        />
+                                      )}
+                                      {card.subjectName && (
+                                        <Chip
+                                          label={card.subjectName}
+                                          size="small"
+                                          variant="outlined"
+                                          sx={{
+                                            fontSize: '0.72rem',
+                                            maxWidth: '100%',
+                                            '& .MuiChip-label': {
+                                              overflow: 'hidden',
+                                              textOverflow: 'ellipsis',
+                                              whiteSpace: 'nowrap',
+                                            },
+                                          }}
+                                        />
+                                      )}
+                                    </Box>
+
+                                    <Chip
+                                      label={card.isPublic ? 'Público' : 'Privado'}
+                                      size="small"
+                                      icon={card.isPublic ? <PublicIcon /> : <LockOutlinedIcon />}
+                                      sx={{ fontSize: '0.7rem', flexShrink: 0, ml: 'auto' }}
+                                    />
+                                  </Box>
+
+                                  {/* Conteúdo Frente / Verso */}
+                                  <Box
+                                    onClick={() => handleToggleProfileCardFlip(card.id)}
+                                    sx={{
+                                      minHeight: 110,
+                                      py: 1,
+                                      cursor: 'pointer',
+                                      display: 'flex',
+                                      flexDirection: 'column',
+                                      justifyContent: 'center',
+                                    }}
+                                  >
+                                    <Typography variant="caption" sx={{ fontWeight: 800, color: PALETTE_COLORS.primary, textTransform: 'uppercase', letterSpacing: 0.5, mb: 0.5 }}>
+                                      {isFlipped ? 'Resposta (Verso):' : 'Pergunta (Frente):'}
+                                    </Typography>
+                                    <Typography
+                                      variant="body2"
+                                      sx={{
+                                        fontWeight: isFlipped ? 400 : 600,
+                                        wordBreak: 'break-word',
+                                        overflowWrap: 'break-word',
+                                        display: '-webkit-box',
+                                        WebkitLineClamp: 4,
+                                        WebkitBoxOrient: 'vertical',
+                                        overflow: 'hidden',
+                                      }}
+                                    >
+                                      {isFlipped ? card.back : card.front}
+                                    </Typography>
+                                  </Box>
+                                </Box>
+
+                                {/* Ações do Card */}
+                                <Box sx={{ mt: 1.5, pt: 1, borderTop: 1, borderColor: 'divider', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                  <Button
+                                    size="small"
+                                    startIcon={<FlipCameraAndroidIcon />}
+                                    onClick={() => handleToggleProfileCardFlip(card.id)}
+                                    sx={{ textTransform: 'none', fontSize: '0.75rem', fontWeight: 700 }}
+                                  >
+                                    {isFlipped ? 'Ver Pergunta' : 'Ver Resposta'}
+                                  </Button>
+
+                                  <Stack direction="row" spacing={0.5}>
+                                    <Tooltip title="Salvar em um Deck">
+                                      <IconButton
+                                        size="small"
+                                        onClick={() => {
+                                          setSelectedFlashcardForFolder(card);
+                                          setSaveFlashcardFolderModalOpen(true);
+                                        }}
+                                      >
+                                        <BookmarkBorderIcon fontSize="small" />
+                                      </IconButton>
+                                    </Tooltip>
+                                    <Tooltip title="Editar Flashcard">
+                                      <IconButton
+                                        size="small"
+                                        color="primary"
+                                        onClick={() => setSelectedFlashcardForEdit(card)}
+                                      >
+                                        <EditIcon fontSize="small" />
+                                      </IconButton>
+                                    </Tooltip>
+                                    <Tooltip title="Excluir Flashcard">
+                                      <IconButton
+                                        size="small"
+                                        color="error"
+                                        onClick={() =>
+                                          handleDeleteItem(
+                                            'Excluir Flashcard',
+                                            'Tem certeza que deseja excluir este flashcard? Esta ação não pode ser desfeita.',
+                                            async () => {
+                                              await deleteFlashcard(card.id);
+                                              loadMyFlashcards();
+                                            }
+                                          )
+                                        }
+                                      >
+                                        <DeleteOutlineIcon fontSize="small" />
+                                      </IconButton>
+                                    </Tooltip>
+                                  </Stack>
+                                </Box>
+                              </Paper>
+                            </Grid>
+                          );
+                        })}
+                    </Grid>
+                  )}
+                </>
+              )}
+            </Paper>
+          )}
+
           {/* ABA 4: GERENCIAR BANCAS (ADMIN) */}
           {activeNavTab === 'admin_bancas' && isAdmin && (
             <Paper elevation={3} sx={{ p: 3, borderRadius: 3 }}>
@@ -2659,7 +3175,41 @@ export const UserProfilePage: React.FC = () => {
           setEditFolderModalOpen(false);
           setEditingFolder(null);
         }}
-        onUpdated={() => loadMyFolders()}
+        onUpdated={() => {
+          loadMyFolders();
+          loadMyFlashcardFolders();
+        }}
+      />
+
+      {/* Modais de Flashcard */}
+      <CreateFlashcardModal
+        open={openCreateFlashcard}
+        onClose={() => setOpenCreateFlashcard(false)}
+        onCreated={() => {
+          setOpenCreateFlashcard(false);
+          loadMyFlashcards();
+          loadMyFlashcardFolders();
+        }}
+      />
+      <EditFlashcardModal
+        open={Boolean(selectedFlashcardForEdit)}
+        flashcard={selectedFlashcardForEdit}
+        onClose={() => setSelectedFlashcardForEdit(null)}
+        onUpdated={() => {
+          setSelectedFlashcardForEdit(null);
+          loadMyFlashcards();
+        }}
+      />
+      <SaveFlashcardToFolderModal
+        open={saveFlashcardFolderModalOpen}
+        flashcard={selectedFlashcardForFolder}
+        onClose={() => {
+          setSaveFlashcardFolderModalOpen(false);
+          setSelectedFlashcardForFolder(null);
+        }}
+        onSavedStatusChange={() => {
+          loadMyFlashcardFolders();
+        }}
       />
 
       {/* Diálogo Genérico de Confirmação de Exclusão */}

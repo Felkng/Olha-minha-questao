@@ -10,16 +10,13 @@ import {
   IconButton,
   Tooltip,
   TextField,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
   Tabs,
   Tab,
   Dialog,
   DialogTitle,
   DialogContent,
   DialogActions,
+  Autocomplete,
 } from '@mui/material';
 import { CardGridSkeleton } from '../components/skeletons';
 import AddIcon from '@mui/icons-material/Add';
@@ -45,6 +42,7 @@ import {
   getAreas,
   getFlashcards,
   getFolders,
+  getSubjects,
   getSubjectsByArea,
   toggleFlashcardVisibility,
   toggleFolderVisibility,
@@ -126,7 +124,7 @@ export const FlashcardsPage: React.FC = () => {
   const loadData = async () => {
     setLoading(true);
     try {
-      const [fCards, fFolders, aList] = await Promise.all([
+      const [fCards, fFolders, aList, sList] = await Promise.all([
         getFlashcards({
           areaId: selectedAreaId,
           subjectId: selectedSubjectId,
@@ -136,11 +134,13 @@ export const FlashcardsPage: React.FC = () => {
         }),
         getFolders('FLASHCARD'),
         getAreas(),
+        selectedAreaId ? getSubjectsByArea(Number(selectedAreaId)) : getSubjects(),
       ]);
 
       setFlashcards(fCards.content);
       setFolders(fFolders);
       setAreas(aList);
+      setSubjects(sList);
     } catch (err) {
       console.error('Erro ao carregar flashcards:', err);
     } finally {
@@ -157,13 +157,18 @@ export const FlashcardsPage: React.FC = () => {
     setSelectedSubjectId('');
     if (areaId) {
       try {
-        const sList = await getSubjectsByArea(areaId);
+        const sList = await getSubjectsByArea(Number(areaId));
         setSubjects(sList);
       } catch (err) {
         console.error('Erro ao carregar matérias:', err);
       }
     } else {
-      setSubjects([]);
+      try {
+        const sList = await getSubjects();
+        setSubjects(sList);
+      } catch (err) {
+        console.error('Erro ao carregar matérias:', err);
+      }
     }
   };
 
@@ -246,7 +251,7 @@ export const FlashcardsPage: React.FC = () => {
 
     const qs = params.toString();
     if (qs) url += `?${qs}`;
-    navigate(url);
+    navigate(url, { state: { from: '/flashcards', fromTitle: 'Voltar para Flashcards' } });
   };
 
   const filteredFolders = folders.filter((f) => {
@@ -458,7 +463,7 @@ export const FlashcardsPage: React.FC = () => {
 
                       {/* Deck Footer */}
                       <Box sx={{ pt: 1.5, borderTop: '1px solid', borderColor: 'divider' }}>
-                        <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
+                        <Stack direction="row" justifyContent="space-between" alignItems="center" flexWrap="wrap" sx={{ mb: 2, gap: 1 }}>
                           <Chip
                             size="small"
                             label={`${folder.flashcardCount ?? 0} cards`}
@@ -466,6 +471,7 @@ export const FlashcardsPage: React.FC = () => {
                               backgroundColor: `${folder.color || PALETTE_COLORS.primary}20`,
                               color: folder.color || PALETTE_COLORS.primary,
                               fontWeight: 800,
+                              maxWidth: '100%',
                             }}
                           />
                           {folder.createdByUser && (
@@ -481,7 +487,11 @@ export const FlashcardsPage: React.FC = () => {
                             variant="outlined"
                             fullWidth
                             endIcon={<ArrowForwardIcon />}
-                            onClick={() => navigate(`/pastas/${folder.id}`)}
+                            onClick={() =>
+                              navigate(`/pastas/${folder.id}`, {
+                                state: { from: '/flashcards', fromTitle: 'Voltar para Flashcards' },
+                              })
+                            }
                             sx={{ textTransform: 'none', fontWeight: 600, borderRadius: 2 }}
                           >
                             Ver Cartas
@@ -575,58 +585,62 @@ export const FlashcardsPage: React.FC = () => {
                 </Box>
               </Grid>
 
-              <Grid item xs={6} sm={4} md={2}>
-                <FormControl fullWidth size="small">
-                  <InputLabel>Área</InputLabel>
-                  <Select
-                    value={selectedAreaId}
-                    label="Área"
-                    onChange={(e) => handleAreaFilterChange(e.target.value as number | '')}
-                  >
-                    <MenuItem value="">Todas as Áreas</MenuItem>
-                    {areas.map((a) => (
-                      <MenuItem key={a.id} value={a.id}>
-                        {a.name}
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-              </Grid>
-
-              <Grid item xs={6} sm={4} md={2}>
-                <FormControl fullWidth size="small">
-                  <InputLabel>Matéria</InputLabel>
-                  <Select
-                    value={selectedSubjectId}
-                    label="Matéria"
-                    onChange={(e) => setSelectedSubjectId(e.target.value as number | '')}
-                  >
-                    <MenuItem value="">Todas as Matérias</MenuItem>
-                    {subjects.map((s) => (
-                      <MenuItem key={s.id} value={s.id}>
-                        {s.name}
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
+              <Grid item xs={12} sm={4} md={2}>
+                <Autocomplete
+                  size="small"
+                  fullWidth
+                  options={areas}
+                  getOptionLabel={(option) => (typeof option === 'string' ? option : option.name)}
+                  value={areas.find((a) => a.id === selectedAreaId) || null}
+                  onChange={(_e, newValue) => {
+                    handleAreaFilterChange(newValue ? newValue.id : '');
+                  }}
+                  isOptionEqualToValue={(option, value) => option.id === value.id}
+                  renderInput={(params) => (
+                    <TextField {...params} label="Área" placeholder="Todas as áreas" />
+                  )}
+                />
               </Grid>
 
               <Grid item xs={12} sm={4} md={2}>
-                <FormControl fullWidth size="small">
-                  <InputLabel>Pasta / Deck</InputLabel>
-                  <Select
-                    value={selectedFolderId}
-                    label="Pasta / Deck"
-                    onChange={(e) => setSelectedFolderId(e.target.value as number | '')}
-                  >
-                    <MenuItem value="">Todas as Pastas</MenuItem>
-                    {folders.map((f) => (
-                      <MenuItem key={f.id} value={f.id}>
-                        {f.name}
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
+                <Autocomplete
+                  size="small"
+                  fullWidth
+                  options={subjects}
+                  getOptionLabel={(option) => (typeof option === 'string' ? option : option.name)}
+                  value={subjects.find((s) => s.id === selectedSubjectId) || null}
+                  onChange={(_e, newValue) => {
+                    setSelectedSubjectId(newValue ? newValue.id : '');
+                    if (newValue && newValue.areaId && !selectedAreaId) {
+                      setSelectedAreaId(newValue.areaId);
+                    }
+                  }}
+                  isOptionEqualToValue={(option, value) => option.id === value.id}
+                  renderInput={(params) => (
+                    <TextField
+                      {...params}
+                      label="Matéria"
+                      placeholder="Todas as matérias"
+                    />
+                  )}
+                />
+              </Grid>
+
+              <Grid item xs={12} sm={4} md={2}>
+                <Autocomplete
+                  size="small"
+                  fullWidth
+                  options={folders}
+                  getOptionLabel={(option) => (typeof option === 'string' ? option : option.name)}
+                  value={folders.find((f) => f.id === selectedFolderId) || null}
+                  onChange={(_e, newValue) => {
+                    setSelectedFolderId(newValue ? newValue.id : '');
+                  }}
+                  isOptionEqualToValue={(option, value) => option.id === value.id}
+                  renderInput={(params) => (
+                    <TextField {...params} label="Pasta / Deck" placeholder="Todos os decks" />
+                  )}
+                />
               </Grid>
 
               <Grid item xs={12} md={2.5}>
@@ -705,7 +719,7 @@ export const FlashcardsPage: React.FC = () => {
                     >
                       <Box>
                         {/* Card Top Metadata & Controls (com espaçamento limpo entre chips) */}
-                        <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', mb: 2, gap: 1 }}>
+                        <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', mb: 2, gap: 1, flexWrap: 'wrap', width: '100%' }}>
                           <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.8, alignItems: 'center', flex: 1, minWidth: 0 }}>
                             {card.areaName && (
                               <Chip
@@ -713,7 +727,13 @@ export const FlashcardsPage: React.FC = () => {
                                 label={card.areaName}
                                 sx={{
                                   fontWeight: 700,
+                                  maxWidth: '100%',
                                   backgroundColor: isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.06)',
+                                  '& .MuiChip-label': {
+                                    overflow: 'hidden',
+                                    textOverflow: 'ellipsis',
+                                    whiteSpace: 'nowrap',
+                                  },
                                 }}
                               />
                             )}
@@ -722,7 +742,15 @@ export const FlashcardsPage: React.FC = () => {
                                 size="small"
                                 label={card.subjectName}
                                 variant="outlined"
-                                sx={{ fontWeight: 600 }}
+                                sx={{
+                                  fontWeight: 600,
+                                  maxWidth: '100%',
+                                  '& .MuiChip-label': {
+                                    overflow: 'hidden',
+                                    textOverflow: 'ellipsis',
+                                    whiteSpace: 'nowrap',
+                                  },
+                                }}
                               />
                             )}
                             {card.folderName && (
@@ -733,14 +761,20 @@ export const FlashcardsPage: React.FC = () => {
                                 variant="outlined"
                                 sx={{
                                   fontWeight: 600,
+                                  maxWidth: '100%',
                                   borderColor: card.folderColor || PALETTE_COLORS.primary,
+                                  '& .MuiChip-label': {
+                                    overflow: 'hidden',
+                                    textOverflow: 'ellipsis',
+                                    whiteSpace: 'nowrap',
+                                  },
                                 }}
                               />
                             )}
                           </Box>
 
                           {/* Action Icons */}
-                          <Stack direction="row" spacing={0.5} alignItems="center" sx={{ flexShrink: 0 }}>
+                          <Stack direction="row" spacing={0.5} alignItems="center" sx={{ flexShrink: 0, ml: 'auto' }}>
                             {/* Salvar / Mover para Pasta */}
                             <Tooltip title={card.folderId ? `Salvo na pasta "${card.folderName}" (Clique para alterar)` : 'Salvar em Pasta / Deck'}>
                               <IconButton
