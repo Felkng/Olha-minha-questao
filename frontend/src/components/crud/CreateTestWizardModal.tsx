@@ -684,7 +684,7 @@ export const CreateTestWizardModal: React.FC<CreateTestWizardModalProps> = ({
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, p: 2, bgcolor: 'action.hover', borderRadius: 2 }}>
                 <CircularProgress size={24} />
                 <Typography variant="body2" color="text.secondary">
-                  Processando o PDF da prova e extraindo questões com pdfplumber... Por favor, aguarde.
+                  Processando o PDF da prova e extraindo questões... Por favor, aguarde.
                 </Typography>
               </Box>
             )}
