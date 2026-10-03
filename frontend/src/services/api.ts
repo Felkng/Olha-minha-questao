@@ -405,8 +405,12 @@ export const toggleTestVisibility = async (id: number): Promise<Test> => {
   return response.data;
 };
 
-export const deleteTest = async (id: number): Promise<void> => {
-  await apiClient.delete(`/tests/${id}`);
+export const deleteTest = async (id: number, deleteQuestions: boolean = false): Promise<void> => {
+  await apiClient.delete(`/tests/${id}`, {
+    params: {
+      deleteQuestions,
+    },
+  });
 };
 
 export const createTestWithQuestions = async (

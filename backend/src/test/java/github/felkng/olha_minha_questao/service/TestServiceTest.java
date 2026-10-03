@@ -219,4 +219,75 @@ class TestServiceTest {
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("Identificador duplicado");
     }
+
+    @Test
+    @DisplayName("Deve deletar prova e manter questões desvinculadas quando deleteQuestions=false")
+    void testDelete_WithoutDeletingQuestions() {
+        var qAlts = List.of(
+                github.felkng.olha_minha_questao.dto.alternative.AlternativeRequestDTO.builder().identifier("A").text("Alt A").isCorrect(true).build(),
+                github.felkng.olha_minha_questao.dto.alternative.AlternativeRequestDTO.builder().identifier("B").text("Alt B").build()
+        );
+
+        var q1 = github.felkng.olha_minha_questao.dto.question.QuestionRequestDTO.builder()
+                .identifier("101")
+                .enunciado("Enunciado da Questão 101")
+                .year(2024)
+                .alternatives(qAlts)
+                .build();
+
+        var request = github.felkng.olha_minha_questao.dto.test.TestWithQuestionsRequestDTO.builder()
+                .name("Prova Para Excluir Sem Questoes")
+                .year(2024)
+                .questions(List.of(q1))
+                .build();
+
+        TestResponseDTO created = testService.createWithQuestions(request, null);
+        entityManager.flush();
+
+        Long testId = created.getId();
+        testService.delete(testId, null, false);
+        entityManager.flush();
+
+        assertThatThrownBy(() -> testService.findById(testId))
+                .isInstanceOf(ResourceNotFoundException.class);
+
+        var standalone = entityManager.createQuery("SELECT q FROM Question q WHERE q.identifier = '101'", github.felkng.olha_minha_questao.domain.entity.Question.class).getResultList();
+        assertThat(standalone).isNotEmpty();
+        assertThat(standalone.get(0).getTest()).isNull();
+    }
+
+    @Test
+    @DisplayName("Deve deletar prova e suas questões em cascata quando deleteQuestions=true")
+    void testDelete_WithDeletingQuestions() {
+        var qAlts = List.of(
+                github.felkng.olha_minha_questao.dto.alternative.AlternativeRequestDTO.builder().identifier("A").text("Alt A").isCorrect(true).build(),
+                github.felkng.olha_minha_questao.dto.alternative.AlternativeRequestDTO.builder().identifier("B").text("Alt B").build()
+        );
+
+        var q1 = github.felkng.olha_minha_questao.dto.question.QuestionRequestDTO.builder()
+                .identifier("202")
+                .enunciado("Enunciado da Questão 202")
+                .year(2024)
+                .alternatives(qAlts)
+                .build();
+
+        var request = github.felkng.olha_minha_questao.dto.test.TestWithQuestionsRequestDTO.builder()
+                .name("Prova Para Excluir Com Questoes")
+                .year(2024)
+                .questions(List.of(q1))
+                .build();
+
+        TestResponseDTO created = testService.createWithQuestions(request, null);
+        entityManager.flush();
+
+        Long testId = created.getId();
+        testService.delete(testId, null, true);
+        entityManager.flush();
+
+        assertThatThrownBy(() -> testService.findById(testId))
+                .isInstanceOf(ResourceNotFoundException.class);
+
+        var standalone = entityManager.createQuery("SELECT q FROM Question q WHERE q.identifier = '202'", github.felkng.olha_minha_questao.domain.entity.Question.class).getResultList();
+        assertThat(standalone).isEmpty();
+    }
 }

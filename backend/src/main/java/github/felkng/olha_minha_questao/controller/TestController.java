@@ -132,8 +132,9 @@ public class TestController {
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> delete(
             @PathVariable Long id,
+            @org.springframework.web.bind.annotation.RequestParam(required = false, defaultValue = "false") boolean deleteQuestions,
             @org.springframework.web.bind.annotation.RequestHeader(name = "X-User-Id", required = false) Long userId) {
-        testService.delete(id, userId);
+        testService.delete(id, userId, deleteQuestions);
         return ResponseEntity.noContent().build();
     }
 

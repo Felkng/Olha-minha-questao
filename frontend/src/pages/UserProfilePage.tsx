@@ -12,8 +12,10 @@ import {
   Dialog,
   DialogActions,
   DialogContent,
+  DialogContentText,
   DialogTitle,
   Divider,
+  Checkbox,
   FormControl,
   Grid,
   IconButton,
@@ -255,6 +257,11 @@ export const UserProfilePage: React.FC = () => {
     onConfirm: async () => {},
   });
   const [deleting, setDeleting] = useState(false);
+
+  // Exclusão de Prova com Opção de Excluir Questões
+  const [deletingTest, setDeletingTest] = useState<Test | null>(null);
+  const [deleteQuestionsAlso, setDeleteQuestionsAlso] = useState<boolean>(false);
+  const [isDeletingTest, setIsDeletingTest] = useState<boolean>(false);
 
   // Compartilhamento de Simulado CSV
   const [shareModalOpen, setShareModalOpen] = useState<boolean>(false);
@@ -2046,16 +2053,10 @@ export const UserProfilePage: React.FC = () => {
                             <IconButton
                               size="small"
                               color="error"
-                              onClick={() =>
-                                handleDeleteItem(
-                                  'Excluir Prova',
-                                  `Tem certeza que deseja excluir a prova "${t.name}"? As questões associadas permanecerão no sistema como avulsas.`,
-                                  async () => {
-                                    await deleteTest(t.id);
-                                    loadMyTests();
-                                  }
-                                )
-                              }
+                              onClick={() => {
+                                setDeletingTest(t);
+                                setDeleteQuestionsAlso(false);
+                              }}
                             >
                               <DeleteOutlineIcon fontSize="small" />
                             </IconButton>
@@ -3211,6 +3212,102 @@ export const UserProfilePage: React.FC = () => {
           loadMyFlashcardFolders();
         }}
       />
+
+      {/* Diálogo Específico de Confirmação de Exclusão de Prova */}
+      <Dialog
+        open={Boolean(deletingTest)}
+        onClose={() => {
+          if (!isDeletingTest) {
+            setDeletingTest(null);
+            setDeleteQuestionsAlso(false);
+          }
+        }}
+        maxWidth="xs"
+        fullWidth
+      >
+        <DialogTitle sx={{ fontWeight: 700 }}>
+          {isAdmin && deletingTest?.createdByUser?.id !== currentUser?.id
+            ? 'Moderação: Excluir Prova Pública'
+            : 'Excluir Prova'}
+        </DialogTitle>
+        <DialogContent>
+          <DialogContentText sx={{ mb: 2 }}>
+            {isAdmin && deletingTest?.createdByUser?.id !== currentUser?.id
+              ? `Como Administrador, você está prestes a remover a prova pública "${deletingTest?.name}" criada por outro usuário. Deseja continuar?`
+              : `Tem certeza que deseja excluir a prova "${deletingTest?.name}"?`}
+          </DialogContentText>
+
+          <Box
+            sx={{
+              p: 1.5,
+              borderRadius: 2,
+              border: '1px solid',
+              borderColor: deleteQuestionsAlso ? 'error.main' : 'divider',
+              backgroundColor: deleteQuestionsAlso ? 'rgba(250, 66, 75, 0.08)' : 'action.hover',
+              transition: 'all 0.2s ease',
+            }}
+          >
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={deleteQuestionsAlso}
+                  onChange={(e) => setDeleteQuestionsAlso(e.target.checked)}
+                  color="error"
+                  size="small"
+                />
+              }
+              label={
+                <Box>
+                  <Typography variant="body2" sx={{ fontWeight: 700, color: deleteQuestionsAlso ? 'error.main' : 'text.primary' }}>
+                    Também excluir todas as questões vinculadas
+                  </Typography>
+                  <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', mt: 0.3, lineHeight: 1.3 }}>
+                    {deleteQuestionsAlso
+                      ? 'Atenção: Todas as questões desta prova serão excluídas permanentemente do sistema.'
+                      : 'Se desmarcado, as questões serão mantidas no sistema como avulsas.'}
+                  </Typography>
+                </Box>
+              }
+              sx={{ alignItems: 'flex-start', m: 0, gap: 1 }}
+            />
+          </Box>
+        </DialogContent>
+        <DialogActions sx={{ p: 2 }}>
+          <Button
+            onClick={() => {
+              setDeletingTest(null);
+              setDeleteQuestionsAlso(false);
+            }}
+            disabled={isDeletingTest}
+            sx={{ color: 'text.secondary' }}
+          >
+            Cancelar
+          </Button>
+          <Button
+            variant="contained"
+            color="error"
+            onClick={async () => {
+              if (!deletingTest) return;
+              setIsDeletingTest(true);
+              try {
+                await deleteTest(deletingTest.id, deleteQuestionsAlso);
+                setDeletingTest(null);
+                setDeleteQuestionsAlso(false);
+                loadMyTests();
+              } catch (err: any) {
+                console.error('Erro ao excluir prova:', err);
+                setError(err.response?.data?.message || 'Erro ao excluir prova.');
+              } finally {
+                setIsDeletingTest(false);
+              }
+            }}
+            disabled={isDeletingTest}
+            sx={{ fontWeight: 700 }}
+          >
+            {isDeletingTest ? 'Excluindo...' : 'Excluir Prova'}
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       {/* Diálogo Genérico de Confirmação de Exclusão */}
       <Dialog open={deleteDialog.open} onClose={() => setDeleteDialog((prev) => ({ ...prev, open: false }))}>

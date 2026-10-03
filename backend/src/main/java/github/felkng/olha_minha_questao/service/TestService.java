@@ -428,11 +428,16 @@ public class TestService {
 
     @Transactional
     public void delete(Long id) {
-        delete(id, null);
+        delete(id, null, false);
     }
 
     @Transactional
     public void delete(Long id, Long userId) {
+        delete(id, userId, false);
+    }
+
+    @Transactional
+    public void delete(Long id, Long userId, boolean deleteQuestions) {
         Test test = testRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Prova não encontrada com o id: " + id));
 
@@ -453,6 +458,19 @@ public class TestService {
                             org.springframework.http.HttpStatus.FORBIDDEN,
                             "Você não tem permissão para excluir esta prova.");
                 }
+            }
+        }
+
+        if (deleteQuestions) {
+            List<Question> questions = questionRepository.findAllQuestionsByTestId(test.getId());
+            for (Question q : questions) {
+                questionRepository.delete(q);
+            }
+        } else {
+            List<Question> linkedQuestions = questionRepository.findByTestId(test.getId());
+            for (Question q : linkedQuestions) {
+                q.setTest(null);
+                questionRepository.save(q);
             }
         }
 

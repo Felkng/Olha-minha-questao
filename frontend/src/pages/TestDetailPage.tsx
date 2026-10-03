@@ -16,6 +16,8 @@ import {
   DialogContent,
   DialogContentText,
   DialogActions,
+  FormControlLabel,
+  Checkbox,
 } from '@mui/material';
 import { DetailPageSkeleton } from '../components/skeletons';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
@@ -72,6 +74,7 @@ export const TestDetailPage: React.FC<TestDetailPageProps> = ({
   const [saveModalOpen, setSaveModalOpen] = useState<boolean>(false);
   const [toastOpen, setToastOpen] = useState<boolean>(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState<boolean>(false);
+  const [deleteQuestionsAlso, setDeleteQuestionsAlso] = useState<boolean>(false);
   const [isDeleting, setIsDeleting] = useState<boolean>(false);
 
   useEffect(() => {
@@ -506,7 +509,14 @@ export const TestDetailPage: React.FC<TestDetailPageProps> = ({
 
       <Dialog
         open={deleteDialogOpen}
-        onClose={() => !isDeleting && setDeleteDialogOpen(false)}
+        onClose={() => {
+          if (!isDeleting) {
+            setDeleteDialogOpen(false);
+            setDeleteQuestionsAlso(false);
+          }
+        }}
+        maxWidth="xs"
+        fullWidth
       >
         <DialogTitle sx={{ fontWeight: 700 }}>
           {isAdmin && test?.createdByUser?.id !== user?.id
@@ -514,15 +524,53 @@ export const TestDetailPage: React.FC<TestDetailPageProps> = ({
             : 'Excluir Prova'}
         </DialogTitle>
         <DialogContent>
-          <DialogContentText>
+          <DialogContentText sx={{ mb: 2 }}>
             {isAdmin && test?.createdByUser?.id !== user?.id
               ? `Como Administrador, você está prestes a remover a prova pública "${test?.name}" criada por outro usuário. Deseja continuar?`
-              : `Tem certeza que deseja excluir a prova "${test?.name}"? Esta ação removerá a prova e suas vinculações.`}
+              : `Tem certeza que deseja excluir a prova "${test?.name}"?`}
           </DialogContentText>
+
+          <Box
+            sx={{
+              p: 1.5,
+              borderRadius: 2,
+              border: '1px solid',
+              borderColor: deleteQuestionsAlso ? 'error.main' : 'divider',
+              backgroundColor: deleteQuestionsAlso ? 'rgba(250, 66, 75, 0.08)' : 'action.hover',
+              transition: 'all 0.2s ease',
+            }}
+          >
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={deleteQuestionsAlso}
+                  onChange={(e) => setDeleteQuestionsAlso(e.target.checked)}
+                  color="error"
+                  size="small"
+                />
+              }
+              label={
+                <Box>
+                  <Typography variant="body2" sx={{ fontWeight: 700, color: deleteQuestionsAlso ? 'error.main' : 'text.primary' }}>
+                    Também excluir todas as questões vinculadas
+                  </Typography>
+                  <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', mt: 0.3, lineHeight: 1.3 }}>
+                    {deleteQuestionsAlso
+                      ? 'Atenção: Todas as questões desta prova serão excluídas permanentemente do sistema.'
+                      : 'Se desmarcado, as questões serão mantidas no sistema como avulsas.'}
+                  </Typography>
+                </Box>
+              }
+              sx={{ alignItems: 'flex-start', m: 0, gap: 1 }}
+            />
+          </Box>
         </DialogContent>
         <DialogActions sx={{ p: 2 }}>
           <Button
-            onClick={() => setDeleteDialogOpen(false)}
+            onClick={() => {
+              setDeleteDialogOpen(false);
+              setDeleteQuestionsAlso(false);
+            }}
             disabled={isDeleting}
             sx={{ color: 'text.secondary' }}
           >
@@ -535,8 +583,9 @@ export const TestDetailPage: React.FC<TestDetailPageProps> = ({
               if (!test) return;
               setIsDeleting(true);
               try {
-                await deleteTest(test.id);
+                await deleteTest(test.id, deleteQuestionsAlso);
                 setDeleteDialogOpen(false);
+                setDeleteQuestionsAlso(false);
                 navigate('/provas');
               } catch (err) {
                 console.error('Erro ao excluir prova:', err);
