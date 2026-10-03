@@ -24,6 +24,7 @@ import { useAppTheme } from '../theme/ThemeContext';
 import { TextualReferenceDrawer } from '../components/questions/TextualReferenceDrawer';
 import { ShareResultsModal } from '../components/simulations/ShareResultsModal';
 import { FormattedText } from '../components/common/FormattedText';
+import { ZoomableImage } from '../components/common/ZoomableImage';
 
 export const TestAttemptReviewPage: React.FC = () => {
   const { testId, attemptId } = useParams<{ testId: string; attemptId: string }>();
@@ -351,30 +352,13 @@ export const TestAttemptReviewPage: React.FC = () => {
                   alignItems: 'center',
                 }}
               >
-                {q.images.map((imgUrl, imgIdx) => {
-                  const resolvedUrl =
-                    imgUrl.startsWith('http') || imgUrl.startsWith('data:')
-                      ? imgUrl
-                      : `${window.location.origin}${imgUrl}`;
-                  return (
-                    <Box
-                      key={imgIdx}
-                      component="img"
-                      src={resolvedUrl}
-                      alt={`Imagem da Questão ${q.identifier}`}
-                      sx={{
-                        maxWidth: '100%',
-                        maxHeight: 450,
-                        objectFit: 'contain',
-                        borderRadius: 2,
-                        border: '1px solid',
-                        borderColor: 'divider',
-                        backgroundColor: isDark ? '#1b2028' : '#f9fafb',
-                        p: 1.5,
-                      }}
-                    />
-                  );
-                })}
+                {q.images.map((imgUrl, imgIdx) => (
+                  <ZoomableImage
+                    key={imgIdx}
+                    src={imgUrl}
+                    alt={`Imagem ${imgIdx + 1} da Questão ${q.identifier}`}
+                  />
+                ))}
               </Box>
             )}
 

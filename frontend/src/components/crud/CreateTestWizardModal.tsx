@@ -41,6 +41,7 @@ import EditIcon from '@mui/icons-material/Edit';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 import ImageIcon from '@mui/icons-material/Image';
+import { ZoomableImage } from '../common/ZoomableImage';
 import { Area, Origin, TextualReference, AvailableProvaOption } from '../../types';
 import {
   getAreas,
@@ -1119,31 +1120,27 @@ export const CreateTestWizardModal: React.FC<CreateTestWizardModalProps> = ({
                                 key={imgIdx}
                                 sx={{
                                   position: 'relative',
-                                  border: '1px solid',
-                                  borderColor: 'divider',
-                                  borderRadius: 1.5,
-                                  overflow: 'hidden',
-                                  bgcolor: 'background.paper',
-                                  p: 0.5,
+                                  display: 'inline-block',
                                 }}
                               >
-                                <Box
-                                  component="img"
-                                  src={imgUrl.startsWith('http') || imgUrl.startsWith('data:') ? imgUrl : `${window.location.origin}${imgUrl}`}
-                                  alt={`Diagrama ${imgIdx + 1}`}
-                                  sx={{ maxHeight: 120, maxWidth: 220, objectFit: 'contain', display: 'block' }}
+                                <ZoomableImage
+                                  src={imgUrl}
+                                  alt={`Diagrama ${imgIdx + 1} da Questão ${q.identifier}`}
+                                  maxHeight={140}
+                                  maxWidth={260}
                                 />
                                 <IconButton
                                   size="small"
                                   onClick={() => handleRemoveQuestionImage(qIndex, imgIdx)}
                                   sx={{
                                     position: 'absolute',
-                                    top: 4,
-                                    right: 4,
-                                    bgcolor: 'rgba(0,0,0,0.6)',
+                                    top: 6,
+                                    right: 6,
+                                    bgcolor: 'rgba(0,0,0,0.65)',
                                     color: '#fff',
-                                    p: 0.3,
-                                    '&:hover': { bgcolor: 'rgba(200,0,0,0.8)' },
+                                    p: 0.4,
+                                    zIndex: 2,
+                                    '&:hover': { bgcolor: 'rgba(200,0,0,0.9)' },
                                   }}
                                   title="Remover imagem"
                                 >

@@ -39,6 +39,7 @@ import { PALETTE_COLORS } from '../theme/theme';
 import { useAppTheme } from '../theme/ThemeContext';
 import { TextualReferenceDrawer } from '../components/questions/TextualReferenceDrawer';
 import { FormattedText } from '../components/common/FormattedText';
+import { ZoomableImage } from '../components/common/ZoomableImage';
 import { TestQuestionsNavigator } from '../components/questions/TestQuestionsNavigator';
 import { QuestionWhiteboard } from '../components/whiteboard/QuestionWhiteboard';
 import { ShareResultsModal } from '../components/simulations/ShareResultsModal';
@@ -912,30 +913,13 @@ export const TestEvaluationPage: React.FC = () => {
                 alignItems: 'center',
               }}
             >
-              {currentQuestion.images.map((imgUrl, imgIdx) => {
-                const resolvedUrl =
-                  imgUrl.startsWith('http') || imgUrl.startsWith('data:')
-                    ? imgUrl
-                    : `${window.location.origin}${imgUrl}`;
-                return (
-                  <Box
-                    key={imgIdx}
-                    component="img"
-                    src={resolvedUrl}
-                    alt={`Imagem da Questão ${currentQuestion.identifier}`}
-                    sx={{
-                      maxWidth: '100%',
-                      maxHeight: 500,
-                      objectFit: 'contain',
-                      borderRadius: 2,
-                      border: '1px solid',
-                      borderColor: 'divider',
-                      backgroundColor: isDark ? '#1b2028' : '#f9fafb',
-                      p: 1.5,
-                    }}
-                  />
-                );
-              })}
+              {currentQuestion.images.map((imgUrl, imgIdx) => (
+                <ZoomableImage
+                  key={imgIdx}
+                  src={imgUrl}
+                  alt={`Imagem ${imgIdx + 1} da Questão ${currentQuestion.identifier}`}
+                />
+              ))}
             </Box>
           )}
 

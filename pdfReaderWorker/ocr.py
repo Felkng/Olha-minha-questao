@@ -98,18 +98,71 @@ def clean_code_line(line: str) -> str:
     s = re.sub(r'^1\)$', '}', s)
     s = re.sub(r'^y$', '}', s)
     s = re.sub(r'returh', 'return', s)
+    
+    # Fix array/matrix literals: ((1,0,0), (4,5,0), 17,8,9)k; -> {{1, 0, 0}, {4, 5, 0}, {7, 8, 9}};
+    s = re.sub(r'[\(\[\{]\s*[\(\[\{]\s*(\d+,\s*\d+,\s*\d+)[\)\]\}]\s*,\s*[\(\[\{]?\s*(\d+,\s*\d+,\s*\d+)[\)\]\}]?\s*,\s*[\(\[\{]?\s*1?(\d+,\s*\d+,\s*\d+)[\)\]\}]?\s*[\)\]\}][kK]?;', r'{{ \1 }, { \2 }, { \3 }};', s)
+    
     if re.match(r'^public\s+class\s+\w+', s):
         s = re.sub(r'[\(\{|\s]+$', '', s) + " {"
-    elif re.match(r'^(?:public|private|protected)?\s*(?:static)?\s*\w+\s+\w+\s*\(.*?\)', s) and not s.endswith(";"):
+    elif re.match(r'^(?:public|private|protected)?\s*(?:static)?\s*\w+\s+\w+\s*\(.*?\)', s) and not s.endswith(";") and not s.endswith("{"):
         s = re.sub(r'[\(\{|\s]+$', '', s) + " {"
     elif re.match(r'^\s*[\)\|f]\s*$', s):
         s = "}"
     return s
 
+def format_code_block(code_lines: List[str], lang: str = "java") -> str:
+    """
+    Applies structural indentation (4 spaces per block level) and syntax beautification
+    to OCR-extracted code lines.
+    """
+    cleaned_lines = []
+    for l in code_lines:
+        c = clean_code_line(l)
+        for part in c.split('\n'):
+            if part.strip():
+                cleaned_lines.append(part.strip())
+
+    if not cleaned_lines:
+        return ""
+
+    if lang.lower() in ['java', 'c', 'cpp', 'csharp', 'javascript', 'typescript', 'sql']:
+        formatted = []
+        indent = 0
+        for line in cleaned_lines:
+            open_count = line.count('{')
+            close_count = line.count('}')
+            
+            line_indent = indent
+            if line.startswith('}'):
+                line_indent = max(0, indent - 1)
+            
+            formatted.append(('    ' * line_indent) + line)
+            indent = max(0, indent + open_count - close_count)
+        return '\n'.join(formatted)
+
+    elif lang.lower() == 'python':
+        formatted = []
+        indent = 0
+        for line in cleaned_lines:
+            if re.match(r'^(?:elif |else:|except |finally:)', line):
+                line_indent = max(0, indent - 1)
+            else:
+                line_indent = indent
+
+            formatted.append(('    ' * line_indent) + line)
+
+            if line.endswith(':'):
+                indent += 1
+            elif line.startswith(('return', 'break', 'continue', 'pass')) and indent > 0:
+                pass
+        return '\n'.join(formatted)
+
+    return '\n'.join(cleaned_lines)
+
 def format_enunciado_with_code_blocks(lines: List[str]) -> str:
     """
     Detects code blocks in question enunciado lines, preserves their formatting,
-    repairs common OCR syntax errors, and wraps them in markdown ``` blocks.
+    repairs common OCR syntax errors, and wraps them in markdown ``` blocks with proper indentation.
     """
     code_start_keywords = [
         'public class', 'public static', 'public void', 'public int', 'def ', 'class ',
@@ -161,16 +214,16 @@ def format_enunciado_with_code_blocks(lines: List[str]) -> str:
             if curr_text_lines:
                 result_parts.append(' '.join(curr_text_lines))
                 curr_text_lines = []
-            curr_code_lines.append(clean_code_line(line))
+            curr_code_lines.append(line)
         else:
             if curr_code_lines:
-                code_text = '\n'.join(curr_code_lines)
+                code_text = format_code_block(curr_code_lines, detected_lang)
                 result_parts.append(f'```{detected_lang}\n{code_text}\n```')
                 curr_code_lines = []
             curr_text_lines.append(line)
 
     if curr_code_lines:
-        code_text = '\n'.join(curr_code_lines)
+        code_text = format_code_block(curr_code_lines, detected_lang)
         result_parts.append(f'```{detected_lang}\n{code_text}\n```')
     if curr_text_lines:
         result_parts.append(' '.join(curr_text_lines))
