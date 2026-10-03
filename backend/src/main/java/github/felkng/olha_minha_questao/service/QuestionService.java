@@ -46,6 +46,8 @@ public class QuestionService {
     private final TestRepository testRepository;
     private final UserRepository userRepository;
     private final github.felkng.olha_minha_questao.domain.repository.TextualReferenceRepository textualReferenceRepository;
+    private final github.felkng.olha_minha_questao.storage.ImageStorageService imageStorageService;
+    private final github.felkng.olha_minha_questao.domain.repository.ImageRepository imageRepository;
     private final QuestionMapper questionMapper;
     private final AlternativeMapper alternativeMapper;
 
@@ -304,6 +306,8 @@ public class QuestionService {
             question.setIsPublic(dto.getIsPublic());
         }
 
+        processQuestionImages(question, dto.getImages());
+
         Question saved = questionRepository.save(question);
 
         // Define a alternativa correta a partir de isCorrect=true ou correctAlternativeId
@@ -421,6 +425,10 @@ public class QuestionService {
             }
         }
 
+        if (dto.getImages() != null) {
+            processQuestionImages(question, dto.getImages());
+        }
+
         Question updated = questionRepository.save(question);
 
         // Atualiza a alternativa correta
@@ -446,6 +454,33 @@ public class QuestionService {
         updated = questionRepository.save(updated);
 
         return questionMapper.toDTO(updated);
+    }
+
+    private void processQuestionImages(Question question, List<String> imageInputs) {
+        if (imageInputs == null) {
+            return;
+        }
+        question.getImages().clear();
+        int order = 0;
+        for (String input : imageInputs) {
+            if (input == null || input.isBlank()) continue;
+            String url = imageStorageService.storeBase64Image(input);
+            if (url != null) {
+                github.felkng.olha_minha_questao.domain.entity.Image image = github.felkng.olha_minha_questao.domain.entity.Image.builder()
+                        .url(url)
+                        .fileName(url.substring(url.lastIndexOf('/') + 1))
+                        .contentType(imageStorageService.getContentType(url))
+                        .build();
+                github.felkng.olha_minha_questao.domain.entity.Image savedImage = imageRepository.save(image);
+
+                github.felkng.olha_minha_questao.domain.entity.QuestionImage qi = github.felkng.olha_minha_questao.domain.entity.QuestionImage.builder()
+                        .question(question)
+                        .image(savedImage)
+                        .displayOrder(order++)
+                        .build();
+                question.getImages().add(qi);
+            }
+        }
     }
 
     @Transactional

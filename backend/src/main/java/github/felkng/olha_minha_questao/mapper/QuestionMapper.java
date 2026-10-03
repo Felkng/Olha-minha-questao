@@ -29,7 +29,19 @@ public interface QuestionMapper {
     @Mapping(target = "difficultyLevel", source = "statistic.difficultyLevel")
     @Mapping(target = "accuracyPercentage", source = "statistic.firstAttemptAccuracy")
     @Mapping(target = "totalAttempts", source = "statistic.totalAttempts")
+    @Mapping(target = "images", source = "images")
     QuestionResponseDTO toDTO(Question entity);
+
+    default java.util.List<String> mapQuestionImages(java.util.List<github.felkng.olha_minha_questao.domain.entity.QuestionImage> images) {
+        if (images == null || images.isEmpty()) {
+            return new java.util.ArrayList<>();
+        }
+        return images.stream()
+                .sorted(java.util.Comparator.comparing(github.felkng.olha_minha_questao.domain.entity.QuestionImage::getDisplayOrder, java.util.Comparator.nullsLast(java.util.Comparator.naturalOrder())))
+                .map(qi -> qi.getImage() != null ? qi.getImage().getUrl() : null)
+                .filter(java.util.Objects::nonNull)
+                .toList();
+    }
 
     @Mapping(target = "id", ignore = true)
     @Mapping(target = "origin", ignore = true)

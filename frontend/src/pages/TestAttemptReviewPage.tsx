@@ -23,6 +23,7 @@ import { PALETTE_COLORS } from '../theme/theme';
 import { useAppTheme } from '../theme/ThemeContext';
 import { TextualReferenceDrawer } from '../components/questions/TextualReferenceDrawer';
 import { ShareResultsModal } from '../components/simulations/ShareResultsModal';
+import { FormattedText } from '../components/common/FormattedText';
 
 export const TestAttemptReviewPage: React.FC = () => {
   const { testId, attemptId } = useParams<{ testId: string; attemptId: string }>();
@@ -338,9 +339,44 @@ export const TestAttemptReviewPage: React.FC = () => {
               </Box>
             )}
 
-            <Typography variant="body1" sx={{ mb: 2.5, lineHeight: 1.6 }}>
-              {q.enunciado}
-            </Typography>
+            <FormattedText text={q.enunciado} sx={{ mb: 2.5, lineHeight: 1.6 }} />
+
+            {q.images && q.images.length > 0 && (
+              <Box
+                sx={{
+                  mb: 3,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 2,
+                  alignItems: 'center',
+                }}
+              >
+                {q.images.map((imgUrl, imgIdx) => {
+                  const resolvedUrl =
+                    imgUrl.startsWith('http') || imgUrl.startsWith('data:')
+                      ? imgUrl
+                      : `${window.location.origin}${imgUrl}`;
+                  return (
+                    <Box
+                      key={imgIdx}
+                      component="img"
+                      src={resolvedUrl}
+                      alt={`Imagem da Questão ${q.identifier}`}
+                      sx={{
+                        maxWidth: '100%',
+                        maxHeight: 450,
+                        objectFit: 'contain',
+                        borderRadius: 2,
+                        border: '1px solid',
+                        borderColor: 'divider',
+                        backgroundColor: isDark ? '#1b2028' : '#f9fafb',
+                        p: 1.5,
+                      }}
+                    />
+                  );
+                })}
+              </Box>
+            )}
 
             <Stack spacing={1}>
               {q.alternatives.map((alt) => {

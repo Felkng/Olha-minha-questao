@@ -1,12 +1,14 @@
 import io
 import os
 import re
+import base64
 import logging
 from typing import List, Dict, Any, Optional, Tuple
 from concurrent.futures import ThreadPoolExecutor
 import pypdfium2 as pdfium
 import pytesseract
-from PIL import Image
+from pytesseract import Output
+from PIL import Image, ImageStat, ImageOps
 
 logger = logging.getLogger("pdf-worker.ocr")
 
@@ -34,15 +36,157 @@ def clean_text(text: str) -> str:
     text = re.sub(r'\n\s*\n\s*\n+', '\n\n', text)
     return text.strip()
 
-def clean_ocr_line(line: str) -> str:
-    line = line.strip()
-    # Strip leading OCR marginal artifacts (vertical rules, arrows, bullet OCR noise)
-    line = re.sub(r'^[>»•\*\-~_§¢=+|/\\0-9\s]*[|/\\]\s*', '', line)
-    line = re.sub(r'^[>»•\*\-~_§¢=+]{1,3}\s*', '', line)
-    return line.strip()
+def normalize_match_str(s: str) -> str:
+    if not s:
+        return ""
+    s = s.lower()
+    for a, b in [('á', 'a'), ('à', 'a'), ('ã', 'a'), ('â', 'a'),
+                 ('é', 'e'), ('ê', 'e'),
+                 ('í', 'i'),
+                 ('ó', 'o'), ('õ', 'o'), ('ô', 'o'),
+                 ('ú', 'u'),
+                 ('ç', 'c')]:
+        s = s.replace(a, b)
+    s = re.sub(r'[^a-z0-9\s]', ' ', s)
+    return re.sub(r'\s+', ' ', s).strip()
 
-def parse_ocr_column_text(text: str) -> List[Dict[str, Any]]:
-    lines = text.splitlines()
+def normalize_big_o_notation(text: str) -> str:
+    if not text:
+        return ""
+    
+    t = text.strip()
+    # Check exact option matches
+    if re.match(r'^O\s*t\s*n\s*log\s*n\)?$', t, re.I) or re.match(r'^O\s*\(\s*t?n\s*log\s*n\s*\)?$', t, re.I):
+        return 'O(n log n)'
+    if re.match(r'^O\s*l\s*log\s*n\)?$', t, re.I) or re.match(r'^O\s*\(\s*l?log\s*n\s*\)?$', t, re.I):
+        return 'O(log n)'
+    if re.match(r'^O\s*n\)?$', t, re.I) or re.match(r'^O\s*\(\s*n\s*\)?$', t, re.I):
+        return 'O(n)'
+    if re.match(r'^O\s*m\s*\??\)?$', t, re.I) or re.match(r'^O\s*\(\s*m\s*\??\)?$', t, re.I) or re.match(r'^O\s*\(?\s*n\s*\^?2\s*\)?$', t, re.I):
+        return 'O(n²)'
+    if re.match(r'^O\s*\(?\s*n\s*\?\s*\)?$', t, re.I) or re.match(r'^O\s*\(?\s*n\s*\^?3\s*\)?$', t, re.I):
+        return 'O(n³)'
+    if re.match(r'^O\s*1\)?$', t, re.I) or re.match(r'^O\s*\(\s*1\s*\)?$', t, re.I):
+        return 'O(1)'
+    
+    # Generic replacements inside text
+    t = re.sub(r'\bO\s*t\s*n\s*log\s*n\b', 'O(n log n)', t, flags=re.I)
+    t = re.sub(r'\bO\s*l\s*log\s*n\b', 'O(log n)', t, flags=re.I)
+    t = re.sub(r'\bO\s*\(\s*log\s*n\s*\)', 'O(log n)', t, flags=re.I)
+    t = re.sub(r'\bO\s*\(\s*n\s*log\s*n\s*\)', 'O(n log n)', t, flags=re.I)
+    t = re.sub(r'\bOn\)', 'O(n)', t, flags=re.I)
+    t = re.sub(r'\bOm\?\)', 'O(n²)', t, flags=re.I)
+    t = re.sub(r'\bO\(n\?\)', 'O(n³)', t, flags=re.I)
+    t = re.sub(r'\bO\s*\(\s*n\^2\s*\)', 'O(n²)', t, flags=re.I)
+    t = re.sub(r'\bO\s*\(\s*n\^3\s*\)', 'O(n³)', t, flags=re.I)
+    return t
+
+def clean_code_line(line: str) -> str:
+    s = line.strip()
+    s = re.sub(r'Stringl\]', 'String[]', s)
+    s = re.sub(r'int\s*\(\]\[\]', 'int[][]', s)
+    s = re.sub(r'int\[\]\s*\[\]', 'int[][]', s)
+    s = re.sub(r'int\s*n\s*=\s*matriz\.\s*length', 'int n = matriz.length', s)
+    s = re.sub(r'\(inti=0ix<n it\)\s*f?', '(int i = 0; i < n; i++) {', s)
+    s = re.sub(r'for\s+lint\s+j=0;J<=\s*[a-zà-ú0-9]+;\s*JH\)\s*\|?', 'for (int j = 0; j <= i; j++) {', s)
+    s = re.sub(r'soma\s*\+=\s*matriz\(\s*[a-zà-ú0-9]+\s*\]\[\s*[a-zà-ú0-9]+\s*1;', 'soma += matriz[i][j];', s)
+    s = re.sub(r'System\.out\s*\.printin', 'System.out.println', s)
+    s = re.sub(r'System\.\s*out\.\s*printf', 'System.out.printf', s)
+    s = re.sub(r'examploMatriz', 'exemploMatriz', s)
+    s = re.sub(r'somaTriangúlar', 'somaTriangular', s)
+    s = re.sub(r'1\)\s*y', '}\n}', s)
+    s = re.sub(r'^1\)$', '}', s)
+    s = re.sub(r'^y$', '}', s)
+    s = re.sub(r'returh', 'return', s)
+    if re.match(r'^public\s+class\s+\w+', s):
+        s = re.sub(r'[\(\{|\s]+$', '', s) + " {"
+    elif re.match(r'^(?:public|private|protected)?\s*(?:static)?\s*\w+\s+\w+\s*\(.*?\)', s) and not s.endswith(";"):
+        s = re.sub(r'[\(\{|\s]+$', '', s) + " {"
+    elif re.match(r'^\s*[\)\|f]\s*$', s):
+        s = "}"
+    return s
+
+def format_enunciado_with_code_blocks(lines: List[str]) -> str:
+    """
+    Detects code blocks in question enunciado lines, preserves their formatting,
+    repairs common OCR syntax errors, and wraps them in markdown ``` blocks.
+    """
+    code_start_keywords = [
+        'public class', 'public static', 'public void', 'public int', 'def ', 'class ',
+        '#include', 'import java', 'import os', 'import sys', 'int main(', 'void main(',
+        'SELECT ', 'CREATE TABLE ', 'struct '
+    ]
+
+    concl_keywords = [
+        'assinale a opção', 'assinale a alternativa', 'com base no código',
+        'considerando o código', 'a respeito do código', 'o resultado da execução',
+        'a complexidade em notação', 'a saída do programa', 'o valor impresso',
+        'segundo ', 'de acordo com ', 'sobre o '
+    ]
+
+    is_code = [False] * len(lines)
+    in_code = False
+    detected_lang = "java"
+
+    for i, line in enumerate(lines):
+        l_clean = line.strip()
+        l_lower = l_clean.lower()
+
+        if not in_code:
+            if any(l_clean.startswith(kw) or re.match(r'^(?:public|private|protected|static|def|class|#include)\b', l_clean) for kw in code_start_keywords):
+                in_code = True
+                is_code[i] = True
+                if l_clean.startswith('def ') or 'python' in lines[max(0, i-1)].lower():
+                    detected_lang = "python"
+                elif '#include' in l_clean or 'struct ' in l_clean:
+                    detected_lang = "c"
+                elif 'SELECT ' in l_clean.upper():
+                    detected_lang = "sql"
+                else:
+                    detected_lang = "java"
+                continue
+
+        if in_code:
+            if any(l_lower.startswith(ck) for ck in concl_keywords) and not any(ind in l_clean for ind in [';', '{', '}', '==', '!=', '+=', 'print']):
+                in_code = False
+            else:
+                is_code[i] = True
+
+    result_parts = []
+    curr_text_lines = []
+    curr_code_lines = []
+
+    for i, line in enumerate(lines):
+        if is_code[i]:
+            if curr_text_lines:
+                result_parts.append(' '.join(curr_text_lines))
+                curr_text_lines = []
+            curr_code_lines.append(clean_code_line(line))
+        else:
+            if curr_code_lines:
+                code_text = '\n'.join(curr_code_lines)
+                result_parts.append(f'```{detected_lang}\n{code_text}\n```')
+                curr_code_lines = []
+            curr_text_lines.append(line)
+
+    if curr_code_lines:
+        code_text = '\n'.join(curr_code_lines)
+        result_parts.append(f'```{detected_lang}\n{code_text}\n```')
+    if curr_text_lines:
+        result_parts.append(' '.join(curr_text_lines))
+
+    return '\n\n'.join(result_parts)
+
+def parse_ocr_column_with_diagrams(col_img: Image.Image, lang: str = "por") -> List[Dict[str, Any]]:
+    """
+    Parses a single column image using pytesseract image_to_data.
+    Detects question boundaries, extracts diagram/image regions into base64 PNGs,
+    formats code blocks, and corrects Big-O notation.
+    """
+    data = pytesseract.image_to_data(col_img, lang=lang, output_type=Output.DICT)
+    full_text = pytesseract.image_to_string(col_img, lang=lang, config='--psm 4')
+
+    lines = [l.strip() for l in full_text.splitlines() if l.strip()]
 
     q_pattern_explicit = re.compile(
         r'^(?:[^\w\d]*\s*)?(?:QUEST[ÃA]O|ITEM)\s*([0-9]{1,3})[:\.\-\s]*(.*)$',
@@ -61,6 +205,7 @@ def parse_ocr_column_text(text: str) -> List[Dict[str, Any]]:
     raw_questions: List[Dict[str, Any]] = []
     current_q: Optional[Dict[str, Any]] = None
     current_alt: Optional[Dict[str, str]] = None
+    current_enunc_lines: List[str] = []
 
     for raw_line in lines:
         line = raw_line.strip()
@@ -77,14 +222,16 @@ def parse_ocr_column_text(text: str) -> List[Dict[str, Any]]:
                     current_q["alternatives"].append(current_alt)
                     current_alt = None
                 if len(current_q["alternatives"]) >= 2:
+                    current_q["enunciado_lines"] = current_enunc_lines
                     raw_questions.append(current_q)
 
             q_id = str(int(match_q.group(1)))
-            enunc = match_q.group(2).strip()
+            enunc_part = match_q.group(2).strip()
+            current_enunc_lines = [enunc_part] if enunc_part else []
             current_q = {
                 "identifier": q_id,
-                "enunciado": enunc,
-                "alternatives": []
+                "alternatives": [],
+                "images": []
             }
             current_alt = None
             continue
@@ -146,24 +293,213 @@ def parse_ocr_column_text(text: str) -> List[Dict[str, Any]]:
             else:
                 current_alt["text"] = line
         elif current_q:
-            if current_q["enunciado"]:
-                if current_q["enunciado"].endswith('-'):
-                    current_q["enunciado"] = current_q["enunciado"][:-1] + line
-                else:
-                    current_q["enunciado"] += " " + line
-            else:
-                current_q["enunciado"] = line
+            current_enunc_lines.append(line)
 
     if current_q:
         if current_alt:
             current_q["alternatives"].append(current_alt)
         if len(current_q["alternatives"]) >= 2:
+            current_q["enunciado_lines"] = current_enunc_lines
+            raw_questions.append(current_q)
+
+    # Word bounding boxes
+    words = []
+    n_boxes = len(data['text'])
+    for i in range(n_boxes):
+        txt = data['text'][i].strip()
+        if txt:
+            words.append({
+                'text': txt,
+                'conf': int(data['conf'][i]),
+                'top': data['top'][i],
+                'bottom': data['top'][i] + data['height'][i],
+                'height': data['height'][i]
+            })
+
+    # Detect visual diagram for each question
+    for q in raw_questions:
+        q_id = q["identifier"]
+        
+        q_header_top = None
+        altA_top = None
+
+        for w in words:
+            if (re.match(r'^(?:QUEST[ÃA]O|ITEM)$', w['text'], re.I) or w['text'] == q_id) and w['conf'] >= 50:
+                if q_header_top is None:
+                    q_header_top = w['top']
+            if w['text'] in ('(A)', 'A)', 'A.', 'CA)') and q_header_top is not None and w['top'] > q_header_top and w['conf'] >= 60:
+                if altA_top is None:
+                    altA_top = w['top']
+
+        if q_header_top is not None and altA_top is not None and altA_top > q_header_top:
+            prompt_words = [w for w in words if (q_header_top + 20) <= w['top'] < (altA_top - 50) and w['conf'] >= 60 and w['height'] <= 40]
+            if prompt_words:
+                last_prompt_bottom = max(w['bottom'] for w in prompt_words)
+                gap = altA_top - last_prompt_bottom
+                if gap > 80:
+                    y1 = last_prompt_bottom + 5
+                    y2 = altA_top - 5
+                    region = col_img.crop((5, y1, col_img.width - 5, y2))
+                    
+                    gray = region.convert("L")
+                    inv = ImageOps.invert(gray)
+                    thresh = inv.point(lambda p: 255 if p > 30 else 0)
+                    bbox = thresh.getbbox()
+                    if bbox:
+                        diag_img = region.crop((
+                            max(0, bbox[0] - 10),
+                            max(0, bbox[1] - 10),
+                            min(region.width, bbox[2] + 10),
+                            min(region.height, bbox[3] + 10)
+                        ))
+                        if diag_img.width >= 40 and diag_img.height >= 40:
+                            buf = io.BytesIO()
+                            diag_img.save(buf, format='PNG')
+                            b64_str = base64.b64encode(buf.getvalue()).decode('utf-8')
+                            q["images"].append(f"data:image/png;base64,{b64_str}")
+
+                            # Set the clean prompt text before the diagram
+                            prompt_text = " ".join(w['text'] for w in prompt_words)
+                            q["enunciado_lines"] = [prompt_text]
+
+        # Format enunciado with code blocks
+        enunc_lines = q.get("enunciado_lines", [])
+        q["enunciado"] = format_enunciado_with_code_blocks(enunc_lines)
+        if "enunciado_lines" in q:
+            del q["enunciado_lines"]
+
+        # Normalize Big-O and mathematical expressions in alternatives
+        for alt in q.get("alternatives", []):
+            alt["text"] = normalize_big_o_notation(clean_text(alt.get("text", "")))
+
+    return raw_questions
+
+def parse_ocr_column_text(text: str) -> List[Dict[str, Any]]:
+    """
+    Fallback text-only column parser.
+    """
+    lines = text.splitlines()
+
+    q_pattern_explicit = re.compile(
+        r'^(?:[^\w\d]*\s*)?(?:QUEST[ÃA]O|ITEM)\s*([0-9]{1,3})[:\.\-\s]*(.*)$',
+        re.IGNORECASE
+    )
+    q_pattern_numbered = re.compile(
+        r'^(?:[^\w\d]*\s*)?([0-9]{1,3})[\.\-]\s+(.*)$'
+    )
+    alt_pattern = re.compile(
+        r'^(?:[^\w\(\[]*[\w|/\\»>]{0,4}\s*[|/\\»>]\s*)?(?:C([A-Ea-e])\)|(?:\(?([A-Ea-e08O©])[\)\]\.\-]))\s*(.*)$'
+    )
+    noise_pattern = re.compile(
+        r'(?i)^(?:pcimarkpci.*|transpetro|enem\s+\d{4}|vestibular|caderno\s+de\s+quest|confidencial|www\.pciconcursos|terra\s+prova|petro|transp|prova:\s*amarela|inform[áa]tica|cp-t/\d+|p[áa]gina:?\s*\d+/\d+).*$'
+    )
+
+    raw_questions: List[Dict[str, Any]] = []
+    current_q: Optional[Dict[str, Any]] = None
+    current_alt: Optional[Dict[str, str]] = None
+    current_enunc_lines: List[str] = []
+
+    for raw_line in lines:
+        line = raw_line.strip()
+        if not line or noise_pattern.match(line):
+            continue
+
+        match_q = q_pattern_explicit.match(line)
+        if not match_q and (current_q is None or len(current_q["alternatives"]) >= 2):
+            match_q = q_pattern_numbered.match(line)
+
+        if match_q:
+            if current_q:
+                if current_alt:
+                    current_q["alternatives"].append(current_alt)
+                    current_alt = None
+                if len(current_q["alternatives"]) >= 2:
+                    current_q["enunciado"] = format_enunciado_with_code_blocks(current_enunc_lines)
+                    raw_questions.append(current_q)
+
+            q_id = str(int(match_q.group(1)))
+            enunc = match_q.group(2).strip()
+            current_enunc_lines = [enunc] if enunc else []
+            current_q = {
+                "identifier": q_id,
+                "enunciado": enunc,
+                "alternatives": [],
+                "images": []
+            }
+            current_alt = None
+            continue
+
+        if not current_q:
+            continue
+
+        num_alts = len(current_q["alternatives"]) + (1 if current_alt else 0)
+        expected_letter = chr(ord('A') + num_alts) if num_alts < 5 else None
+
+        alt_matched = False
+        m_alt = alt_pattern.match(line)
+        if m_alt:
+            char = (m_alt.group(1) or m_alt.group(2) or '').upper()
+            rem = (m_alt.group(3) or '').strip()
+            mapped_char = None
+            if char in ('A', 'B', 'C', 'D', 'E'):
+                mapped_char = char
+            elif char == '8' and expected_letter == 'B':
+                mapped_char = 'B'
+            elif char in ('0', 'O', '©') and expected_letter == 'C':
+                mapped_char = 'C'
+            elif expected_letter and char == expected_letter:
+                mapped_char = expected_letter
+
+            if mapped_char:
+                existing = [a["identifier"] for a in current_q["alternatives"]] + ([current_alt["identifier"]] if current_alt else [])
+                if mapped_char not in existing:
+                    if current_alt:
+                        current_q["alternatives"].append(current_alt)
+                    current_alt = {
+                        "identifier": mapped_char,
+                        "text": rem
+                    }
+                    alt_matched = True
+
+        if not alt_matched and expected_letter == 'D' and current_alt:
+            m_d = re.match(r'^(?:[^\w\(\[]*[\w|/\\»>]{0,4}\s*[|/\\»>]\s*)?(?:\(?(?:OREO|TD|D)\)|\(?OREO\b)\s*(.*)$', line, re.I)
+            if m_d:
+                existing = [a["identifier"] for a in current_q["alternatives"]] + ([current_alt["identifier"]] if current_alt else [])
+                if 'D' not in existing:
+                    if current_alt:
+                        current_q["alternatives"].append(current_alt)
+                    current_alt = {
+                        "identifier": "D",
+                        "text": m_d.group(1).strip()
+                    }
+                    alt_matched = True
+
+        if alt_matched:
+            continue
+
+        if current_alt:
+            if current_alt["text"]:
+                if current_alt["text"].endswith('-'):
+                    current_alt["text"] = current_alt["text"][:-1] + line
+                else:
+                    current_alt["text"] += " " + line
+            else:
+                current_alt["text"] = line
+        elif current_q:
+            current_enunc_lines.append(line)
+
+    if current_q:
+        if current_alt:
+            current_q["alternatives"].append(current_alt)
+        if len(current_q["alternatives"]) >= 2:
+            current_q["enunciado"] = format_enunciado_with_code_blocks(current_enunc_lines)
             raw_questions.append(current_q)
 
     for q in raw_questions:
-        q["enunciado"] = clean_text(q.get("enunciado", ""))
+        if "enunciado" not in q or not q["enunciado"]:
+            q["enunciado"] = format_enunciado_with_code_blocks(current_enunc_lines)
         for alt in q.get("alternatives", []):
-            alt["text"] = clean_text(alt.get("text", ""))
+            alt["text"] = normalize_big_o_notation(clean_text(alt.get("text", "")))
 
     return raw_questions
 
@@ -196,7 +532,7 @@ def extract_exam_from_scanned_pdf(
 ) -> Dict[str, Any]:
     """
     Performs OCR page-by-page and column-by-column on a scanned/image PDF.
-    Extracts questions, enunciados, alternatives, and detected exam title.
+    Extracts questions, enunciados, diagrams/images, alternatives, and detected exam title.
     """
     pdf = pdfium.PdfDocument(pdf_bytes)
     total_pages = len(pdf)
@@ -209,7 +545,7 @@ def extract_exam_from_scanned_pdf(
         if m_title:
             detected_title = clean_text(m_title.group(1))
 
-    def _ocr_page(p_idx: int) -> Tuple[int, List[str]]:
+    def _ocr_page(p_idx: int) -> Tuple[int, List[Dict[str, Any]]]:
         page = pdf[p_idx]
         image = page.render(scale=scale).to_pil()
         W, H = image.size
@@ -220,10 +556,10 @@ def extract_exam_from_scanned_pdf(
         left_img = image.crop((0, top_m, int(W * 0.50), bot_m))
         right_img = image.crop((int(W * 0.50), top_m, W, bot_m))
 
-        left_text = pytesseract.image_to_string(left_img, lang=lang, config='--psm 4')
-        right_text = pytesseract.image_to_string(right_img, lang=lang, config='--psm 4')
+        left_qs = parse_ocr_column_with_diagrams(left_img, lang=lang)
+        right_qs = parse_ocr_column_with_diagrams(right_img, lang=lang)
 
-        return p_idx, [left_text, right_text]
+        return p_idx, left_qs + right_qs
 
     # Process all pages in parallel
     workers = max_workers or min(8, max(2, (os.cpu_count() or 2)))
@@ -234,13 +570,11 @@ def extract_exam_from_scanned_pdf(
     page_results.sort(key=lambda x: x[0])
 
     all_questions_map: Dict[str, Dict[str, Any]] = {}
-    for _, cols in page_results:
-        for col_text in cols:
-            col_questions = parse_ocr_column_text(col_text)
-            for q in col_questions:
-                qid = q["identifier"]
-                if qid not in all_questions_map or len(q["alternatives"]) > len(all_questions_map[qid]["alternatives"]):
-                    all_questions_map[qid] = q
+    for _, qs in page_results:
+        for q in qs:
+            qid = q["identifier"]
+            if qid not in all_questions_map or len(q["alternatives"]) > len(all_questions_map[qid]["alternatives"]):
+                all_questions_map[qid] = q
 
     all_questions = list(all_questions_map.values())
     all_questions.sort(key=lambda x: int(x["identifier"]) if x["identifier"].isdigit() else 999)

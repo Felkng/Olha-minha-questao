@@ -53,4 +53,7 @@ public class QuestionRequestDTO {
     @Size(min = 2, message = "A questão deve conter no mínimo 2 alternativas")
     @Builder.Default
     private List<AlternativeRequestDTO> alternatives = new ArrayList<>();
+
+    @Builder.Default
+    private List<String> images = new ArrayList<>();
 }

@@ -2,7 +2,13 @@ import re
 import io
 import pdfplumber
 from typing import List, Dict, Any, Optional, Tuple
-from ocr import is_scanned_pdf, extract_exam_from_scanned_pdf, extract_answer_key_from_scanned_pdf
+from ocr import (
+    is_scanned_pdf,
+    extract_exam_from_scanned_pdf,
+    extract_answer_key_from_scanned_pdf,
+    normalize_big_o_notation,
+    format_enunciado_with_code_blocks
+)
 
 def sanitize_text_noise(text: str) -> str:
     if not text:
@@ -471,11 +477,14 @@ def parse_exam_pdf(pdf_bytes: bytes) -> Dict[str, Any]:
     # Sort questions by integer identifier
     all_questions.sort(key=lambda x: int(x["identifier"]) if x["identifier"].isdigit() else 999)
 
-    # Clean text content
+    # Clean text content, format code blocks, and normalize notation
     for q in all_questions:
-        q["enunciado"] = clean_text(q["enunciado"])
+        raw_lines = [l.strip() for l in q.get("enunciado", "").splitlines() if l.strip()]
+        q["enunciado"] = format_enunciado_with_code_blocks(raw_lines)
+        if "images" not in q:
+            q["images"] = []
         for a in q["alternatives"]:
-            a["text"] = clean_text(a["text"])
+            a["text"] = normalize_big_o_notation(clean_text(a["text"]))
 
     return {
         "questions": all_questions,

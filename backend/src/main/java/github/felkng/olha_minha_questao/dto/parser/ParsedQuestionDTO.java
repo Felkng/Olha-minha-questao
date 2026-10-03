@@ -19,4 +19,6 @@ public class ParsedQuestionDTO {
     private String enunciado;
     @Builder.Default
     private List<ParsedAlternativeDTO> alternatives = new ArrayList<>();
+    @Builder.Default
+    private List<String> images = new ArrayList<>();
 }

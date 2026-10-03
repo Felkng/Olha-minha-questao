@@ -35,6 +35,8 @@ public class QuestionResponseDTO {
     private Boolean isPublic;
     @Builder.Default
     private List<AlternativeResponseDTO> alternatives = new ArrayList<>();
+    @Builder.Default
+    private List<String> images = new ArrayList<>();
     private Long correctAlternativeId;
     private String correctAlternativeIdentifier;
     private github.felkng.olha_minha_questao.domain.entity.DifficultyLevel difficultyLevel;

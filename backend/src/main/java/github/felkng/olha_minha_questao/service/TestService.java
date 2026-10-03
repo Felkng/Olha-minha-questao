@@ -40,6 +40,8 @@ public class TestService {
     private final github.felkng.olha_minha_questao.domain.repository.TestQuestionRepository testQuestionRepository;
     private final github.felkng.olha_minha_questao.domain.repository.UserRepository userRepository;
     private final github.felkng.olha_minha_questao.domain.repository.TextualReferenceRepository textualReferenceRepository;
+    private final github.felkng.olha_minha_questao.storage.ImageStorageService imageStorageService;
+    private final github.felkng.olha_minha_questao.domain.repository.ImageRepository imageRepository;
     private final TestMapper testMapper;
     private final QuestionMapper questionMapper;
     private final github.felkng.olha_minha_questao.mapper.AlternativeMapper alternativeMapper;
@@ -336,6 +338,8 @@ public class TestService {
                     savedQuestion.setStatistic(stat);
                 }
 
+                processQuestionImages(savedQuestion, qDto.getImages());
+
                 questionRepository.save(savedQuestion);
             }
         }
@@ -497,5 +501,31 @@ public class TestService {
             }
         });
         return testIds;
+    }
+
+    private void processQuestionImages(Question question, List<String> imageInputs) {
+        if (imageInputs == null || imageInputs.isEmpty()) {
+            return;
+        }
+        int order = 0;
+        for (String input : imageInputs) {
+            if (input == null || input.isBlank()) continue;
+            String url = imageStorageService.storeBase64Image(input);
+            if (url != null) {
+                github.felkng.olha_minha_questao.domain.entity.Image image = github.felkng.olha_minha_questao.domain.entity.Image.builder()
+                        .url(url)
+                        .fileName(url.substring(url.lastIndexOf('/') + 1))
+                        .contentType(imageStorageService.getContentType(url))
+                        .build();
+                github.felkng.olha_minha_questao.domain.entity.Image savedImage = imageRepository.save(image);
+
+                github.felkng.olha_minha_questao.domain.entity.QuestionImage qi = github.felkng.olha_minha_questao.domain.entity.QuestionImage.builder()
+                        .question(question)
+                        .image(savedImage)
+                        .displayOrder(order++)
+                        .build();
+                question.getImages().add(qi);
+            }
+        }
     }
 }

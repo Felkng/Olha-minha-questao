@@ -35,6 +35,7 @@ import { submitQuestionAttempt, deleteQuestion, toggleQuestionVisibility } from 
 import { useAuth } from '../../context/AuthContext';
 import { TextualReferenceDrawer } from './TextualReferenceDrawer';
 import { EditQuestionModal } from '../crud/EditQuestionModal';
+import { FormattedText } from '../common/FormattedText';
 import {
   Dialog,
   DialogTitle,
@@ -589,18 +590,57 @@ export const QuestionCard: React.FC<QuestionCardProps> = ({
       )}
 
       {/* Question Statement (Enunciado) */}
-      <Typography
-        variant="body1"
+      <FormattedText
+        text={question.enunciado}
         sx={{
           fontSize: '1.05rem',
           lineHeight: 1.7,
           color: 'text.primary',
-          mb: 3,
+          mb: 2.5,
           fontWeight: 400,
         }}
-      >
-        {question.enunciado}
-      </Typography>
+      />
+
+      {/* Question Images (Diagrams, figures, charts) */}
+      {question.images && question.images.length > 0 && (
+        <Box
+          sx={{
+            mb: 3,
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 2,
+            alignItems: 'center',
+          }}
+        >
+          {question.images.map((imgUrl, imgIdx) => {
+            const resolvedUrl =
+              imgUrl.startsWith('http') || imgUrl.startsWith('data:')
+                ? imgUrl
+                : `${window.location.origin}${imgUrl}`;
+            return (
+              <Box
+                key={imgIdx}
+                component="img"
+                src={resolvedUrl}
+                alt={`Imagem da Questão ${question.identifier}`}
+                sx={{
+                  maxWidth: '100%',
+                  maxHeight: 520,
+                  objectFit: 'contain',
+                  borderRadius: 2,
+                  border: '1px solid',
+                  borderColor: 'divider',
+                  backgroundColor: isDark ? '#1b2028' : '#f9fafb',
+                  p: 1.5,
+                  boxShadow: isDark
+                    ? '0 4px 14px rgba(0,0,0,0.5)'
+                    : '0 4px 14px rgba(0,0,0,0.06)',
+                }}
+              />
+            );
+          })}
+        </Box>
+      )}
 
       <Divider sx={{ mb: 2.5 }} />
 

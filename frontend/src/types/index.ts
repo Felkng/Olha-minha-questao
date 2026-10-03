@@ -156,6 +156,7 @@ export interface Question {
   totalAttempts?: number;
   createdByUser?: UserSummary;
   isPublic?: boolean;
+  images?: string[];
 }
 
 export interface FilterState {
@@ -518,6 +519,7 @@ export interface ParsedQuestion {
   identifier: string;
   enunciado: string;
   alternatives: ParsedAlternative[];
+  images?: string[];
 }
 
 export interface ParsedExamResponse {
@@ -569,6 +571,8 @@ export interface TestWithQuestionsRequest {
     correctAlternativeId?: number | null;
     textualReferenceId?: number | null;
     textualReferenceIndex?: number | null;
+    isPublic?: boolean;
+    images?: string[];
     alternatives: {
       identifier: string;
       text: string;

@@ -40,6 +40,7 @@ import MenuBookIcon from '@mui/icons-material/MenuBook';
 import EditIcon from '@mui/icons-material/Edit';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
+import ImageIcon from '@mui/icons-material/Image';
 import { Area, Origin, TextualReference, AvailableProvaOption } from '../../types';
 import {
   getAreas,
@@ -69,6 +70,7 @@ interface QuestionForm {
   id: string; // temp unique client id
   identifier: string;
   enunciado: string;
+  images?: string[];
   textualReferenceIndex?: number | null;
   alternatives: QuestionAltForm[];
 }
@@ -213,6 +215,7 @@ export const CreateTestWizardModal: React.FC<CreateTestWizardModalProps> = ({
           id: `q_${Date.now()}_${idx}`,
           identifier: pq.identifier || `${idx + 1}`,
           enunciado: pq.enunciado || '',
+          images: pq.images || [],
           textualReferenceIndex: null,
           alternatives: (pq.alternatives && pq.alternatives.length > 0)
             ? pq.alternatives.map((alt) => ({
@@ -275,6 +278,15 @@ export const CreateTestWizardModal: React.FC<CreateTestWizardModalProps> = ({
   const handleUpdateQuestion = (index: number, field: 'identifier' | 'enunciado' | 'textualReferenceIndex', val: any) => {
     const updated = [...questions];
     updated[index] = { ...updated[index], [field]: val };
+    setQuestions(updated);
+  };
+
+  // Remove question image
+  const handleRemoveQuestionImage = (qIndex: number, imgIndex: number) => {
+    const updated = [...questions];
+    const currentImgs = [...(updated[qIndex].images || [])];
+    currentImgs.splice(imgIndex, 1);
+    updated[qIndex] = { ...updated[qIndex], images: currentImgs };
     setQuestions(updated);
   };
 
@@ -451,6 +463,7 @@ export const CreateTestWizardModal: React.FC<CreateTestWizardModalProps> = ({
         questions: questions.map((q) => ({
           identifier: q.identifier.trim(),
           enunciado: q.enunciado.trim(),
+          images: q.images || [],
           year: Number(year),
           originId: originId ? Number(originId) : null,
           areaId: areaId ? Number(areaId) : null,
@@ -1094,6 +1107,54 @@ export const CreateTestWizardModal: React.FC<CreateTestWizardModalProps> = ({
                         size="small"
                       />
 
+                      {/* Question Images */}
+                      {q.images && q.images.length > 0 && (
+                        <Box sx={{ p: 1.5, border: '1px dashed', borderColor: 'divider', borderRadius: 2, bgcolor: 'action.hover' }}>
+                          <Typography variant="caption" sx={{ fontWeight: 700, color: 'text.secondary', display: 'block', mb: 1 }}>
+                            Imagens / Diagramas extraídos ({q.images.length}):
+                          </Typography>
+                          <Stack direction="row" spacing={1.5} flexWrap="wrap">
+                            {q.images.map((imgUrl, imgIdx) => (
+                              <Box
+                                key={imgIdx}
+                                sx={{
+                                  position: 'relative',
+                                  border: '1px solid',
+                                  borderColor: 'divider',
+                                  borderRadius: 1.5,
+                                  overflow: 'hidden',
+                                  bgcolor: 'background.paper',
+                                  p: 0.5,
+                                }}
+                              >
+                                <Box
+                                  component="img"
+                                  src={imgUrl.startsWith('http') || imgUrl.startsWith('data:') ? imgUrl : `${window.location.origin}${imgUrl}`}
+                                  alt={`Diagrama ${imgIdx + 1}`}
+                                  sx={{ maxHeight: 120, maxWidth: 220, objectFit: 'contain', display: 'block' }}
+                                />
+                                <IconButton
+                                  size="small"
+                                  onClick={() => handleRemoveQuestionImage(qIndex, imgIdx)}
+                                  sx={{
+                                    position: 'absolute',
+                                    top: 4,
+                                    right: 4,
+                                    bgcolor: 'rgba(0,0,0,0.6)',
+                                    color: '#fff',
+                                    p: 0.3,
+                                    '&:hover': { bgcolor: 'rgba(200,0,0,0.8)' },
+                                  }}
+                                  title="Remover imagem"
+                                >
+                                  <DeleteOutlineIcon sx={{ fontSize: '1rem' }} />
+                                </IconButton>
+                              </Box>
+                            ))}
+                          </Stack>
+                        </Box>
+                      )}
+
                       {/* Textual Reference Selector */}
                       {textualReferences.length > 0 && (
                         <Box sx={{ mt: 1, mb: 1 }}>
@@ -1433,6 +1494,14 @@ export const CreateTestWizardModal: React.FC<CreateTestWizardModalProps> = ({
                       <Typography variant="body2" sx={{ flex: 1 }} noWrap>
                         {q.enunciado ? q.enunciado.substring(0, 100) + '...' : 'Sem enunciado'}
                       </Typography>
+                      {q.images && q.images.length > 0 && (
+                        <Chip
+                          icon={<ImageIcon fontSize="small" />}
+                          label={`${q.images.length} fig.`}
+                          size="small"
+                          variant="outlined"
+                        />
+                      )}
                       {q.textualReferenceIndex !== undefined && q.textualReferenceIndex !== null && textualReferences[q.textualReferenceIndex] && (
                         <Chip
                           icon={<MenuBookIcon fontSize="small" />}
