@@ -30,8 +30,8 @@ public class ExamParserService {
 
     public ExamParserService(@Value("${app.pdf-worker.url:http://localhost:8001}") String workerUrl) {
         SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
-        factory.setConnectTimeout((int) Duration.ofSeconds(10).toMillis());
-        factory.setReadTimeout((int) Duration.ofSeconds(120).toMillis());
+        factory.setConnectTimeout((int) Duration.ofSeconds(30).toMillis());
+        factory.setReadTimeout((int) Duration.ofMinutes(5).toMillis());
 
         this.restClient = RestClient.builder()
                 .baseUrl(workerUrl)

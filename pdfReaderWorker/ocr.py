@@ -1,4 +1,5 @@
 import io
+import os
 import re
 import logging
 from typing import List, Dict, Any, Optional, Tuple
@@ -189,9 +190,9 @@ def is_scanned_pdf(pdf_bytes: bytes) -> bool:
 
 def extract_exam_from_scanned_pdf(
     pdf_bytes: bytes,
-    scale: float = 2.5,
-    lang: str = "por+eng",
-    max_workers: int = 4
+    scale: float = 2.0,
+    lang: str = "por",
+    max_workers: Optional[int] = None
 ) -> Dict[str, Any]:
     """
     Performs OCR page-by-page and column-by-column on a scanned/image PDF.
@@ -202,7 +203,7 @@ def extract_exam_from_scanned_pdf(
     detected_title: Optional[str] = None
 
     if total_pages > 0:
-        first_img = pdf[0].render(scale=2.0).to_pil()
+        first_img = pdf[0].render(scale=scale).to_pil()
         first_text = pytesseract.image_to_string(first_img, lang=lang)
         m_title = re.search(r'(?i)(CP-T[^\n]+|CONCURSO PÚBLICO[^\n]+|PROVA\s*\d+\s*[-–][^\n]+|INFORM[ÁA]TICA)', first_text)
         if m_title:
@@ -225,7 +226,8 @@ def extract_exam_from_scanned_pdf(
         return p_idx, [left_text, right_text]
 
     # Process all pages in parallel
-    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+    workers = max_workers or min(8, max(2, (os.cpu_count() or 2)))
+    with ThreadPoolExecutor(max_workers=workers) as executor:
         page_results = list(executor.map(_ocr_page, range(total_pages)))
 
     # Sort by page index
@@ -252,9 +254,9 @@ def extract_exam_from_scanned_pdf(
 def extract_answer_key_from_scanned_pdf(
     pdf_bytes: bytes,
     prova_name: Optional[str] = None,
-    scale: float = 2.5,
-    lang: str = "por+eng",
-    max_workers: int = 4
+    scale: float = 2.0,
+    lang: str = "por",
+    max_workers: Optional[int] = None
 ) -> Dict[str, Any]:
     """
     Performs OCR on a scanned answer key (gabarito) PDF.
@@ -301,7 +303,8 @@ def extract_answer_key_from_scanned_pdf(
             "col_texts": col_texts
         }
 
-    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+    workers = max_workers or min(8, max(2, (os.cpu_count() or 2)))
+    with ThreadPoolExecutor(max_workers=workers) as executor:
         page_results = list(executor.map(_ocr_page_parts, range(total_pages)))
 
     page_results.sort(key=lambda x: x["p_idx"])

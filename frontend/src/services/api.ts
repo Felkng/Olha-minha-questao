@@ -423,7 +423,7 @@ export const parseExamPdf = async (file: File): Promise<ParsedExamResponse> => {
     headers: {
       'Content-Type': 'multipart/form-data',
     },
-    timeout: 60000,
+    timeout: 300000,
   });
   return {
     questions: Array.isArray(response.data?.questions) ? response.data.questions : [],
@@ -443,7 +443,7 @@ export const parseAnswerKeyPdf = async (file: File, provaName?: string): Promise
     headers: {
       'Content-Type': 'multipart/form-data',
     },
-    timeout: 60000,
+    timeout: 300000,
   });
   return {
     answers: Array.isArray(response.data?.answers) ? response.data.answers : [],
