@@ -302,23 +302,26 @@ public class TestService {
 
                 Question savedQuestion = questionRepository.save(question);
 
+                boolean isAllCorrect = savedQuestion.getAlternatives() != null && savedQuestion.getAlternatives().size() >= 2
+                        && savedQuestion.getAlternatives().stream().allMatch(a -> Boolean.TRUE.equals(a.getIsCorrect()));
+
                 github.felkng.olha_minha_questao.domain.entity.Alternative correct = null;
-                if (qDto.getCorrectAlternativeId() != null) {
-                    correct = savedQuestion.getAlternatives().stream()
-                            .filter(a -> qDto.getCorrectAlternativeId().equals(a.getId()))
-                            .findFirst()
-                            .orElse(null);
-                }
-                if (correct == null) {
-                    correct = savedQuestion.getAlternatives().stream()
-                            .filter(a -> Boolean.TRUE.equals(a.getIsCorrect()))
-                            .findFirst()
-                            .orElse(null);
+                if (!isAllCorrect) {
+                    if (qDto.getCorrectAlternativeId() != null) {
+                        correct = savedQuestion.getAlternatives().stream()
+                                .filter(a -> qDto.getCorrectAlternativeId().equals(a.getId()))
+                                .findFirst()
+                                .orElse(null);
+                    }
+                    if (correct == null) {
+                        correct = savedQuestion.getAlternatives().stream()
+                                .filter(a -> Boolean.TRUE.equals(a.getIsCorrect()))
+                                .findFirst()
+                                .orElse(null);
+                    }
                 }
 
-                if (correct != null) {
-                    savedQuestion.setCorrectAlternative(correct);
-                }
+                savedQuestion.setCorrectAlternative(correct);
 
                 if (savedQuestion.getStatistic() == null) {
                     QuestionStatistic stat = QuestionStatistic.builder()

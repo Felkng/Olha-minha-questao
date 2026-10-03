@@ -538,11 +538,12 @@ export const TestEvaluationPage: React.FC = () => {
         {evaluation.questions.map((q, idx) => {
           const detail = result.detailedResults.find((d) => d.questionId === q.id);
           const userSelectedId = answers[q.id];
+          const isAnnulled = Boolean(q.alternatives && q.alternatives.length > 0 && q.alternatives.every((a) => a.isCorrect));
           const fallbackCorrectAlt = q.alternatives.find((a) => a.isCorrect);
           const correctAltId = detail?.correctAlternativeId ?? fallbackCorrectAlt?.id;
-          const isCorrect = detail?.isCorrect !== undefined
+          const isCorrect = isAnnulled || (detail?.isCorrect !== undefined
             ? detail.isCorrect
-            : Boolean(userSelectedId && correctAltId && userSelectedId === correctAltId);
+            : Boolean(userSelectedId && correctAltId && userSelectedId === correctAltId));
 
           return (
             <Paper
@@ -553,7 +554,7 @@ export const TestEvaluationPage: React.FC = () => {
                 mb: 3,
                 borderRadius: 3,
                 border: '1.5px solid',
-                borderColor: isCorrect ? PALETTE_COLORS.success : PALETTE_COLORS.danger,
+                borderColor: isAnnulled ? PALETTE_COLORS.warning : isCorrect ? PALETTE_COLORS.success : PALETTE_COLORS.danger,
               }}
             >
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
@@ -561,16 +562,25 @@ export const TestEvaluationPage: React.FC = () => {
                   label={`Questão ${idx + 1} (${q.identifier})`}
                   sx={{
                     fontWeight: 700,
-                    backgroundColor: isCorrect ? PALETTE_COLORS.success : PALETTE_COLORS.danger,
-                    color: isCorrect ? '#0f2910' : '#ffffff',
+                    backgroundColor: isAnnulled ? PALETTE_COLORS.warning : isCorrect ? PALETTE_COLORS.success : PALETTE_COLORS.danger,
+                    color: isAnnulled ? '#1a1e24' : isCorrect ? '#0f2910' : '#ffffff',
                   }}
                 />
-                <Chip
-                  icon={isCorrect ? <CheckCircleOutlineIcon /> : <HighlightOffIcon />}
-                  label={isCorrect ? 'Acertou' : userSelectedId ? 'Errou' : 'Não Respondida'}
-                  variant="outlined"
-                  color={isCorrect ? 'success' : 'error'}
-                />
+                {isAnnulled ? (
+                  <Chip
+                    label="Anulada (Pontuada para todos)"
+                    color="warning"
+                    variant="outlined"
+                    sx={{ fontWeight: 700 }}
+                  />
+                ) : (
+                  <Chip
+                    icon={isCorrect ? <CheckCircleOutlineIcon /> : <HighlightOffIcon />}
+                    label={isCorrect ? 'Acertou' : userSelectedId ? 'Errou' : 'Não Respondida'}
+                    variant="outlined"
+                    color={isCorrect ? 'success' : 'error'}
+                  />
+                )}
               </Box>
 
               {q.textualReference && (
@@ -603,12 +613,17 @@ export const TestEvaluationPage: React.FC = () => {
               <Stack spacing={1}>
                 {q.alternatives.map((alt) => {
                   const isUserSelection = userSelectedId === alt.id;
-                  const isCorrectAlt = correctAltId ? correctAltId === alt.id : alt.isCorrect;
+                  const isCorrectAlt = isAnnulled ? false : (correctAltId ? correctAltId === alt.id : alt.isCorrect);
 
                   let bgColor = 'transparent';
                   let borderCol = 'divider';
 
-                  if (isCorrectAlt) {
+                  if (isAnnulled) {
+                    if (isUserSelection) {
+                      bgColor = isDark ? 'rgba(255, 152, 0, 0.12)' : 'rgba(255, 152, 0, 0.15)';
+                      borderCol = PALETTE_COLORS.warning;
+                    }
+                  } else if (isCorrectAlt) {
                     bgColor = isDark ? 'rgba(75, 241, 81, 0.12)' : 'rgba(75, 241, 81, 0.15)';
                     borderCol = PALETTE_COLORS.success;
                   } else if (isUserSelection && !isCorrect) {
@@ -639,12 +654,24 @@ export const TestEvaluationPage: React.FC = () => {
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
-                          backgroundColor: isCorrectAlt
+                          backgroundColor: isAnnulled
+                            ? isUserSelection
+                              ? PALETTE_COLORS.warning
+                              : 'divider'
+                            : isCorrectAlt
                             ? PALETTE_COLORS.success
                             : isUserSelection
                             ? PALETTE_COLORS.danger
                             : 'divider',
-                          color: isCorrectAlt ? '#0f2910' : isUserSelection ? '#ffffff' : 'text.secondary',
+                          color: isAnnulled
+                            ? isUserSelection
+                              ? '#1a1e24'
+                              : 'text.secondary'
+                            : isCorrectAlt
+                            ? '#0f2910'
+                            : isUserSelection
+                            ? '#ffffff'
+                            : 'text.secondary',
                         }}
                       >
                         {alt.identifier}
@@ -652,14 +679,14 @@ export const TestEvaluationPage: React.FC = () => {
                       <Typography variant="body2" sx={{ flexGrow: 1 }}>
                         {alt.text}
                       </Typography>
-                      {isCorrectAlt && (
+                      {!isAnnulled && isCorrectAlt && (
                         <Chip size="small" label="Correta" color="success" sx={{ fontWeight: 600 }} />
                       )}
                       {isUserSelection && (
                         <Chip
                           size="small"
-                          label={isCorrect ? 'Sua Escolha' : 'Sua Escolha (Incorreta)'}
-                          color={isCorrect ? 'success' : 'error'}
+                          label={isAnnulled ? 'Sua Escolha (+1 ponto)' : isCorrect ? 'Sua Escolha' : 'Sua Escolha (Incorreta)'}
+                          color={isAnnulled ? 'warning' : isCorrect ? 'success' : 'error'}
                           sx={{ fontWeight: 600 }}
                         />
                       )}

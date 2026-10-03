@@ -307,23 +307,26 @@ public class QuestionService {
         Question saved = questionRepository.save(question);
 
         // Define a alternativa correta a partir de isCorrect=true ou correctAlternativeId
+        boolean isAllCorrect = saved.getAlternatives() != null && saved.getAlternatives().size() >= 2
+                && saved.getAlternatives().stream().allMatch(a -> Boolean.TRUE.equals(a.getIsCorrect()));
+
         Alternative correct = null;
-        if (dto.getCorrectAlternativeId() != null) {
-            correct = saved.getAlternatives().stream()
-                    .filter(a -> dto.getCorrectAlternativeId().equals(a.getId()))
-                    .findFirst()
-                    .orElse(null);
-        }
-        if (correct == null) {
-            correct = saved.getAlternatives().stream()
-                    .filter(a -> Boolean.TRUE.equals(a.getIsCorrect()))
-                    .findFirst()
-                    .orElse(null);
+        if (!isAllCorrect) {
+            if (dto.getCorrectAlternativeId() != null) {
+                correct = saved.getAlternatives().stream()
+                        .filter(a -> dto.getCorrectAlternativeId().equals(a.getId()))
+                        .findFirst()
+                        .orElse(null);
+            }
+            if (correct == null) {
+                correct = saved.getAlternatives().stream()
+                        .filter(a -> Boolean.TRUE.equals(a.getIsCorrect()))
+                        .findFirst()
+                        .orElse(null);
+            }
         }
 
-        if (correct != null) {
-            saved.setCorrectAlternative(correct);
-        }
+        saved.setCorrectAlternative(correct);
 
         if (saved.getStatistic() == null) {
             QuestionStatistic stat = QuestionStatistic.builder()
@@ -421,18 +424,23 @@ public class QuestionService {
         Question updated = questionRepository.save(question);
 
         // Atualiza a alternativa correta
+        boolean isAllCorrect = updated.getAlternatives() != null && updated.getAlternatives().size() >= 2
+                && updated.getAlternatives().stream().allMatch(a -> Boolean.TRUE.equals(a.getIsCorrect()));
+
         Alternative correct = null;
-        if (dto.getCorrectAlternativeId() != null) {
-            correct = updated.getAlternatives().stream()
-                    .filter(a -> dto.getCorrectAlternativeId().equals(a.getId()))
-                    .findFirst()
-                    .orElse(null);
-        }
-        if (correct == null) {
-            correct = updated.getAlternatives().stream()
-                    .filter(a -> Boolean.TRUE.equals(a.getIsCorrect()))
-                    .findFirst()
-                    .orElse(null);
+        if (!isAllCorrect) {
+            if (dto.getCorrectAlternativeId() != null) {
+                correct = updated.getAlternatives().stream()
+                        .filter(a -> dto.getCorrectAlternativeId().equals(a.getId()))
+                        .findFirst()
+                        .orElse(null);
+            }
+            if (correct == null) {
+                correct = updated.getAlternatives().stream()
+                        .filter(a -> Boolean.TRUE.equals(a.getIsCorrect()))
+                        .findFirst()
+                        .orElse(null);
+            }
         }
         updated.setCorrectAlternative(correct);
         updated = questionRepository.save(updated);

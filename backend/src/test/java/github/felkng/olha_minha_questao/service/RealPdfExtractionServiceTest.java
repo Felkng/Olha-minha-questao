@@ -204,4 +204,70 @@ class RealPdfExtractionServiceTest {
         assertThat(lastQuestion.getIdentifier()).isEqualTo("70");
         assertThat(lastQuestion.getCorrectAlternativeIdentifier()).isEqualTo("E");
     }
+
+    @Test
+    @DisplayName("Deve extrair prova escaneada em imagem (CP-T-2024_INFORMÁTICA_AMARELA.pdf) via OCR pelo Worker")
+    void testScannedExamPdfOcrExtraction() throws Exception {
+        Path scannedExamPath = Path.of("src", "test", "prova_pdf", "CP-T-2024_INFORMÁTICA_AMARELA.pdf");
+        assertThat(Files.exists(scannedExamPath))
+                .as("Arquivo da prova escaneada deve existir em " + scannedExamPath.toAbsolutePath())
+                .isTrue();
+
+        MockMultipartFile examMultipart = new MockMultipartFile(
+                "file",
+                "CP-T-2024_INFORMÁTICA_AMARELA.pdf",
+                "application/pdf",
+                Files.readAllBytes(scannedExamPath)
+        );
+
+        github.felkng.olha_minha_questao.dto.parser.ParsedExamResponseDTO examResponse = examParserService.parseExamPdf(examMultipart);
+        List<ParsedQuestionDTO> parsedQuestions = examResponse.getQuestions();
+        assertThat(parsedQuestions).hasSize(50);
+
+        ParsedQuestionDTO q1 = parsedQuestions.get(0);
+        assertThat(q1.getIdentifier()).isEqualTo("1");
+        assertThat(q1.getEnunciado()).contains("MapReduce");
+        assertThat(q1.getAlternatives()).hasSize(5);
+
+        ParsedQuestionDTO q50 = parsedQuestions.get(49);
+        assertThat(q50.getIdentifier()).isEqualTo("50");
+        assertThat(q50.getAlternatives()).hasSize(5);
+    }
+
+    @Test
+    @DisplayName("Deve extrair gabarito com múltiplas áreas e cores (GabFinal_CP-T2024.pdf) e filtrar por Informática - AMARELA")
+    void testGabFinalExtractionWithAreaAndColorSelection() throws Exception {
+        Path keyPath = Path.of("src", "test", "prova_pdf", "GabFinal_CP-T2024.pdf");
+        assertThat(Files.exists(keyPath))
+                .as("Arquivo do gabarito deve existir em " + keyPath.toAbsolutePath())
+                .isTrue();
+
+        MockMultipartFile keyMultipart = new MockMultipartFile(
+                "file",
+                "GabFinal_CP-T2024.pdf",
+                "application/pdf",
+                Files.readAllBytes(keyPath)
+        );
+
+        github.felkng.olha_minha_questao.dto.parser.ParsedAnswerKeyResponseDTO keyResponse =
+                examParserService.parseAnswerKeyPdf(keyMultipart, "Informática - AMARELA");
+
+        assertThat(keyResponse.getAvailableProvas()).hasSize(18);
+        assertThat(keyResponse.getSelectedProva()).contains("Informática").contains("AMARELA");
+
+        List<ParsedAnswerKeyDTO> parsedAnswers = keyResponse.getAnswers();
+        assertThat(parsedAnswers).hasSize(50);
+
+        Map<String, String> answerMap = parsedAnswers.stream()
+                .collect(Collectors.toMap(ParsedAnswerKeyDTO::getIdentifier, ParsedAnswerKeyDTO::getCorrectAlternative));
+
+        assertThat(answerMap.get("1")).isEqualTo("D");
+        assertThat(answerMap.get("2")).isEqualTo("B");
+        assertThat(answerMap.get("3")).isEqualTo("X"); // Anulada
+        assertThat(answerMap.get("4")).isEqualTo("E");
+        assertThat(answerMap.get("5")).isEqualTo("B");
+        assertThat(answerMap.get("50")).isEqualTo("A");
+    }
 }
+
+

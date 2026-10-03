@@ -2,6 +2,7 @@ import re
 import io
 import pdfplumber
 from typing import List, Dict, Any, Optional, Tuple
+from ocr import is_scanned_pdf, extract_exam_from_scanned_pdf, extract_answer_key_from_scanned_pdf
 
 def sanitize_text_noise(text: str) -> str:
     if not text:
@@ -417,7 +418,11 @@ def parse_exam_pdf(pdf_bytes: bytes) -> Dict[str, Any]:
     """
     Parses an exam PDF and extracts questions, enunciados, alternatives,
     and identifies textual references (passages).
+    Automatically falls back to OCR if the PDF is scanned / image-based.
     """
+    if is_scanned_pdf(pdf_bytes):
+        return extract_exam_from_scanned_pdf(pdf_bytes)
+
     all_questions: List[Dict[str, Any]] = []
     textual_references: List[Dict[str, Any]] = []
     detected_title: Optional[str] = None
@@ -481,25 +486,55 @@ def parse_exam_pdf(pdf_bytes: bytes) -> Dict[str, Any]:
 def parse_answer_key_pdf(pdf_bytes: bytes, prova_name: Optional[str] = None) -> Dict[str, Any]:
     """
     Parses an answer key PDF (gabarito) and maps question identifiers to correct alternatives.
-    Identifies all available provas in the gabarito and supports flexible filtering by prova_name.
+    Identifies all available provas/areas/colors in the gabarito and supports flexible filtering by prova_name.
+    Automatically falls back to OCR if the PDF is scanned / image-based.
     """
+    if is_scanned_pdf(pdf_bytes):
+        return extract_answer_key_from_scanned_pdf(pdf_bytes, prova_name=prova_name)
+
     answers_map: Dict[str, str] = {}
     available_provas: List[Dict[str, str]] = []
     seen_provas: set = set()
-
-    prova_norm = normalize_match_str(prova_name) if prova_name else None
+    prova_specs: List[Dict[str, Any]] = []
 
     with pdfplumber.open(io.BytesIO(pdf_bytes)) as pdf:
-        # First pass: identify all available provas and their columns
-        prova_col_specs: List[Dict[str, Any]] = []
-
         for p_idx, page in enumerate(pdf.pages):
             tables = page.extract_tables() or []
             for t_idx, table in enumerate(tables):
                 if not table or len(table) < 3:
                     continue
 
-                # Check if this table has PROVA X headers
+                # Pattern 1: Check for Area + Color tables (e.g. Row 0 = Area, Row 1 = AMARELA, AZUL)
+                first_row = [c for c in table[0] if c]
+                area_cand = first_row[0].strip() if first_row else ""
+
+                color_row = table[1] if len(table) > 1 else []
+                colors_with_cols: List[Tuple[int, str]] = []
+                for c_idx, cell in enumerate(color_row):
+                    if cell and re.match(r'(?i)^(?:AMARELA|AZUL|BRANCA|VERDE|ROSA|CINZA|PRETA|VERMELHA|LARANJA)', str(cell).strip()):
+                        colors_with_cols.append((c_idx, str(cell).strip().upper()))
+
+                if area_cand and colors_with_cols:
+                    area_name = re.sub(r'\s+', ' ', area_cand).strip()
+                    for i, (col_idx, color_name) in enumerate(colors_with_cols):
+                        next_col = colors_with_cols[i + 1][0] if i + 1 < len(colors_with_cols) else len(table[0])
+                        p_id = f"{area_name} - {color_name}"
+                        p_name = f"{area_name} - Cor {color_name}"
+                        if p_id not in seen_provas:
+                            seen_provas.add(p_id)
+                            available_provas.append({"id": p_id, "name": p_name})
+
+                        prova_specs.append({
+                            "id": p_id,
+                            "name": p_name,
+                            "type": "area_color_table",
+                            "col_start": col_idx,
+                            "col_end": next_col,
+                            "rows": table[2:]
+                        })
+                    continue
+
+                # Pattern 2: PROVA X columns (e.g. PROVA 1 - ENGENHARIA CIVIL)
                 prova_cells = [
                     (r_idx, c_idx, str(c).strip())
                     for r_idx in range(min(5, len(table)))
@@ -507,108 +542,111 @@ def parse_answer_key_pdf(pdf_bytes: bytes, prova_name: Optional[str] = None) -> 
                     if c and re.search(r'PROVA\s*\d+', str(c), re.I)
                 ]
 
-                if not prova_cells:
-                    continue
+                if prova_cells:
+                    headers_by_col: Dict[int, str] = {}
+                    for r, c, val in prova_cells:
+                        parts = [val]
+                        for next_r in range(r + 1, min(6, len(table))):
+                            cell_val = table[next_r][c]
+                            if cell_val and not re.search(r'^\d+\s*[\-\:]', str(cell_val)):
+                                parts.append(str(cell_val).strip())
+                        full_name = " ".join(parts).replace("\n", " ")
+                        full_name = re.sub(r'\s+', ' ', full_name).strip()
+                        headers_by_col[c] = full_name
 
-                # Group by column index to assemble full multi-line header
-                headers_by_col: Dict[int, str] = {}
-                for r, c, val in prova_cells:
-                    parts = [val]
-                    for next_r in range(r + 1, min(6, len(table))):
-                        cell_val = table[next_r][c]
-                        if cell_val and not re.search(r'^\d+\s*[\-\:]', str(cell_val)):
-                            parts.append(str(cell_val).strip())
-                    full_name = " ".join(parts).replace("\n", " ")
-                    full_name = re.sub(r'\s+', ' ', full_name).strip()
-                    headers_by_col[c] = full_name
+                    sorted_cols = sorted(headers_by_col.keys())
+                    for i, col_idx in enumerate(sorted_cols):
+                        col_name = headers_by_col[col_idx]
+                        col_start = 0 if i == 0 else col_idx
+                        col_end = sorted_cols[i + 1] if i + 1 < len(sorted_cols) else len(table[0])
 
-                sorted_cols = sorted(headers_by_col.keys())
-                for i, col_idx in enumerate(sorted_cols):
-                    col_name = headers_by_col[col_idx]
-                    col_start = 0 if i == 0 else col_idx
-                    col_end = sorted_cols[i + 1] if i + 1 < len(sorted_cols) else len(table[0])
+                        m_code = re.search(r'(PROVA\s*\d+)', col_name, re.I)
+                        code = m_code.group(1).upper() if m_code else col_name
 
-                    m_code = re.search(r'(PROVA\s*\d+)', col_name, re.I)
-                    code = m_code.group(1).upper() if m_code else col_name
+                        if code not in seen_provas:
+                            seen_provas.add(code)
+                            available_provas.append({"id": code, "name": col_name})
 
-                    if code not in seen_provas:
-                        seen_provas.add(code)
-                        available_provas.append({
+                        prova_specs.append({
                             "id": code,
-                            "name": col_name
+                            "name": col_name,
+                            "type": "multi_prova_table",
+                            "col_start": col_start,
+                            "col_end": col_end,
+                            "rows": table[3:]
                         })
 
-                    prova_col_specs.append({
-                        "p_idx": p_idx,
-                        "t_idx": t_idx,
-                        "id": code,
-                        "name": col_name,
-                        "col_start": col_start,
-                        "col_end": col_end,
-                        "table": table
-                    })
-
-        # Determine target prova
-        stopwords = {'prova', 'de', 'da', 'do', 'dos', 'das', 'e', 'em', 'para', 'com'}
+        # Match target prova
+        prova_norm = normalize_match_str(prova_name) if prova_name else None
         target_spec: Optional[Dict[str, Any]] = None
-        if prova_norm:
-            m_code = re.search(r'prova\s*(\d+)', prova_norm)
-            if m_code:
-                code_str = f"PROVA {m_code.group(1)}"
-                for spec in prova_col_specs:
-                    if spec["id"].upper() == code_str:
-                        target_spec = spec
-                        break
 
+        if prova_norm and prova_specs:
+            # 1. Exact ID or name match
+            for spec in prova_specs:
+                if normalize_match_str(spec["id"]) == prova_norm or normalize_match_str(spec["name"]) == prova_norm:
+                    target_spec = spec
+                    break
+
+            # 2. Check if prova_norm has specific words matching Area and Color
             if not target_spec:
-                words = [w for w in prova_norm.split() if len(w) >= 3 and w not in stopwords]
+                stopwords = {'prova', 'de', 'da', 'do', 'dos', 'das', 'e', 'em', 'para', 'com', 'cor'}
+                query_words = [w for w in prova_norm.split() if len(w) >= 3 and w not in stopwords]
                 best_spec = None
-                best_score = 0
-                for spec in prova_col_specs:
-                    s_norm = normalize_match_str(spec["name"])
-                    score = sum(1 for w in words if w in s_norm)
-                    if score > best_score:
+                best_score = -1
+                for spec in prova_specs:
+                    spec_norm = normalize_match_str(spec["name"])
+                    score = sum(1 for w in query_words if w in spec_norm)
+                    for color in ['amarela', 'azul', 'branca', 'verde', 'rosa', 'cinza', 'preta', 'vermelha', 'laranja']:
+                        if color in prova_norm and color in spec_norm:
+                            score += 5
+                    if score > best_score and score > 0:
                         best_score = score
                         best_spec = spec
-                if best_score > 0:
+                if best_spec:
                     target_spec = best_spec
 
-        # If no target matched yet and only 1 prova exists in the doc, select it
-        if not target_spec and len(available_provas) == 1:
-            target_spec = prova_col_specs[0]
+        # If no target matched yet and specs exist, default to first spec
+        if not target_spec and prova_specs:
+            target_spec = prova_specs[0]
 
-        # Extract answers from standard text (e.g. Page 1 Conhecimentos Básicos 1-20)
-        for page in pdf.pages:
-            tables = page.extract_tables() or []
-            has_multi_prova = any(
-                re.search(r'PROVA\s*\d+', str(c), re.I)
-                for t in tables if t and len(t) >= 3
-                for r in t[:3] for c in r if c
-            )
-            if has_multi_prova:
-                continue
+        selected_prova_name: Optional[str] = target_spec["id"] if target_spec else None
 
-            p_text = page.extract_text() or ""
-            matches = re.findall(r'(?:^|\s)([0-9]{1,3})\s*[\-\:\.]\s*([A-Ea-e])\b', p_text)
-            for q_id, ans in matches:
-                q_num = str(int(q_id))
-                if q_num not in answers_map:
-                    answers_map[q_num] = ans.upper()
-
-        # If a target prova was matched/selected, extract its specific columns (e.g. 21 to 70)
-        selected_prova_name: Optional[str] = None
+        # Extract answers from target_spec if available
         if target_spec:
-            selected_prova_name = target_spec["name"]
-            table = target_spec["table"]
-            col_start = target_spec["col_start"]
-            col_end = target_spec["col_end"]
+            if target_spec["type"] == "area_color_table":
+                col_s, col_e = target_spec["col_start"], target_spec["col_end"]
+                for row in target_spec["rows"]:
+                    sub_cells = [str(c).strip() for c in row[col_s:col_e] if c]
+                    sub_text = " ".join(sub_cells)
+                    matches = re.findall(r'([0-9]{1,3})\s*[\-\:\.]\s*([A-Ea-e]|Anulada|ANULADA|X)\b', sub_text, re.I)
+                    for q_id, ans in matches:
+                        q_num = str(int(q_id))
+                        answers_map[q_num] = ans.upper() if len(ans) == 1 else "X"
 
-            for row in table[3:]:
-                sub_cells = [str(c).strip() for c in row[col_start:col_end] if c]
-                sub_text = " ".join(sub_cells)
-                matches = re.findall(r'([0-9]{1,3})\s*[\-\:\.]\s*([A-Ea-e])\b', sub_text)
-                for q_id, ans in matches:
-                    answers_map[str(int(q_id))] = ans.upper()
+            elif target_spec["type"] == "multi_prova_table":
+                for page in pdf.pages:
+                    tables = page.extract_tables() or []
+                    has_multi = any(re.search(r'PROVA\s*\d+', str(c), re.I) for t in tables if t for r in t[:3] for c in r if c)
+                    if has_multi:
+                        continue
+                    p_text = page.extract_text() or ""
+                    for q_id, ans in re.findall(r'(?:^|\s)([0-9]{1,3})\s*[\-\:\.]\s*([A-Ea-e])\b', p_text):
+                        answers_map[str(int(q_id))] = ans.upper()
+
+                col_s, col_e = target_spec["col_start"], target_spec["col_end"]
+                for row in target_spec["rows"]:
+                    sub_cells = [str(c).strip() for c in row[col_s:col_e] if c]
+                    sub_text = " ".join(sub_cells)
+                    for q_id, ans in re.findall(r'([0-9]{1,3})\s*[\-\:\.]\s*([A-Ea-e])\b', sub_text):
+                        answers_map[str(int(q_id))] = ans.upper()
+
+        # Fallback to full document text if no tables
+        if not answers_map:
+            for page in pdf.pages:
+                p_text = page.extract_text() or ""
+                for q_id, ans in re.findall(r'(?:^|\s)([0-9]{1,3})\s*[\-\:\.]\s*([A-Ea-e]|Anulada|ANULADA|X)\b', p_text, re.I):
+                    q_num = str(int(q_id))
+                    answers_map[q_num] = ans.upper() if len(ans) == 1 else "X"
 
     result_answers = [{"identifier": q_id, "correctAlternative": ans} for q_id, ans in answers_map.items()]
     result_answers.sort(key=lambda x: int(x["identifier"]) if x["identifier"].isdigit() else 999)

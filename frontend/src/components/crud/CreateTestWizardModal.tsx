@@ -318,16 +318,35 @@ export const CreateTestWizardModal: React.FC<CreateTestWizardModalProps> = ({
     setQuestions(updated);
   };
 
+  // Toggle annulled state for question (all alternatives correct)
+  const handleToggleAnnulled = (qIndex: number) => {
+    const updated = [...questions];
+    const q = updated[qIndex];
+    const isCurrentlyAnnulled = q.alternatives.length > 0 && q.alternatives.every((a) => a.isCorrect);
+    const alts = q.alternatives.map((alt) => ({
+      ...alt,
+      isCorrect: !isCurrentlyAnnulled,
+    }));
+    updated[qIndex] = { ...q, alternatives: alts };
+    setQuestions(updated);
+  };
+
   // Parse answer key PDF
-  const handleUploadAnswerKeyPdf = async (file: File, provaToSelect?: string) => {
+  const handleUploadAnswerKeyPdf = async (file: File, provaToSelect?: string, isNewFile: boolean = false) => {
     setParsingAnswerKey(true);
     setErrorMessage(null);
     try {
-      const res = await parseAnswerKeyPdf(file, provaToSelect || selectedProvaId || undefined);
+      const targetProva = isNewFile ? undefined : (provaToSelect || selectedProvaId || undefined);
+      const res = await parseAnswerKeyPdf(file, targetProva);
       const answers = res.answers || [];
-      setAvailableProvas(res.availableProvas || []);
+      const provas = res.availableProvas || [];
+      setAvailableProvas(provas);
       if (res.selectedProva) {
         setSelectedProvaId(res.selectedProva);
+      } else if (provas.length > 0) {
+        setSelectedProvaId(provas[0].id);
+      } else {
+        setSelectedProvaId('');
       }
 
       if (!answers || answers.length === 0) {
@@ -351,22 +370,31 @@ export const CreateTestWizardModal: React.FC<CreateTestWizardModalProps> = ({
         const correctLetter = ansMap[qIden];
         if (correctLetter) {
           matches++;
+          const isAnnulled = correctLetter === 'X' || correctLetter === 'ANULADA';
           return {
             ...q,
             alternatives: q.alternatives.map((alt) => ({
               ...alt,
-              isCorrect: alt.identifier.toUpperCase() === correctLetter,
+              isCorrect: isAnnulled ? true : alt.identifier.toUpperCase() === correctLetter,
             })),
           };
         }
-        return q;
+        // Se trocou de gabarito e a questão não está no novo gabarito, desmarca alternativas antigas
+        return {
+          ...q,
+          alternatives: q.alternatives.map((alt) => ({
+            ...alt,
+            isCorrect: false,
+          })),
+        };
       });
 
       setQuestions(updated);
       setMatchedCount(matches);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Erro ao processar gabarito:', err);
-      setErrorMessage('Falha ao processar o PDF do gabarito.');
+      const serverMsg = err.response?.data?.message || err.message;
+      setErrorMessage(serverMsg ? `Falha ao processar o PDF do gabarito: ${serverMsg}` : 'Falha ao processar o PDF do gabarito.');
     } finally {
       setParsingAnswerKey(false);
     }
@@ -1168,11 +1196,17 @@ export const CreateTestWizardModal: React.FC<CreateTestWizardModalProps> = ({
                   accept=".pdf"
                   id="answer-key-pdf-upload"
                   style={{ display: 'none' }}
+                  onClick={(e) => {
+                    (e.target as HTMLInputElement).value = '';
+                  }}
                   onChange={(e) => {
                     if (e.target.files && e.target.files[0]) {
                       const file = e.target.files[0];
                       setAnswerKeyPdfFile(file);
-                      handleUploadAnswerKeyPdf(file);
+                      setSelectedProvaId('');
+                      setAvailableProvas([]);
+                      setMatchedCount(null);
+                      handleUploadAnswerKeyPdf(file, undefined, true);
                     }
                   }}
                 />
@@ -1240,7 +1274,8 @@ export const CreateTestWizardModal: React.FC<CreateTestWizardModalProps> = ({
 
             <Stack spacing={1.5}>
               {questions.map((q, qIndex) => {
-                const correctAlt = q.alternatives.find((a) => a.isCorrect);
+                const isAnnulled = q.alternatives.length > 0 && q.alternatives.every((a) => a.isCorrect);
+                const correctAlt = isAnnulled ? null : q.alternatives.find((a) => a.isCorrect);
                 return (
                   <Paper
                     key={q.id}
@@ -1267,7 +1302,7 @@ export const CreateTestWizardModal: React.FC<CreateTestWizardModalProps> = ({
                     {/* Quick Selection Buttons for Correct Alternative */}
                     <Stack direction="row" spacing={1} alignItems="center">
                       {q.alternatives.map((alt) => {
-                        const isSelected = Boolean(alt.isCorrect);
+                        const isSelected = !isAnnulled && Boolean(alt.isCorrect);
                         return (
                           <Button
                             key={alt.identifier}
@@ -1288,10 +1323,35 @@ export const CreateTestWizardModal: React.FC<CreateTestWizardModalProps> = ({
                           </Button>
                         );
                       })}
+                      <Button
+                        variant={isAnnulled ? 'contained' : 'outlined'}
+                        size="small"
+                        color="warning"
+                        onClick={() => handleToggleAnnulled(qIndex)}
+                        sx={{
+                          height: 38,
+                          fontWeight: 700,
+                          borderRadius: 2,
+                          px: 1.5,
+                          textTransform: 'none',
+                          backgroundColor: isAnnulled ? PALETTE_COLORS.warning : 'transparent',
+                          color: isAnnulled ? '#1a1e24' : PALETTE_COLORS.warning,
+                          borderColor: PALETTE_COLORS.warning,
+                        }}
+                      >
+                        Anulada
+                      </Button>
                     </Stack>
 
-                    <Box sx={{ minWidth: 120, textAlign: 'right' }}>
-                      {correctAlt ? (
+                    <Box sx={{ minWidth: 150, textAlign: 'right' }}>
+                      {isAnnulled ? (
+                        <Chip
+                          label="Anulada (Pontuada)"
+                          color="warning"
+                          size="small"
+                          sx={{ fontWeight: 700, color: '#1a1e24' }}
+                        />
+                      ) : correctAlt ? (
                         <Chip
                           icon={<CheckCircleIcon fontSize="small" />}
                           label={`Correta: ${correctAlt.identifier}`}
@@ -1349,6 +1409,12 @@ export const CreateTestWizardModal: React.FC<CreateTestWizardModalProps> = ({
                   <strong>Questões com Gabarito Definido:</strong>{' '}
                   {questions.filter((q) => q.alternatives.some((a) => a.isCorrect)).length} / {questions.length}
                 </Typography>
+                {questions.filter((q) => q.alternatives.length > 0 && q.alternatives.every((a) => a.isCorrect)).length > 0 && (
+                  <Typography variant="body2" sx={{ color: 'warning.main', fontWeight: 600 }}>
+                    <strong>Questões Anuladas:</strong>{' '}
+                    {questions.filter((q) => q.alternatives.length > 0 && q.alternatives.every((a) => a.isCorrect)).length}
+                  </Typography>
+                )}
               </Stack>
             </Paper>
 
@@ -1358,7 +1424,8 @@ export const CreateTestWizardModal: React.FC<CreateTestWizardModalProps> = ({
 
             <Stack spacing={1}>
               {questions.map((q, idx) => {
-                const correct = q.alternatives.find((a) => a.isCorrect);
+                const isAnnulled = q.alternatives.length > 0 && q.alternatives.every((a) => a.isCorrect);
+                const correct = isAnnulled ? null : q.alternatives.find((a) => a.isCorrect);
                 return (
                   <Paper key={q.id} variant="outlined" sx={{ p: 1.5, borderRadius: 2 }}>
                     <Stack direction="row" spacing={1.5} alignItems="center">
@@ -1375,7 +1442,14 @@ export const CreateTestWizardModal: React.FC<CreateTestWizardModalProps> = ({
                           color="primary"
                         />
                       )}
-                      {correct ? (
+                      {isAnnulled ? (
+                        <Chip
+                          label="Anulada"
+                          size="small"
+                          color="warning"
+                          sx={{ fontWeight: 700, color: '#1a1e24' }}
+                        />
+                      ) : correct ? (
                         <Chip
                           label={`Gabarito: ${correct.identifier}`}
                           size="small"

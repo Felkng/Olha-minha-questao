@@ -68,6 +68,7 @@ export const CreateQuestionModal: React.FC<CreateQuestionModalProps> = ({
     { identifier: 'E', text: '' },
   ]);
   const [correctAltIndex, setCorrectAltIndex] = useState<number>(0);
+  const [isAnnulled, setIsAnnulled] = useState<boolean>(false);
 
   const [origins, setOrigins] = useState<Origin[]>([]);
   const [areas, setAreas] = useState<Area[]>([]);
@@ -145,7 +146,7 @@ export const CreateQuestionModal: React.FC<CreateQuestionModalProps> = ({
       const finalAlternatives = alternatives.map((a, idx) => ({
         identifier: a.identifier,
         text: a.text.trim(),
-        isCorrect: idx === correctAltIndex,
+        isCorrect: isAnnulled ? true : idx === correctAltIndex,
       }));
 
       await createQuestion({
@@ -167,6 +168,7 @@ export const CreateQuestionModal: React.FC<CreateQuestionModalProps> = ({
       setSubjectId('');
       setTestId('');
       setIsPublic(true);
+      setIsAnnulled(false);
       onClose();
       if (onCreated) onCreated();
     } catch (err) {
@@ -327,8 +329,44 @@ export const CreateQuestionModal: React.FC<CreateQuestionModalProps> = ({
             />
           </Paper>
 
+          <Paper
+            elevation={0}
+            sx={{
+              p: 1.5,
+              borderRadius: 2,
+              border: '1px solid',
+              borderColor: isAnnulled ? PALETTE_COLORS.warning : 'divider',
+              backgroundColor: isAnnulled ? 'rgba(255, 152, 0, 0.08)' : 'transparent',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+            }}
+          >
+            <Box>
+              <Typography variant="body2" sx={{ fontWeight: 700, color: isAnnulled ? 'warning.main' : 'text.primary' }}>
+                Questão Anulada
+              </Typography>
+              <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                {isAnnulled
+                  ? 'Todas as alternativas são corretas e qualquer resposta pontua no simulado'
+                  : 'Marcar esta questão como anulada pela banca'}
+              </Typography>
+            </Box>
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={isAnnulled}
+                  onChange={(e) => setIsAnnulled(e.target.checked)}
+                  color="warning"
+                />
+              }
+              label={isAnnulled ? 'Anulada' : 'Normal'}
+              sx={{ m: 0 }}
+            />
+          </Paper>
+
           <Typography variant="subtitle2" sx={{ fontWeight: 800, pt: 1 }}>
-            ALTERNATIVAS DA QUESTÃO (Mínimo de 2 alternativas fechadas. Selecione a opção correta no botão de rádio):
+            ALTERNATIVAS DA QUESTÃO {isAnnulled ? '(Questão Anulada: todas pontuam)' : '(Mínimo de 2 alternativas fechadas. Selecione a opção correta no botão de rádio):'}
           </Typography>
 
           <RadioGroup
@@ -344,8 +382,16 @@ export const CreateQuestionModal: React.FC<CreateQuestionModalProps> = ({
                     p: 1.5,
                     borderRadius: 2,
                     border: '1px solid',
-                    borderColor: correctAltIndex === idx ? PALETTE_COLORS.success : 'divider',
-                    backgroundColor: correctAltIndex === idx ? 'rgba(75, 241, 81, 0.08)' : 'transparent',
+                    borderColor: isAnnulled
+                      ? PALETTE_COLORS.warning
+                      : correctAltIndex === idx
+                      ? PALETTE_COLORS.success
+                      : 'divider',
+                    backgroundColor: isAnnulled
+                      ? 'rgba(255, 152, 0, 0.05)'
+                      : correctAltIndex === idx
+                      ? 'rgba(75, 241, 81, 0.08)'
+                      : 'transparent',
                     display: 'flex',
                     alignItems: 'center',
                     gap: 1.5,
@@ -353,6 +399,7 @@ export const CreateQuestionModal: React.FC<CreateQuestionModalProps> = ({
                 >
                   <FormControlLabel
                     value={idx}
+                    disabled={isAnnulled}
                     control={<Radio color="success" />}
                     label={alt.identifier}
                     sx={{ mr: 0 }}

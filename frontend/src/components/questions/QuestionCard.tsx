@@ -134,10 +134,18 @@ export const QuestionCard: React.FC<QuestionCardProps> = ({
 
   const isBookmarked = isSavedInAnyFolder || localBookmarked;
 
+  // Determina se a questão foi anulada (todas as alternativas corretas)
+  const isAnnulled = Boolean(
+    question.alternatives &&
+      question.alternatives.length > 0 &&
+      question.alternatives.every((a) => a.isCorrect)
+  );
+
   // Determina se a alternativa selecionada está correta
   const isCorrectAnswer = Boolean(
-    selectedAlternativeId &&
-      question.alternatives.find((a) => a.id === selectedAlternativeId)?.isCorrect
+    isAnnulled ||
+      (selectedAlternativeId &&
+        question.alternatives.find((a) => a.id === selectedAlternativeId)?.isCorrect)
   );
 
   const handleSelect = (id?: number) => {
@@ -268,6 +276,19 @@ export const QuestionCard: React.FC<QuestionCardProps> = ({
               height: 28,
             }}
           />
+
+          {isAnnulled && (
+            <Chip
+              label="Anulada"
+              size="small"
+              sx={{
+                backgroundColor: isDark ? 'rgba(255, 152, 0, 0.15)' : 'rgba(255, 152, 0, 0.2)',
+                color: isDark ? PALETTE_COLORS.warning : '#b26a00',
+                fontWeight: 700,
+                border: `1px solid ${PALETTE_COLORS.warning}`,
+              }}
+            />
+          )}
 
           {isAttemptedByCurrentUser && (
             <Chip
@@ -705,27 +726,33 @@ export const QuestionCard: React.FC<QuestionCardProps> = ({
       {/* Answer feedback banner */}
       {isAnswered && (
         <Alert
-          severity={isCorrectAnswer ? 'success' : 'error'}
-          icon={isCorrectAnswer ? <CheckCircleOutlineIcon /> : <HighlightOffIcon />}
+          severity={isAnnulled ? 'warning' : isCorrectAnswer ? 'success' : 'error'}
+          icon={isAnnulled ? <CheckCircleOutlineIcon sx={{ color: PALETTE_COLORS.warning }} /> : isCorrectAnswer ? <CheckCircleOutlineIcon /> : <HighlightOffIcon />}
           sx={{
             mb: 2.5,
             borderRadius: 2,
             border: '1px solid',
-            borderColor: isCorrectAnswer ? PALETTE_COLORS.success : PALETTE_COLORS.danger,
+            borderColor: isAnnulled ? PALETTE_COLORS.warning : isCorrectAnswer ? PALETTE_COLORS.success : PALETTE_COLORS.danger,
             backgroundColor: isDark
-              ? isCorrectAnswer
+              ? isAnnulled
+                ? 'rgba(255, 152, 0, 0.1)'
+                : isCorrectAnswer
                 ? 'rgba(75, 241, 81, 0.1)'
                 : 'rgba(250, 66, 75, 0.1)'
               : undefined,
           }}
         >
-          {isCorrectAnswer ? (
+          {isAnnulled ? (
             <Typography variant="body2" sx={{ fontWeight: 600 }}>
-              Parabéns! Você acertou a questão. A alternativa {question.correctAlternativeIdentifier} é a correta.
+              <strong>Questão Anulada:</strong> Esta questão foi anulada pela banca examinadora. Todos os candidatos pontuam independentemente da alternativa assinalada (+1 acerto).
+            </Typography>
+          ) : isCorrectAnswer ? (
+            <Typography variant="body2" sx={{ fontWeight: 600 }}>
+              Parabéns! Você acertou a questão. A alternativa {question.correctAlternativeIdentifier || question.alternatives.find((a) => a.isCorrect)?.identifier} é a correta.
             </Typography>
           ) : (
             <Typography variant="body2" sx={{ fontWeight: 600 }}>
-              Resposta incorreta. A alternativa correta é a letra {question.correctAlternativeIdentifier}.
+              Resposta incorreta. A alternativa correta é a letra {question.correctAlternativeIdentifier || question.alternatives.find((a) => a.isCorrect)?.identifier}.
             </Typography>
           )}
         </Alert>

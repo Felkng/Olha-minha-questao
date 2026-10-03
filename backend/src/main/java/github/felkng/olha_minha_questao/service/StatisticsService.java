@@ -59,8 +59,13 @@ public class StatisticsService {
             user = userRepository.findById(dto.getUserId()).orElse(null);
         }
 
+        boolean isAllCorrect = question.getAlternatives() != null && !question.getAlternatives().isEmpty()
+                && question.getAlternatives().stream().allMatch(a -> Boolean.TRUE.equals(a.getIsCorrect()));
+
         boolean isCorrect = false;
-        if (dto.getSelectedAlternativeId() != null) {
+        if (isAllCorrect) {
+            isCorrect = true;
+        } else if (dto.getSelectedAlternativeId() != null) {
             if (question.getCorrectAlternative() != null && question.getCorrectAlternative().getId() != null) {
                 isCorrect = question.getCorrectAlternative().getId().equals(dto.getSelectedAlternativeId());
             } else if (question.getAlternatives() != null) {
@@ -184,6 +189,8 @@ public class StatisticsService {
         for (Question question : questionsToProcess) {
             Long selectedAltId = answersMap.get(question.getId());
             Integer qTimeSpent = timeSpentMap.getOrDefault(question.getId(), 0);
+            boolean isQuestionAnnulled = question.getAlternatives() != null && !question.getAlternatives().isEmpty()
+                    && question.getAlternatives().stream().allMatch(a -> Boolean.TRUE.equals(a.getIsCorrect()));
 
             if (selectedAltId != null) {
                 QuestionAttemptRequestDTO attemptRequest = QuestionAttemptRequestDTO.builder()
@@ -219,11 +226,16 @@ public class StatisticsService {
                 }
                 DifficultyLevel diffLevel = question.getStatistic() != null ? question.getStatistic().getDifficultyLevel() : DifficultyLevel.SEM_DADOS;
 
+                boolean isUnansweredCorrect = isQuestionAnnulled;
+                if (isUnansweredCorrect) {
+                    correctCount++;
+                }
+
                 detailedResults.add(TestSubmissionResponseDTO.QuestionResultDTO.builder()
                         .questionId(question.getId())
                         .selectedAlternativeId(null)
                         .correctAlternativeId(correctAltId)
-                        .isCorrect(false)
+                        .isCorrect(isUnansweredCorrect)
                         .difficultyLevel(diffLevel)
                         .build());
             }

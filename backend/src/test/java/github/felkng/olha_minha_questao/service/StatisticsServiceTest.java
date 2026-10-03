@@ -297,4 +297,48 @@ class StatisticsServiceTest {
         assertThat(history.get(0).getIsCorrect()).isTrue();
         assertThat(history.get(0).getQuestionEnunciado()).isEqualTo("Qual a velocidade da luz?");
     }
+
+    @Test
+    @DisplayName("Deve pontuar questão anulada independentemente da alternativa assinalada")
+    void testAnnulledQuestionScoring() {
+        // Cria uma questão anulada (todas as alternativas com isCorrect = true)
+        QuestionResponseDTO annulledQ = questionService.create(QuestionRequestDTO.builder()
+                .enunciado("Questão Anulada pelo examinador")
+                .year(2024)
+                .originId(testOrigin.getId())
+                .areaId(testArea.getId())
+                .testId(testEntity.getId())
+                .alternatives(List.of(
+                        AlternativeRequestDTO.builder().identifier("A").text("Alternativa A").isCorrect(true).build(),
+                        AlternativeRequestDTO.builder().identifier("B").text("Alternativa B").isCorrect(true).build(),
+                        AlternativeRequestDTO.builder().identifier("C").text("Alternativa C").isCorrect(true).build()
+                ))
+                .build());
+
+        assertThat(annulledQ.getCorrectAlternativeId()).isNull();
+
+        // Usuário responde alternativa B (que em uma questão normal poderia ser errada, mas nesta anulada pontua)
+        Long chosenAltId = annulledQ.getAlternatives().get(1).getId();
+        QuestionAttemptResponseDTO attempt = statisticsService.registerQuestionAttempt(annulledQ.getId(), QuestionAttemptRequestDTO.builder()
+                .selectedAlternativeId(chosenAltId)
+                .sessionId("session-annulled-1")
+                .build());
+
+        assertThat(attempt.getIsCorrect()).isTrue();
+
+        // No simulado completo com questão anulada
+        TestSubmissionRequestDTO request = TestSubmissionRequestDTO.builder()
+                .sessionId("test-annulled-session")
+                .answers(List.of(
+                        TestSubmissionRequestDTO.QuestionAnswerDTO.builder()
+                                .questionId(annulledQ.getId())
+                                .selectedAlternativeId(chosenAltId)
+                                .timeSpentSeconds(30)
+                                .build()
+                ))
+                .build();
+
+        TestSubmissionResponseDTO response = statisticsService.submitTestAttempt(testEntity.getId(), request);
+        assertThat(response.getCorrectAnswers()).isGreaterThanOrEqualTo(1);
+    }
 }

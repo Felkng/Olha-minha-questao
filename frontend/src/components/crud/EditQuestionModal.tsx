@@ -67,6 +67,7 @@ export const EditQuestionModal: React.FC<EditQuestionModalProps> = ({
 
   const [alternatives, setAlternatives] = useState<AltInput[]>([]);
   const [correctAltIndex, setCorrectAltIndex] = useState<number>(0);
+  const [isAnnulled, setIsAnnulled] = useState<boolean>(false);
 
   const [origins, setOrigins] = useState<Origin[]>([]);
   const [areas, setAreas] = useState<Area[]>([]);
@@ -86,6 +87,9 @@ export const EditQuestionModal: React.FC<EditQuestionModalProps> = ({
       setTestId(question.testId || '');
       setTextualReferenceId(question.textualReferenceId || question.textualReference?.id ? Number(question.textualReferenceId || question.textualReference?.id) : '');
       setIsPublic(question.isPublic !== undefined ? question.isPublic : true);
+
+      const isAnn = (question.alternatives || []).length > 0 && (question.alternatives || []).every((a) => a.isCorrect);
+      setIsAnnulled(isAnn);
 
       const alts: AltInput[] = (question.alternatives || []).map((a) => ({
         id: a.id,
@@ -182,7 +186,7 @@ export const EditQuestionModal: React.FC<EditQuestionModalProps> = ({
       const formattedAlternatives = alternatives.map((a, idx) => ({
         identifier: a.identifier,
         text: a.text,
-        isCorrect: idx === correctAltIndex,
+        isCorrect: isAnnulled ? true : idx === correctAltIndex,
       }));
 
       await updateQuestion(question.id, {
@@ -391,12 +395,50 @@ export const EditQuestionModal: React.FC<EditQuestionModalProps> = ({
             />
           </Paper>
 
+          <Paper
+            elevation={0}
+            sx={{
+              p: 1.5,
+              borderRadius: 2,
+              border: '1px solid',
+              borderColor: isAnnulled ? PALETTE_COLORS.warning : 'divider',
+              backgroundColor: isAnnulled ? 'rgba(255, 152, 0, 0.08)' : 'transparent',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+            }}
+          >
+            <Box>
+              <Typography variant="body2" sx={{ fontWeight: 700, color: isAnnulled ? 'warning.main' : 'text.primary' }}>
+                Questão Anulada
+              </Typography>
+              <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                {isAnnulled
+                  ? 'Todas as alternativas são corretas e qualquer resposta pontua no simulado'
+                  : 'Marcar esta questão como anulada pela banca'}
+              </Typography>
+            </Box>
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={isAnnulled}
+                  onChange={(e) => setIsAnnulled(e.target.checked)}
+                  color="warning"
+                />
+              }
+              label={isAnnulled ? 'Anulada' : 'Normal'}
+              sx={{ m: 0 }}
+            />
+          </Paper>
+
           <Paper variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
             <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>
-              Alternativas (Selecione a Correta)
+              Alternativas {isAnnulled ? '(Questão Anulada: todas pontuam)' : '(Selecione a Correta)'}
             </Typography>
             <FormHelperText sx={{ mb: 2 }}>
-              Marque o botão redondo correspondente à alternativa gabarito. Mínimo de 2 alternativas.
+              {isAnnulled
+                ? 'Como a questão está anulada, todas as alternativas são consideradas corretas.'
+                : 'Marque o botão redondo correspondente à alternativa gabarito. Mínimo de 2 alternativas.'}
             </FormHelperText>
 
             <RadioGroup
@@ -408,7 +450,8 @@ export const EditQuestionModal: React.FC<EditQuestionModalProps> = ({
                   <Stack key={index} direction="row" spacing={1.5} alignItems="center">
                     <FormControlLabel
                       value={index}
-                      control={<Radio size="small" color="primary" />}
+                      disabled={isAnnulled}
+                      control={<Radio size="small" color={isAnnulled ? 'warning' : 'primary'} />}
                       label={alt.identifier}
                       sx={{ m: 0, minWidth: 50 }}
                     />

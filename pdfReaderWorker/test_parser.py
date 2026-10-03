@@ -149,5 +149,34 @@ class TestPdfParser(unittest.TestCase):
         self.assertIn("Parágrafo 4", ref["content"])
         self.assertIn("Parágrafo 5", ref["content"])
 
+    def test_parse_ocr_column_text(self):
+        import ocr
+        sample_ocr_text = """
+        QUESTÃO 1
+        MapReduce é um modelo de programação.
+        (A) Apache Flink.
+        (B) Apache Hive.
+        (C) Apache Tomcat.
+        (D) Hadoop.
+        (E) MongoDB.
+
+        QUESTÃO 2
+        Segundo Valente (2020), correlacione os itens.
+        CA) Opção 1
+        (8) Opção 2
+        (0) Opção 3
+        (OREO) Opção 4
+        (E) Opção 5
+        """
+        qs = ocr.parse_ocr_column_text(sample_ocr_text)
+        self.assertEqual(len(qs), 2)
+        self.assertEqual(qs[0]["identifier"], "1")
+        self.assertEqual(len(qs[0]["alternatives"]), 5)
+        self.assertEqual([a["identifier"] for a in qs[0]["alternatives"]], ["A", "B", "C", "D", "E"])
+
+        self.assertEqual(qs[1]["identifier"], "2")
+        self.assertEqual(len(qs[1]["alternatives"]), 5)
+        self.assertEqual([a["identifier"] for a in qs[1]["alternatives"]], ["A", "B", "C", "D", "E"])
+
 if __name__ == '__main__':
     unittest.main()
