@@ -21,8 +21,22 @@ class TestRealPdfExtraction(unittest.TestCase):
             '/app/prova_pdf/gabarito (1).pdf',
         ]
 
+        possible_prova3_paths = [
+            os.path.join(base_dir, 'backend', 'src', 'test', 'prova_pdf', 'prova_3_analista_de_sistemas_jnior_area_infraestrutura.pdf'),
+            os.path.join(os.path.dirname(os.path.abspath(__file__)), 'prova_pdf', 'prova_3_analista_de_sistemas_jnior_area_infraestrutura.pdf'),
+            '/app/prova_pdf/prova_3_analista_de_sistemas_jnior_area_infraestrutura.pdf',
+        ]
+
+        possible_gabaritos_paths = [
+            os.path.join(base_dir, 'backend', 'src', 'test', 'prova_pdf', 'gabaritos.pdf'),
+            os.path.join(os.path.dirname(os.path.abspath(__file__)), 'prova_pdf', 'gabaritos.pdf'),
+            '/app/prova_pdf/gabaritos.pdf',
+        ]
+
         cls.exam_pdf_path = next((p for p in possible_exam_paths if os.path.exists(p)), None)
         cls.answer_key_pdf_path = next((p for p in possible_key_paths if os.path.exists(p)), None)
+        cls.prova3_pdf_path = next((p for p in possible_prova3_paths if os.path.exists(p)), None)
+        cls.gabaritos_pdf_path = next((p for p in possible_gabaritos_paths if os.path.exists(p)), None)
 
         possible_scanned_paths = [
             os.path.join(base_dir, 'backend', 'src', 'test', 'prova_pdf', 'CP-T-2024_INFORMÁTICA_AMARELA.pdf'),
@@ -48,6 +62,16 @@ class TestRealPdfExtraction(unittest.TestCase):
 
         with open(cls.answer_key_pdf_path, 'rb') as f:
             cls.answer_key_bytes = f.read()
+
+        cls.prova3_bytes = None
+        if cls.prova3_pdf_path:
+            with open(cls.prova3_pdf_path, 'rb') as f:
+                cls.prova3_bytes = f.read()
+
+        cls.gabaritos_bytes = None
+        if cls.gabaritos_pdf_path:
+            with open(cls.gabaritos_pdf_path, 'rb') as f:
+                cls.gabaritos_bytes = f.read()
 
         cls.scanned_bytes = None
         if cls.scanned_pdf_path:
@@ -257,6 +281,130 @@ class TestRealPdfExtraction(unittest.TestCase):
                 matched_count += 1
 
         self.assertEqual(matched_count, 50, "Todas as 50 questões da prova escaneada devem ser associadas ao gabarito")
+
+    def test_extract_prova_3_analista_infraestrutura(self):
+        if not self.prova3_bytes:
+            self.skipTest("Arquivo prova_3_analista_de_sistemas_jnior_area_infraestrutura.pdf não encontrado")
+
+        parsed = parse_exam_pdf(self.prova3_bytes)
+        questions = parsed["questions"]
+        textual_references = parsed["textualReferences"]
+
+        # 1. Total questions count (deve extrair 70 questões completas sem pular 49, 50, 63)
+        self.assertEqual(len(questions), 70, f"Deveriam ser extraídas 70 questões, mas foram extraídas {len(questions)}")
+
+        # 2. Identifiers sequence 1..70
+        expected_identifiers = [str(i) for i in range(1, 71)]
+        actual_identifiers = [q["identifier"] for q in questions]
+        self.assertEqual(actual_identifiers, expected_identifiers, "A sequência de identificadores deve ser de 1 a 70")
+
+        # 3. Check Questão 1
+        q1 = questions[0]
+        self.assertEqual(q1["identifier"], "1")
+        self.assertEqual(len(q1["alternatives"]), 5)
+
+        # 4. Check Questões com alternativas inline (49, 50, 63)
+        q49 = next(q for q in questions if q["identifier"] == "49")
+        self.assertEqual(len(q49["alternatives"]), 5, "Questão 49 deve ter 5 alternativas inline extraídas")
+        self.assertEqual(q49["alternatives"][0]["identifier"], "A")
+        self.assertIn("M e T", q49["alternatives"][0]["text"])
+        self.assertEqual(q49["alternatives"][1]["identifier"], "B")
+        self.assertIn("M e I", q49["alternatives"][1]["text"])
+
+        q50 = next(q for q in questions if q["identifier"] == "50")
+        self.assertEqual(len(q50["alternatives"]), 5, "Questão 50 deve ter 5 alternativas inline extraídas")
+        self.assertEqual(q50["alternatives"][0]["identifier"], "A")
+        self.assertIn("42,86", q50["alternatives"][0]["text"])
+
+        q63 = next(q for q in questions if q["identifier"] == "63")
+        self.assertEqual(len(q63["alternatives"]), 5, "Questão 63 deve ter 5 alternativas inline extraídas")
+        self.assertEqual(q63["alternatives"][0]["identifier"], "A")
+        self.assertIn("250", q63["alternatives"][0]["text"])
+
+        # Check Questão 66 com sentenças lógicas (sem interpretar b) como alternativa)
+        q66 = next(q for q in questions if q["identifier"] == "66")
+        self.assertEqual(len(q66["alternatives"]), 5, "Questão 66 deve ter exatamente 5 alternativas (A-E)")
+        self.assertEqual([a["identifier"] for a in q66["alternatives"]], ["A", "B", "C", "D", "E"])
+        self.assertIn("¬a", q66["alternatives"][0]["text"])
+        self.assertIn("(¬a b) (¬a b)", q66["alternatives"][2]["text"])
+        self.assertIn("(¬a b) (a ¬b)", q66["alternatives"][4]["text"])
+
+        # 5. Check referências textuais
+        self.assertEqual(len(textual_references), 2, "Devem ser extraídas 2 referências textuais")
+        ref1 = textual_references[0]
+        self.assertIn("LÍNGUA PORTUGUESA", ref1["title"])
+        self.assertIn("Science fiction", ref1["title"])
+        self.assertNotIn("O marciano encontrou-me na rua", ref1["title"], "O primeiro verso não deve poluir o título")
+        self.assertIn("O marciano encontrou-me na rua", ref1["content"])
+
+        ref2 = textual_references[1]
+        self.assertIn("LÍNGUA INGLESA", ref2["title"])
+        self.assertIn("Safety Meeting Presentation", ref2["title"])
+        self.assertNotIn("Today’s meeting is really about you", ref2["title"], "O início do texto não deve poluir o título")
+        self.assertIn("Today’s meeting is really about you", ref2["content"])
+        self.assertIn("Concluding Remarks", ref2["content"], "Deve incluir a seção Concluding Remarks")
+        self.assertIn("While nothing we do can completely eliminate the", ref2["content"], "Deve incluir a linha 75")
+        self.assertIn("Let’s keep communicating and continue to improve safety.", ref2["content"])
+        self.assertEqual(ref2["reference"], "http://www.ncsu.edu/ehs/www99/right/training/meeting/emplores.html")
+        self.assertIn("Retrieved on: April 1st, 2012", ref2["source"])
+
+    def test_extract_gabaritos_multi_page_pdf(self):
+        if not self.gabaritos_bytes:
+            self.skipTest("Arquivo gabaritos.pdf não encontrado")
+
+        parsed = parse_answer_key_pdf(self.gabaritos_bytes, prova_name="PROVA 3")
+        answers = parsed["answers"]
+
+        # 1. Total answers count (70 respostas: 1-20 básicos + 21-70 específicos)
+        self.assertEqual(len(answers), 70, f"Deveriam ser extraídas 70 respostas do gabarito, mas foram {len(answers)}")
+        self.assertEqual(len(parsed["availableProvas"]), 28, "Devem ser detectadas 28 opções de prova no gabarito")
+        self.assertEqual(parsed["selectedProva"], "PROVA 3")
+
+        ans_map = {a["identifier"]: a["correctAlternative"] for a in answers}
+
+        # Conhecimentos Básicos - Português (1 a 10)
+        self.assertEqual(ans_map.get("1"), "B")
+        self.assertEqual(ans_map.get("2"), "E")
+        self.assertEqual(ans_map.get("3"), "C")
+        self.assertEqual(ans_map.get("4"), "D")
+        self.assertEqual(ans_map.get("5"), "E")
+        self.assertEqual(ans_map.get("10"), "A")
+
+        # Conhecimentos Básicos - Inglês (11 a 20)
+        self.assertEqual(ans_map.get("11"), "E")
+        self.assertEqual(ans_map.get("12"), "D")
+        self.assertEqual(ans_map.get("20"), "B")
+
+        # Conhecimentos Específicos - PROVA 3 (21 a 70)
+        self.assertEqual(ans_map.get("21"), "E")
+        self.assertEqual(ans_map.get("22"), "B")
+        self.assertEqual(ans_map.get("40"), "C")
+        self.assertEqual(ans_map.get("41"), "C")
+        self.assertEqual(ans_map.get("49"), "B")
+        self.assertEqual(ans_map.get("50"), "B")
+        self.assertEqual(ans_map.get("55"), "C")
+        self.assertEqual(ans_map.get("56"), "D")
+        self.assertEqual(ans_map.get("70"), "D")
+
+    def test_match_prova_3_with_gabaritos(self):
+        if not self.prova3_bytes or not self.gabaritos_bytes:
+            self.skipTest("Arquivos da prova 3 ou gabaritos não encontrados")
+
+        questions = parse_exam_pdf(self.prova3_bytes)["questions"]
+        answers = parse_answer_key_pdf(self.gabaritos_bytes, prova_name="PROVA 3")["answers"]
+
+        ans_map = {a["identifier"]: a["correctAlternative"] for a in answers}
+        matched_count = 0
+        for q in questions:
+            correct_letter = ans_map.get(q["identifier"])
+            if correct_letter:
+                for alt in q["alternatives"]:
+                    if alt["identifier"] == correct_letter:
+                        alt["isCorrect"] = True
+                        matched_count += 1
+                        break
+
+        self.assertEqual(matched_count, 70, "Todas as 70 questões da Prova 3 devem ser associadas às respostas do gabarito")
 
 if __name__ == '__main__':
     unittest.main()

@@ -268,6 +268,143 @@ class RealPdfExtractionServiceTest {
         assertThat(answerMap.get("5")).isEqualTo("B");
         assertThat(answerMap.get("50")).isEqualTo("A");
     }
+
+    @Test
+    @DisplayName("Deve extrair Prova 3 Infraestrutura e gabaritos.pdf (multi-página com cabeçalho vertical) e persistir atomicamente com 70 questões")
+    void testRealPdfExtractionAndAtomicPersistenceProva3Infraestrutura() throws Exception {
+        Path examPath = Path.of("src", "test", "prova_pdf", "prova_3_analista_de_sistemas_jnior_area_infraestrutura.pdf");
+        Path keyPath = Path.of("src", "test", "prova_pdf", "gabaritos.pdf");
+
+        assertThat(Files.exists(examPath))
+                .as("Arquivo da prova deve existir em " + examPath.toAbsolutePath())
+                .isTrue();
+        assertThat(Files.exists(keyPath))
+                .as("Arquivo do gabarito deve existir em " + keyPath.toAbsolutePath())
+                .isTrue();
+
+        MockMultipartFile examMultipart = new MockMultipartFile(
+                "file",
+                "prova_3_analista_de_sistemas_jnior_area_infraestrutura.pdf",
+                "application/pdf",
+                Files.readAllBytes(examPath)
+        );
+
+        MockMultipartFile keyMultipart = new MockMultipartFile(
+                "file",
+                "gabaritos.pdf",
+                "application/pdf",
+                Files.readAllBytes(keyPath)
+        );
+
+        // 1. Extração das questões e referências textuais
+        github.felkng.olha_minha_questao.dto.parser.ParsedExamResponseDTO examResponse = examParserService.parseExamPdf(examMultipart);
+        List<ParsedQuestionDTO> parsedQuestions = examResponse.getQuestions();
+        assertThat(parsedQuestions).hasSize(70);
+        assertThat(examResponse.getTextualReferences()).hasSize(2);
+
+        // Verifica referências textuais sem poluição de título
+        assertThat(examResponse.getTextualReferences().get(0).getTitle()).contains("Science fiction");
+        assertThat(examResponse.getTextualReferences().get(0).getContent()).contains("O marciano encontrou-me na rua");
+        assertThat(examResponse.getTextualReferences().get(1).getTitle()).contains("Safety Meeting Presentation");
+        assertThat(examResponse.getTextualReferences().get(1).getContent()).contains("Today’s meeting is really about you");
+
+        // Verifica questões com alternativas inline
+        ParsedQuestionDTO q49 = parsedQuestions.stream().filter(q -> q.getIdentifier().equals("49")).findFirst().orElseThrow();
+        assertThat(q49.getAlternatives()).hasSize(5);
+
+        ParsedQuestionDTO q50 = parsedQuestions.stream().filter(q -> q.getIdentifier().equals("50")).findFirst().orElseThrow();
+        assertThat(q50.getAlternatives()).hasSize(5);
+
+        ParsedQuestionDTO q63 = parsedQuestions.stream().filter(q -> q.getIdentifier().equals("63")).findFirst().orElseThrow();
+        assertThat(q63.getAlternatives()).hasSize(5);
+
+        // 2. Extração do gabarito multi-página com PROVA 3
+        github.felkng.olha_minha_questao.dto.parser.ParsedAnswerKeyResponseDTO keyResponse = examParserService.parseAnswerKeyPdf(keyMultipart, "PROVA 3");
+        List<ParsedAnswerKeyDTO> parsedAnswers = keyResponse.getAnswers();
+        assertThat(parsedAnswers).hasSize(70);
+        assertThat(keyResponse.getAvailableProvas()).hasSize(28);
+        assertThat(keyResponse.getSelectedProva()).isEqualTo("PROVA 3");
+
+        Map<String, String> answerMap = parsedAnswers.stream()
+                .collect(Collectors.toMap(ParsedAnswerKeyDTO::getIdentifier, ParsedAnswerKeyDTO::getCorrectAlternative));
+
+        assertThat(answerMap.get("1")).isEqualTo("B");
+        assertThat(answerMap.get("2")).isEqualTo("E");
+        assertThat(answerMap.get("11")).isEqualTo("E");
+        assertThat(answerMap.get("20")).isEqualTo("B");
+        assertThat(answerMap.get("21")).isEqualTo("E");
+        assertThat(answerMap.get("40")).isEqualTo("C");
+        assertThat(answerMap.get("49")).isEqualTo("B");
+        assertThat(answerMap.get("50")).isEqualTo("B");
+        assertThat(answerMap.get("70")).isEqualTo("D");
+
+        // 3. Montagem do DTO para criação atômica
+        List<github.felkng.olha_minha_questao.dto.reference.TextualReferenceRequestDTO> refRequests = examResponse.getTextualReferences().stream()
+                .map(r -> github.felkng.olha_minha_questao.dto.reference.TextualReferenceRequestDTO.builder()
+                        .title(r.getTitle())
+                        .content(r.getContent())
+                        .author(r.getAuthor())
+                        .source(r.getSource())
+                        .build())
+                .toList();
+
+        List<QuestionRequestDTO> questionRequests = new ArrayList<>();
+        for (ParsedQuestionDTO pq : parsedQuestions) {
+            String correctLetter = answerMap.get(pq.getIdentifier());
+            int qNum = Integer.parseInt(pq.getIdentifier());
+            Integer refIdx = null;
+            if (qNum >= 1 && qNum <= 10) refIdx = 0;
+            else if (qNum >= 11 && qNum <= 20) refIdx = 1;
+
+            List<AlternativeRequestDTO> altRequests = pq.getAlternatives().stream()
+                    .map(alt -> AlternativeRequestDTO.builder()
+                            .identifier(alt.getIdentifier())
+                            .text(alt.getText())
+                            .isCorrect(alt.getIdentifier().equalsIgnoreCase(correctLetter))
+                            .build())
+                    .toList();
+
+            questionRequests.add(QuestionRequestDTO.builder()
+                    .identifier(pq.getIdentifier())
+                    .enunciado(pq.getEnunciado())
+                    .year(2012)
+                    .textualReferenceIndex(refIdx)
+                    .alternatives(altRequests)
+                    .build());
+        }
+
+        TestWithQuestionsRequestDTO wizardRequest = TestWithQuestionsRequestDTO.builder()
+                .name("Transpetro 2012 - Analista de Sistemas Júnior Área Infraestrutura")
+                .year(2012)
+                .description("Prova extraída de PDF single-column e gabarito multi-página")
+                .textualReferences(refRequests)
+                .questions(questionRequests)
+                .build();
+
+        // 4. Criação atômica no banco de dados
+        TestResponseDTO createdTest = testService.createWithQuestions(wizardRequest, null);
+        entityManager.flush();
+
+        assertThat(createdTest.getId()).isNotNull();
+        assertThat(createdTest.getName()).isEqualTo("Transpetro 2012 - Analista de Sistemas Júnior Área Infraestrutura");
+        assertThat(createdTest.getTextualReferences()).hasSize(2);
+
+        List<Question> savedDbQuestions = questionRepository.findByTestIdOrderByIdAsc(createdTest.getId());
+        assertThat(savedDbQuestions).hasSize(70);
+
+        Question q1Entity = savedDbQuestions.get(0);
+        assertThat(q1Entity.getCorrectAlternative()).isNotNull();
+        assertThat(q1Entity.getCorrectAlternative().getIdentifier()).isEqualTo("B");
+
+        Question q70Entity = savedDbQuestions.get(69);
+        assertThat(q70Entity.getCorrectAlternative()).isNotNull();
+        assertThat(q70Entity.getCorrectAlternative().getIdentifier()).isEqualTo("D");
+
+        // 5. Validação da prova cadastrada
+        TestEvaluationDTO evaluation = testService.getTestEvaluation(createdTest.getId());
+        assertThat(evaluation.getQuestionCount()).isEqualTo(70);
+        assertThat(evaluation.getQuestions()).hasSize(70);
+    }
 }
 
 
