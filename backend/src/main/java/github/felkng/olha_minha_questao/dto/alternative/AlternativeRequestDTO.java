@@ -1,6 +1,7 @@
 package github.felkng.olha_minha_questao.dto.alternative;
 
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -19,8 +20,9 @@ public class AlternativeRequestDTO {
     @Size(max = 10, message = "O identificador deve ter no máximo 10 caracteres")
     private String identifier;
 
-    @NotBlank(message = "O texto da alternativa é obrigatório")
-    private String text;
+    @NotNull(message = "O texto da alternativa não pode ser nulo")
+    @Builder.Default
+    private String text = "";
 
     @Builder.Default
     private Boolean isCorrect = false;
