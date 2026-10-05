@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import {
   Dialog,
   DialogTitle,
@@ -20,9 +20,14 @@ import {
   Alert,
   Switch,
   Box,
+  IconButton,
+  Chip,
+  Grid,
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
+import CloudUploadOutlinedIcon from '@mui/icons-material/CloudUploadOutlined';
+import CloseIcon from '@mui/icons-material/Close';
 import { Area, Origin, Question, Subject, Test } from '../../types';
 import {
   getAreas,
@@ -64,6 +69,9 @@ export const EditQuestionModal: React.FC<EditQuestionModalProps> = ({
   const [testId, setTestId] = useState<number | ''>('');
   const [textualReferenceId, setTextualReferenceId] = useState<number | ''>('');
   const [isPublic, setIsPublic] = useState<boolean>(true);
+  const [images, setImages] = useState<string[]>([]);
+  const [isDragging, setIsDragging] = useState<boolean>(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [alternatives, setAlternatives] = useState<AltInput[]>([]);
   const [correctAltIndex, setCorrectAltIndex] = useState<number>(0);
@@ -87,6 +95,7 @@ export const EditQuestionModal: React.FC<EditQuestionModalProps> = ({
       setTestId(question.testId || '');
       setTextualReferenceId(question.textualReferenceId || question.textualReference?.id ? Number(question.textualReferenceId || question.textualReference?.id) : '');
       setIsPublic(question.isPublic !== undefined ? question.isPublic : true);
+      setImages(question.images || []);
 
       const isAnn = (question.alternatives || []).length > 0 && (question.alternatives || []).every((a) => a.isCorrect);
       setIsAnnulled(isAnn);
@@ -199,6 +208,7 @@ export const EditQuestionModal: React.FC<EditQuestionModalProps> = ({
         testId: testId ? Number(testId) : undefined,
         textualReferenceId: textualReferenceId ? Number(textualReferenceId) : null,
         isPublic,
+        images: images,
         alternatives: formattedAlternatives,
       });
 
@@ -212,8 +222,41 @@ export const EditQuestionModal: React.FC<EditQuestionModalProps> = ({
     }
   };
 
+  const handleFiles = (files: FileList | File[]) => {
+    Array.from(files).forEach((file) => {
+      if (file.type.startsWith('image/')) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          if (e.target?.result) {
+            setImages((prev) => [...prev, e.target!.result as string]);
+          }
+        };
+        reader.readAsDataURL(file);
+      }
+    });
+  };
+
+  const handlePaste = (e: React.ClipboardEvent) => {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+    const imageFiles: File[] = [];
+    for (let i = 0; i < items.length; i++) {
+      if (items[i].type.indexOf('image') !== -1) {
+        const file = items[i].getAsFile();
+        if (file) imageFiles.push(file);
+      }
+    }
+    if (imageFiles.length > 0) {
+      handleFiles(imageFiles);
+    }
+  };
+
+  const handleRemoveImage = (index: number) => {
+    setImages((prev) => prev.filter((_, idx) => idx !== index));
+  };
+
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
+    <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth onPaste={handlePaste}>
       <DialogTitle sx={{ fontWeight: 700 }}>
         Editar Questão #{question?.id} {question?.identifier ? `(${question.identifier})` : ''}
       </DialogTitle>
@@ -229,12 +272,150 @@ export const EditQuestionModal: React.FC<EditQuestionModalProps> = ({
             label="Enunciado da Questão"
             value={enunciado}
             onChange={(e) => setEnunciado(e.target.value)}
+            onPaste={handlePaste}
             multiline
             rows={4}
             fullWidth
             required
             size="small"
+            placeholder="Digite o enunciado completo da questão (ou cole texto/imagens com Ctrl+V)..."
           />
+
+          {/* Seção de Inserção e Pré-visualização de Imagens */}
+          <Box>
+            <input
+              type="file"
+              ref={fileInputRef}
+              accept="image/*"
+              multiple
+              style={{ display: 'none' }}
+              onChange={(e) => {
+                if (e.target.files) {
+                  handleFiles(e.target.files);
+                  e.target.value = '';
+                }
+              }}
+            />
+
+            {/* Drop & Paste Zone */}
+            <Paper
+              elevation={0}
+              onDragOver={(e) => {
+                e.preventDefault();
+                setIsDragging(true);
+              }}
+              onDragLeave={() => setIsDragging(false)}
+              onDrop={(e) => {
+                e.preventDefault();
+                setIsDragging(false);
+                if (e.dataTransfer.files) {
+                  handleFiles(e.dataTransfer.files);
+                }
+              }}
+              onClick={() => fileInputRef.current?.click()}
+              sx={{
+                p: 2,
+                textAlign: 'center',
+                cursor: 'pointer',
+                borderRadius: 2,
+                border: '2px dashed',
+                borderColor: isDragging ? PALETTE_COLORS.primary : 'divider',
+                backgroundColor: isDragging
+                  ? 'rgba(217, 183, 99, 0.08)'
+                  : 'rgba(0, 0, 0, 0.02)',
+                transition: 'all 0.2s ease',
+                '&:hover': {
+                  borderColor: PALETTE_COLORS.primary,
+                  backgroundColor: 'rgba(217, 183, 99, 0.05)',
+                },
+              }}
+            >
+              <Stack direction="row" spacing={1.5} alignItems="center" justifyContent="center">
+                <CloudUploadOutlinedIcon sx={{ color: PALETTE_COLORS.primary, fontSize: 28 }} />
+                <Box sx={{ textAlign: 'left' }}>
+                  <Typography variant="body2" fontWeight={700}>
+                    Clique para selecionar imagens, arraste arquivos aqui ou cole com <Box component="span" sx={{ color: PALETTE_COLORS.primary }}>Ctrl+V</Box>
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    Suporta imagens em PNG, JPG, WEBP e colagens diretas da área de transferência
+                  </Typography>
+                </Box>
+              </Stack>
+            </Paper>
+
+            {/* Gallery Preview */}
+            {images.length > 0 && (
+              <Box sx={{ mt: 2 }}>
+                <Typography variant="caption" color="text.secondary" fontWeight={700} sx={{ display: 'block', mb: 1 }}>
+                  Imagens anexadas ({images.length}):
+                </Typography>
+                <Grid container spacing={1.5}>
+                  {images.map((imgSrc, idx) => (
+                    <Grid item xs={6} sm={4} md={3} key={idx}>
+                      <Paper
+                        elevation={0}
+                        sx={{
+                          position: 'relative',
+                          borderRadius: 2,
+                          overflow: 'hidden',
+                          border: '1px solid',
+                          borderColor: 'divider',
+                          backgroundColor: 'background.paper',
+                        }}
+                      >
+                        <Box
+                          component="img"
+                          src={imgSrc}
+                          alt={`Imagem ${idx + 1}`}
+                          sx={{
+                            width: '100%',
+                            height: 120,
+                            objectFit: 'contain',
+                            p: 0.5,
+                            backgroundColor: 'rgba(0, 0, 0, 0.02)',
+                          }}
+                        />
+                        <Chip
+                          size="small"
+                          label={`Figura ${idx + 1}`}
+                          sx={{
+                            position: 'absolute',
+                            bottom: 6,
+                            left: 6,
+                            height: 20,
+                            fontSize: '0.68rem',
+                            fontWeight: 700,
+                            backgroundColor: 'rgba(0, 0, 0, 0.7)',
+                            color: '#ffffff',
+                          }}
+                        />
+                        <IconButton
+                          size="small"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleRemoveImage(idx);
+                          }}
+                          sx={{
+                            position: 'absolute',
+                            top: 4,
+                            right: 4,
+                            backgroundColor: 'rgba(0, 0, 0, 0.65)',
+                            color: '#ffffff',
+                            p: 0.4,
+                            '&:hover': {
+                              backgroundColor: 'error.main',
+                            },
+                          }}
+                        >
+                          <CloseIcon fontSize="small" sx={{ fontSize: 16 }} />
+                        </IconButton>
+                      </Paper>
+                    </Grid>
+                  ))}
+                </Grid>
+              </Box>
+            )}
+          </Box>
 
           <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
             <TextField
