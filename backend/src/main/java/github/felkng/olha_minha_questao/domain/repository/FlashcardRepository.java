@@ -17,4 +17,5 @@ public interface FlashcardRepository extends JpaRepository<Flashcard, Long>, Jpa
     long countByAreaId(Long areaId);
     long countBySubjectId(Long subjectId);
     long countByCreatedByUserId(Long userId);
+    List<Flashcard> findByCreatedByUserId(Long userId);
 }

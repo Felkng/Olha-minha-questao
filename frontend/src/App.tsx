@@ -16,6 +16,7 @@ import { FolderDetailPage } from './pages/FolderDetailPage';
 import { FlashcardsPage } from './pages/FlashcardsPage';
 import { FlashcardStudyPage } from './pages/FlashcardStudyPage';
 import { UserProfilePage } from './pages/UserProfilePage';
+import { AdminPage } from './pages/AdminPage';
 import { SaveToFolderModal } from './components/folders/SaveToFolderModal';
 import { Question } from './types';
 import { AuthProvider } from './context/AuthContext';
@@ -82,6 +83,7 @@ export const App: React.FC = () => {
               element={<FolderDetailPage onBookmarkQuestion={handleOpenSaveModal} />}
             />
             <Route path="/perfil/:id" element={<UserProfilePage />} />
+            <Route path="/admin" element={<AdminPage />} />
             {/* Fallback to questoes */}
             <Route path="*" element={<Navigate to="/questoes" replace />} />
           </Routes>

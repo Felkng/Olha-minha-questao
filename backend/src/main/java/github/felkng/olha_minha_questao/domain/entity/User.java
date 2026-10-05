@@ -45,6 +45,10 @@ public class User {
     @Builder.Default
     private UserRole role = UserRole.GENERAL;
 
+    @Column(name = "is_blocked", nullable = false)
+    @Builder.Default
+    private Boolean isBlocked = false;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;

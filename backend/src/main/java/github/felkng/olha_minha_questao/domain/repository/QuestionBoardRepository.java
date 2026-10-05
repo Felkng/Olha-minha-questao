@@ -11,6 +11,8 @@ public interface QuestionBoardRepository extends JpaRepository<QuestionBoard, Lo
 
     Optional<QuestionBoard> findByQuestionIdAndUserId(Long questionId, Long userId);
 
+    java.util.List<QuestionBoard> findByUserId(Long userId);
+
     boolean existsByQuestionIdAndUserId(Long questionId, Long userId);
 
     void deleteByQuestionIdAndUserId(Long questionId, Long userId);

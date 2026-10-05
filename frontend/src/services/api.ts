@@ -114,6 +114,39 @@ export const promoteUserToAdmin = async (userId: number): Promise<UserSummary> =
   return response.data;
 };
 
+export const getAdminUsers = async (params?: {
+  search?: string;
+  role?: string;
+  isBlocked?: boolean;
+  page?: number;
+  size?: number;
+}): Promise<PageResponse<UserSummary>> => {
+  const queryParams: Record<string, any> = {
+    page: params?.page ?? 0,
+    size: params?.size ?? 20,
+  };
+  if (params?.search) queryParams.search = params.search;
+  if (params?.role) queryParams.role = params.role;
+  if (params?.isBlocked !== undefined) queryParams.isBlocked = params.isBlocked;
+
+  const response = await apiClient.get<PageResponse<UserSummary>>('/users', { params: queryParams });
+  return response.data;
+};
+
+export const toggleBlockUser = async (userId: number): Promise<UserSummary> => {
+  const response = await apiClient.patch<UserSummary>(`/users/${userId}/toggle-block`);
+  return response.data;
+};
+
+export const updateUserRole = async (userId: number, role: 'ADMIN' | 'GENERAL'): Promise<UserSummary> => {
+  const response = await apiClient.patch<UserSummary>(`/users/${userId}/role`, { role });
+  return response.data;
+};
+
+export const deleteUser = async (userId: number): Promise<void> => {
+  await apiClient.delete(`/users/${userId}`);
+};
+
 export const updateUser = async (
   userId: number,
   data: UserUpdateRequest
@@ -220,6 +253,7 @@ export const createQuestion = async (questionData: {
   testId?: number;
   textualReferenceId?: number | null;
   isPublic?: boolean;
+  images?: string[];
   alternatives: { identifier: string; text: string; isCorrect?: boolean }[];
 }): Promise<Question> => {
   const response = await apiClient.post('/questions', questionData);
@@ -238,6 +272,7 @@ export const updateQuestion = async (
     testId?: number;
     textualReferenceId?: number | null;
     isPublic?: boolean;
+    images?: string[];
     alternatives: { identifier: string; text: string; isCorrect?: boolean }[];
   }
 ): Promise<Question> => {

@@ -48,6 +48,12 @@ public class AuthService {
         User user = userRepository.findByEmail(dto.getEmail().toLowerCase().trim())
                 .orElseThrow(() -> new IllegalArgumentException("Credenciais inválidas: e-mail não encontrado."));
 
+        if (Boolean.TRUE.equals(user.getIsBlocked())) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                    org.springframework.http.HttpStatus.FORBIDDEN,
+                    "Esta conta está bloqueada pelo administrador do sistema.");
+        }
+
         if (!hashPassword(dto.getPassword()).equals(user.getPasswordHash())) {
             throw new IllegalArgumentException("Credenciais inválidas: senha incorreta.");
         }

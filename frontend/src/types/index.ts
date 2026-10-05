@@ -45,6 +45,8 @@ export interface UserSummary {
   name: string;
   email: string;
   role: UserRole;
+  isBlocked?: boolean;
+  createdAt?: string;
 }
 
 export interface UserUpdateRequest {

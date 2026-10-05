@@ -246,22 +246,120 @@ public class UserService {
                 .build();
     }
 
-    @Transactional
-    public UserSummaryDTO promoteToAdmin(Long targetUserId, Long actingUserId) {
+    @Transactional(readOnly = true)
+    public org.springframework.data.domain.Page<UserSummaryDTO> findAllUsers(
+            String search,
+            UserRole role,
+            Boolean isBlocked,
+            org.springframework.data.domain.Pageable pageable,
+            Long actingUserId) {
         if (actingUserId != null) {
             User actingUser = userRepository.findById(actingUserId)
                     .orElseThrow(() -> new ResourceNotFoundException("Usuário solicitante não encontrado com id: " + actingUserId));
             if (actingUser.getRole() != UserRole.ADMIN) {
-                throw new IllegalArgumentException("Apenas administradores podem promover outros usuários a ADMIN.");
+                throw new org.springframework.web.server.ResponseStatusException(
+                        org.springframework.http.HttpStatus.FORBIDDEN,
+                        "Apenas administradores podem listar os usuários.");
+            }
+        }
+
+        org.springframework.data.jpa.domain.Specification<User> spec = (root, query, cb) -> {
+            List<jakarta.persistence.criteria.Predicate> predicates = new ArrayList<>();
+
+            if (role != null) {
+                predicates.add(cb.equal(root.get("role"), role));
+            }
+
+            if (isBlocked != null) {
+                predicates.add(cb.equal(root.get("isBlocked"), isBlocked));
+            }
+
+            if (search != null && !search.trim().isEmpty()) {
+                String searchPattern = "%" + search.trim().toLowerCase() + "%";
+                predicates.add(cb.or(
+                        cb.like(cb.lower(root.get("name")), searchPattern),
+                        cb.like(cb.lower(root.get("email")), searchPattern)
+                ));
+            }
+
+            return cb.and(predicates.toArray(new jakarta.persistence.criteria.Predicate[0]));
+        };
+
+        return userRepository.findAll(spec, pageable).map(userMapper::toSummaryDTO);
+    }
+
+    @Transactional
+    public UserSummaryDTO toggleBlockUser(Long targetUserId, Long actingUserId) {
+        if (actingUserId != null) {
+            User actingUser = userRepository.findById(actingUserId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Usuário solicitante não encontrado com id: " + actingUserId));
+            if (actingUser.getRole() != UserRole.ADMIN) {
+                throw new org.springframework.web.server.ResponseStatusException(
+                        org.springframework.http.HttpStatus.FORBIDDEN,
+                        "Apenas administradores podem bloquear ou desbloquear usuários.");
+            }
+            if (actingUserId.equals(targetUserId)) {
+                throw new IllegalArgumentException("Você não pode bloquear a sua própria conta.");
             }
         }
 
         User targetUser = userRepository.findById(targetUserId)
                 .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado com id: " + targetUserId));
 
-        targetUser.setRole(UserRole.ADMIN);
+        boolean currentBlocked = Boolean.TRUE.equals(targetUser.getIsBlocked());
+        targetUser.setIsBlocked(!currentBlocked);
+
         User saved = userRepository.save(targetUser);
         return userMapper.toSummaryDTO(saved);
+    }
+
+    @Transactional
+    public UserSummaryDTO setUserRole(Long targetUserId, UserRole newRole, Long actingUserId) {
+        if (actingUserId != null) {
+            User actingUser = userRepository.findById(actingUserId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Usuário solicitante não encontrado com id: " + actingUserId));
+            if (actingUser.getRole() != UserRole.ADMIN) {
+                throw new org.springframework.web.server.ResponseStatusException(
+                        org.springframework.http.HttpStatus.FORBIDDEN,
+                        "Apenas administradores podem alterar o cargo de usuários.");
+            }
+            if (actingUserId.equals(targetUserId) && newRole != UserRole.ADMIN) {
+                throw new IllegalArgumentException("Você não pode remover o seu próprio privilégio de administrador.");
+            }
+        }
+
+        User targetUser = userRepository.findById(targetUserId)
+                .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado com id: " + targetUserId));
+
+        targetUser.setRole(newRole);
+        User saved = userRepository.save(targetUser);
+        return userMapper.toSummaryDTO(saved);
+    }
+
+    @Transactional
+    public void deleteUser(Long targetUserId, Long actingUserId) {
+        if (actingUserId != null) {
+            User actingUser = userRepository.findById(actingUserId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Usuário solicitante não encontrado com id: " + actingUserId));
+            if (actingUser.getRole() != UserRole.ADMIN) {
+                throw new org.springframework.web.server.ResponseStatusException(
+                        org.springframework.http.HttpStatus.FORBIDDEN,
+                        "Apenas administradores podem excluir usuários.");
+            }
+            if (actingUserId.equals(targetUserId)) {
+                throw new IllegalArgumentException("Você não pode excluir a sua própria conta de administrador.");
+            }
+        }
+
+        User targetUser = userRepository.findById(targetUserId)
+                .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado com id: " + targetUserId));
+
+        userRepository.delete(targetUser);
+    }
+
+    @Transactional
+    public UserSummaryDTO promoteToAdmin(Long targetUserId, Long actingUserId) {
+        return setUserRole(targetUserId, UserRole.ADMIN, actingUserId);
     }
 
     @Transactional

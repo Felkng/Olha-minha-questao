@@ -15,4 +15,6 @@ public class UserSummaryDTO {
     private String name;
     private String email;
     private UserRole role;
+    private Boolean isBlocked;
+    private java.time.Instant createdAt;
 }

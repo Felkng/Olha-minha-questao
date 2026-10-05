@@ -41,10 +41,41 @@ public class UserController {
         return ResponseEntity.ok(userService.updateUser(id, dto, actingUserId));
     }
 
-    @PatchMapping("/{id}/promote-admin")
-    public ResponseEntity<UserSummaryDTO> promoteToAdmin(
+    @GetMapping
+    public ResponseEntity<org.springframework.data.domain.Page<UserSummaryDTO>> findAll(
+            @org.springframework.web.bind.annotation.RequestParam(required = false) String search,
+            @org.springframework.web.bind.annotation.RequestParam(required = false) github.felkng.olha_minha_questao.domain.entity.UserRole role,
+            @org.springframework.web.bind.annotation.RequestParam(required = false) Boolean isBlocked,
+            @RequestHeader(value = "X-User-Id", required = false) Long actingUserId,
+            @org.springframework.data.web.PageableDefault(size = 20) org.springframework.data.domain.Pageable pageable) {
+        return ResponseEntity.ok(userService.findAllUsers(search, role, isBlocked, pageable, actingUserId));
+    }
+
+    @PatchMapping("/{id}/toggle-block")
+    public ResponseEntity<UserSummaryDTO> toggleBlock(
             @PathVariable Long id,
             @RequestHeader(value = "X-User-Id", required = false) Long actingUserId) {
-        return ResponseEntity.ok(userService.promoteToAdmin(id, actingUserId));
+        return ResponseEntity.ok(userService.toggleBlockUser(id, actingUserId));
+    }
+
+    @PatchMapping("/{id}/role")
+    public ResponseEntity<UserSummaryDTO> updateRole(
+            @PathVariable Long id,
+            @RequestBody java.util.Map<String, String> body,
+            @RequestHeader(value = "X-User-Id", required = false) Long actingUserId) {
+        String roleStr = body.get("role");
+        if (roleStr == null || roleStr.trim().isEmpty()) {
+            throw new IllegalArgumentException("O campo 'role' é obrigatório.");
+        }
+        github.felkng.olha_minha_questao.domain.entity.UserRole newRole = github.felkng.olha_minha_questao.domain.entity.UserRole.valueOf(roleStr.trim().toUpperCase());
+        return ResponseEntity.ok(userService.setUserRole(id, newRole, actingUserId));
+    }
+
+    @org.springframework.web.bind.annotation.DeleteMapping("/{id}")
+    public ResponseEntity<Void> deleteUser(
+            @PathVariable Long id,
+            @RequestHeader(value = "X-User-Id", required = false) Long actingUserId) {
+        userService.deleteUser(id, actingUserId);
+        return ResponseEntity.noContent().build();
     }
 }
