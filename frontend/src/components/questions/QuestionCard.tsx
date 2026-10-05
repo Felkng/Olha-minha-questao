@@ -728,17 +728,27 @@ export const QuestionCard: React.FC<QuestionCardProps> = ({
                 {alt.identifier}
               </Box>
 
-              <Typography
-                variant="body2"
-                sx={{
-                  fontSize: '0.95rem',
-                  color: 'text.primary',
-                  flexGrow: 1,
-                  lineHeight: 1.5,
-                }}
-              >
-                {alt.text}
-              </Typography>
+              {alt.text && alt.text.match(/^!\[.*?\]\((data:image\/[^)]+)\)$/) ? (
+                <Box sx={{ flexGrow: 1, my: 0.5, maxWidth: '100%' }}>
+                  <ZoomableImage
+                    src={alt.text.match(/^!\[.*?\]\((data:image\/[^)]+)\)$/)![1]}
+                    alt={`Figura da Alternativa ${alt.identifier}`}
+                    maxHeight={260}
+                  />
+                </Box>
+              ) : (
+                <Typography
+                  variant="body2"
+                  sx={{
+                    fontSize: '0.95rem',
+                    color: 'text.primary',
+                    flexGrow: 1,
+                    lineHeight: 1.5,
+                  }}
+                >
+                  {alt.text}
+                </Typography>
+              )}
 
               {isAnswered && isCorrect && (
                 <CheckCircleOutlineIcon sx={{ color: PALETTE_COLORS.success, ml: 1 }} />

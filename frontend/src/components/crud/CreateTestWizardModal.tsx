@@ -474,7 +474,7 @@ export const CreateTestWizardModal: React.FC<CreateTestWizardModalProps> = ({
               : null,
           alternatives: q.alternatives.map((alt) => ({
             identifier: alt.identifier.trim(),
-            text: alt.text.trim(),
+            text: alt.text?.trim() || `[Opção ${alt.identifier.trim()}]`,
             isCorrect: Boolean(alt.isCorrect),
           })),
         })),
