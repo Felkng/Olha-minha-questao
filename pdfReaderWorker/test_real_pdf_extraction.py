@@ -45,12 +45,19 @@ class TestRealPdfExtraction(unittest.TestCase):
             '/app/prova_pdf/gabarito_definitivo.pdf',
         ]
 
+        possible_infra_transpetro_paths = [
+            os.path.join(base_dir, 'backend', 'src', 'test', 'prova_pdf', 'analise_de_sistema_infraestrutura.pdf'),
+            os.path.join(os.path.dirname(os.path.abspath(__file__)), 'prova_pdf', 'analise_de_sistema_infraestrutura.pdf'),
+            '/app/prova_pdf/analise_de_sistema_infraestrutura.pdf',
+        ]
+
         cls.exam_pdf_path = next((p for p in possible_exam_paths if os.path.exists(p)), None)
         cls.answer_key_pdf_path = next((p for p in possible_key_paths if os.path.exists(p)), None)
         cls.prova3_pdf_path = next((p for p in possible_prova3_paths if os.path.exists(p)), None)
         cls.gabaritos_pdf_path = next((p for p in possible_gabaritos_paths if os.path.exists(p)), None)
         cls.infra2018_pdf_path = next((p for p in possible_infra2018_paths if os.path.exists(p)), None)
         cls.gab_definitivo_pdf_path = next((p for p in possible_gab_definitivo_paths if os.path.exists(p)), None)
+        cls.infra_transpetro_pdf_path = next((p for p in possible_infra_transpetro_paths if os.path.exists(p)), None)
 
         possible_scanned_paths = [
             os.path.join(base_dir, 'backend', 'src', 'test', 'prova_pdf', 'CP-T-2024_INFORMÁTICA_AMARELA.pdf'),
@@ -96,6 +103,11 @@ class TestRealPdfExtraction(unittest.TestCase):
         if cls.gab_definitivo_pdf_path:
             with open(cls.gab_definitivo_pdf_path, 'rb') as f:
                 cls.gab_definitivo_bytes = f.read()
+
+        cls.infra_transpetro_bytes = None
+        if cls.infra_transpetro_pdf_path:
+            with open(cls.infra_transpetro_pdf_path, 'rb') as f:
+                cls.infra_transpetro_bytes = f.read()
 
         cls.scanned_bytes = None
         if cls.scanned_pdf_path:
@@ -573,6 +585,65 @@ class TestRealPdfExtraction(unittest.TestCase):
                         break
 
         self.assertEqual(matched_count, 70, "Todas as 70 questões da prova de infraestrutura 2018 devem ser associadas ao gabarito definitivo")
+
+    def test_extract_analise_de_sistema_infraestrutura_pdf(self):
+        if not self.infra_transpetro_bytes:
+            self.skipTest("Arquivo analise_de_sistema_infraestrutura.pdf não encontrado")
+
+        parsed = parse_exam_pdf(self.infra_transpetro_bytes)
+        questions = parsed["questions"]
+        textual_references = parsed["textualReferences"]
+
+        # 1. Total questions count
+        self.assertEqual(len(questions), 70, f"Deveriam ser extraídas 70 questões, mas foram extraídas {len(questions)}")
+
+        # 2. Identifiers sequence 1..70
+        expected_identifiers = [str(i) for i in range(1, 71)]
+        actual_identifiers = [q["identifier"] for q in questions]
+        self.assertEqual(actual_identifiers, expected_identifiers, "A sequência de identificadores deve ser de 1 a 70")
+
+        # 3. Check Questão 10 (Língua Portuguesa)
+        q10 = next(q for q in questions if q["identifier"] == "10")
+        self.assertIn("severidade", q10["enunciado"].lower())
+        self.assertEqual(len(q10["alternatives"]), 5)
+        self.assertEqual(q10["alternatives"][4]["identifier"], "E")
+        self.assertEqual(q10["alternatives"][4]["text"], "incompreensão")
+
+        # 4. Check Questão 11 (Língua Inglesa)
+        q11 = next(q for q in questions if q["identifier"] == "11")
+        self.assertIn("The main idea of the text", q11["enunciado"])
+        self.assertEqual(len(q11["alternatives"]), 5)
+        self.assertEqual(q11["alternatives"][0]["identifier"], "A")
+        self.assertIn("disapprove space technology", q11["alternatives"][0]["text"])
+
+        # 5. Check Questão 24 (Java inverte function)
+        q24 = next(q for q in questions if q["identifier"] == "24")
+        self.assertIn("inverta", q24["enunciado"].lower())
+        self.assertEqual(len(q24["alternatives"]), 5)
+        for alt in q24["alternatives"]:
+            self.assertIn("inverte", alt["text"])
+
+        # 6. Check Questão 25 (SQL CREATE TABLE 2FN)
+        q25 = next(q for q in questions if q["identifier"] == "25")
+        self.assertIn("modelo E-R", q25["enunciado"])
+        self.assertEqual(len(q25["alternatives"]), 5)
+        for alt in q25["alternatives"]:
+            self.assertIn("CREATE TABLE", alt["text"])
+
+        # 7. Check Questão 63 (SQL WITH RECURSIVE)
+        q63 = next(q for q in questions if q["identifier"] == "63")
+        self.assertIn("HIERARQUIA", q63["enunciado"])
+        self.assertEqual(len(q63["alternatives"]), 5)
+
+        # 8. Check Questão 66 (Gráfico ciclo de vida)
+        q66 = next(q for q in questions if q["identifier"] == "66")
+        self.assertIn("ciclo de vida de um projeto", q66["enunciado"])
+        self.assertEqual(len(q66["alternatives"]), 5)
+
+        # 9. Verify 2 textual references
+        self.assertEqual(len(textual_references), 2)
+        self.assertIn("LÍNGUA PORTUGUESA", textual_references[0]["title"])
+        self.assertIn("LÍNGUA INGLESA", textual_references[1]["title"])
 
 if __name__ == '__main__':
     unittest.main()
