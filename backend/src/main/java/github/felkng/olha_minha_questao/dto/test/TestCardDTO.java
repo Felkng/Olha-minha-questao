@@ -24,4 +24,5 @@ public class TestCardDTO {
     private Double averageScore;
     private Long totalAttempts;
     private UserSummaryDTO createdByUser;
+    private Boolean isPublic;
 }

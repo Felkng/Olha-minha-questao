@@ -35,14 +35,20 @@ import TimerOutlinedIcon from '@mui/icons-material/TimerOutlined';
 import PublicIcon from '@mui/icons-material/Public';
 import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
-import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
+import EditIcon from '@mui/icons-material/Edit';
+import ListAltIcon from '@mui/icons-material/ListAlt';
+import PersonOutlineIcon from '@mui/icons-material/PersonOutline';
+import { Link, useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { Question, Test, TestAttemptSummary } from '../types';
 import { getTestById, getTestEvaluation, getTestAttempts, deleteTest, toggleTestVisibility } from '../services/api';
 import { QuestionCard } from '../components/questions/QuestionCard';
 import { QuestionWhiteboard } from '../components/whiteboard/QuestionWhiteboard';
 import { TestQuestionsNavigator } from '../components/questions/TestQuestionsNavigator';
 import { SaveTestToFolderModal } from '../components/folders/SaveTestToFolderModal';
+import { EditTestModal } from '../components/crud/EditTestModal';
+import { TestQuestionsManagerModal } from '../components/crud/TestQuestionsManagerModal';
 import { PALETTE_COLORS } from '../theme/theme';
+import { useAppTheme } from '../theme/ThemeContext';
 import { useAuth } from '../context/AuthContext';
 
 interface TestDetailPageProps {
@@ -56,6 +62,8 @@ export const TestDetailPage: React.FC<TestDetailPageProps> = ({
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { user, isAdmin, attemptedQuestionIds } = useAuth();
+  const { mode } = useAppTheme();
+  const isDark = mode === 'dark';
 
   const initialQ = Number(searchParams.get('q'));
   const initialMode = searchParams.get('mode') as 'single' | 'all' | null;
@@ -76,6 +84,12 @@ export const TestDetailPage: React.FC<TestDetailPageProps> = ({
   const [deleteDialogOpen, setDeleteDialogOpen] = useState<boolean>(false);
   const [deleteQuestionsAlso, setDeleteQuestionsAlso] = useState<boolean>(false);
   const [isDeleting, setIsDeleting] = useState<boolean>(false);
+  const [editModalOpen, setEditModalOpen] = useState<boolean>(false);
+  const [managerModalOpen, setManagerModalOpen] = useState<boolean>(false);
+
+  const isOwner = Boolean(user?.id && test?.createdByUser?.id && user.id === test.createdByUser.id);
+  const canEdit = isOwner || isAdmin;
+  const canDelete = isOwner || isAdmin;
 
   useEffect(() => {
     if (id) {
@@ -205,12 +219,33 @@ export const TestDetailPage: React.FC<TestDetailPageProps> = ({
                 size="small"
                 sx={{ backgroundColor: 'rgba(217, 183, 99, 0.15)', color: PALETTE_COLORS.primary, fontWeight: 700 }}
               />
-              <Tooltip title={user?.id === test.createdByUser?.id ? "Clique para alternar visibilidade (Pública/Privada)" : (test.isPublic !== false ? "Prova pública" : "Prova privada")}>
+              {test.createdByUser && (
+                <Chip
+                  icon={<PersonOutlineIcon fontSize="small" />}
+                  label={`Criado por ${test.createdByUser.name}`}
+                  size="small"
+                  component={Link}
+                  to={`/perfil/${test.createdByUser.id}`}
+                  clickable
+                  sx={{
+                    backgroundColor: isDark ? 'rgba(90, 166, 226, 0.12)' : 'rgba(90, 166, 226, 0.15)',
+                    color: PALETTE_COLORS.secondary,
+                    fontWeight: 600,
+                    border: '1px solid',
+                    borderColor: isDark ? 'rgba(90, 166, 226, 0.3)' : 'rgba(90, 166, 226, 0.4)',
+                    '&:hover': {
+                      backgroundColor: isDark ? 'rgba(90, 166, 226, 0.25)' : 'rgba(90, 166, 226, 0.3)',
+                      textDecoration: 'none',
+                    },
+                  }}
+                />
+              )}
+              <Tooltip title={canEdit ? "Clique para alternar visibilidade (Pública/Privada)" : (test.isPublic !== false ? "Prova pública" : "Prova privada")}>
                 <Chip
                   size="small"
                   icon={test.isPublic !== false ? <PublicIcon fontSize="inherit" /> : <LockOutlinedIcon fontSize="inherit" />}
                   label={test.isPublic !== false ? 'Pública' : 'Privada'}
-                  onClick={user?.id === test.createdByUser?.id ? async () => {
+                  onClick={canEdit ? async () => {
                     try {
                       const updated = await toggleTestVisibility(test.id);
                       setTest({ ...test, isPublic: updated.isPublic });
@@ -218,7 +253,7 @@ export const TestDetailPage: React.FC<TestDetailPageProps> = ({
                       console.error('Erro ao alternar visibilidade:', e);
                     }
                   } : undefined}
-                  clickable={user?.id === test.createdByUser?.id}
+                  clickable={canEdit}
                   sx={{
                     backgroundColor: test.isPublic !== false
                       ? 'rgba(75, 241, 81, 0.15)'
@@ -227,7 +262,7 @@ export const TestDetailPage: React.FC<TestDetailPageProps> = ({
                     border: '1px solid',
                     borderColor: test.isPublic !== false ? PALETTE_COLORS.success : PALETTE_COLORS.danger,
                     fontWeight: 700,
-                    cursor: user?.id === test.createdByUser?.id ? 'pointer' : 'default',
+                    cursor: canEdit ? 'pointer' : 'default',
                   }}
                 />
               </Tooltip>
@@ -251,7 +286,27 @@ export const TestDetailPage: React.FC<TestDetailPageProps> = ({
             >
               Compartilhar
             </Button>
-            {(user?.id === test.createdByUser?.id || (isAdmin && (test.isPublic !== false))) && (
+            {canEdit && (
+              <Button
+                variant="outlined"
+                startIcon={<ListAltIcon />}
+                onClick={() => setManagerModalOpen(true)}
+                sx={{ fontWeight: 700, borderRadius: 2 }}
+              >
+                Gerenciar Questões
+              </Button>
+            )}
+            {canEdit && (
+              <Button
+                variant="outlined"
+                startIcon={<EditIcon />}
+                onClick={() => setEditModalOpen(true)}
+                sx={{ fontWeight: 700, borderRadius: 2 }}
+              >
+                Editar Prova
+              </Button>
+            )}
+            {canDelete && (
               <Button
                 variant="outlined"
                 color="error"
@@ -259,7 +314,7 @@ export const TestDetailPage: React.FC<TestDetailPageProps> = ({
                 onClick={() => setDeleteDialogOpen(true)}
                 sx={{ fontWeight: 700, borderRadius: 2 }}
               >
-                {isAdmin && user?.id !== test.createdByUser?.id ? 'Moderar (Excluir)' : 'Excluir'}
+                {isAdmin && !isOwner ? 'Moderar (Excluir)' : 'Excluir'}
               </Button>
             )}
             <Button
@@ -519,14 +574,14 @@ export const TestDetailPage: React.FC<TestDetailPageProps> = ({
         fullWidth
       >
         <DialogTitle sx={{ fontWeight: 700 }}>
-          {isAdmin && test?.createdByUser?.id !== user?.id
-            ? 'Moderação: Excluir Prova Pública'
+          {isAdmin && !isOwner
+            ? 'Moderação: Excluir Prova'
             : 'Excluir Prova'}
         </DialogTitle>
         <DialogContent>
           <DialogContentText sx={{ mb: 2 }}>
-            {isAdmin && test?.createdByUser?.id !== user?.id
-              ? `Como Administrador, você está prestes a remover a prova pública "${test?.name}" criada por outro usuário. Deseja continuar?`
+            {isAdmin && !isOwner
+              ? `Como Administrador, você está prestes a remover a prova "${test?.name}" criada por outro usuário. Deseja continuar?`
               : `Tem certeza que deseja excluir a prova "${test?.name}"?`}
           </DialogContentText>
 
@@ -600,6 +655,23 @@ export const TestDetailPage: React.FC<TestDetailPageProps> = ({
           </Button>
         </DialogActions>
       </Dialog>
+
+      {test && (
+        <>
+          <EditTestModal
+            open={editModalOpen}
+            onClose={() => setEditModalOpen(false)}
+            onUpdated={() => loadTest(test.id)}
+            test={test}
+          />
+          <TestQuestionsManagerModal
+            open={managerModalOpen}
+            onClose={() => setManagerModalOpen(false)}
+            onUpdated={() => loadTest(test.id)}
+            test={test}
+          />
+        </>
+      )}
     </Box>
   );
 };

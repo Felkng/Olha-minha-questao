@@ -3,7 +3,7 @@ import { Grid, Paper, Box, Skeleton, Stack } from '@mui/material';
 
 interface CardGridSkeletonProps {
   count?: number;
-  columns?: { xs?: number; sm?: number; md?: number; lg?: number };
+  columns?: { xs?: number; sm?: number; md?: number; lg?: number; xl?: number };
   cardHeight?: number | string;
 }
 
@@ -22,6 +22,7 @@ export const CardGridSkeleton: React.FC<CardGridSkeletonProps> = ({
           sm={columns.sm ?? 6}
           md={columns.md ?? 4}
           lg={columns.lg ?? columns.md ?? 4}
+          xl={columns.xl ?? columns.lg ?? columns.md ?? 4}
         >
           <Paper
             elevation={3}

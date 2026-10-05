@@ -31,7 +31,8 @@ import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import PublicIcon from '@mui/icons-material/Public';
 import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
-import { useNavigate } from 'react-router-dom';
+import PersonOutlineIcon from '@mui/icons-material/PersonOutline';
+import { Link, useNavigate } from 'react-router-dom';
 import { TestCard } from '../types';
 import { getTestCards, deleteTest, toggleTestVisibility } from '../services/api';
 import { PALETTE_COLORS } from '../theme/theme';
@@ -257,7 +258,8 @@ export const TestsPage: React.FC = () => {
           {filteredTests.map((test) => {
             const isOwner = Boolean(user?.id && test.createdByUser?.id && user.id === test.createdByUser.id);
             const isPublic = test.isPublic !== undefined ? test.isPublic : true;
-            const canDelete = isOwner || (isAdmin && isPublic);
+            const canEdit = isOwner || isAdmin;
+            const canDelete = isOwner || isAdmin;
 
             return (
               <Grid item xs={12} md={6} key={test.id}>
@@ -284,7 +286,7 @@ export const TestsPage: React.FC = () => {
                       </Typography>
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                         {getDifficultyBadge(test.difficultyLevel)}
-                        {isOwner && (
+                        {canEdit && (
                           <Tooltip title="Editar prova">
                             <IconButton size="small" onClick={() => setEditingTest(test)}>
                               <EditOutlinedIcon fontSize="small" />
@@ -292,7 +294,7 @@ export const TestsPage: React.FC = () => {
                           </Tooltip>
                         )}
                         {canDelete && (
-                          <Tooltip title={isAdmin && !isOwner ? "Moderar / Excluir prova pública (Admin)" : "Excluir prova"}>
+                          <Tooltip title={isAdmin && !isOwner ? "Moderar / Excluir prova (Admin)" : "Excluir prova"}>
                             <IconButton size="small" color="error" onClick={() => setDeletingTest(test)}>
                               <DeleteOutlineIcon fontSize="small" />
                             </IconButton>
@@ -302,6 +304,27 @@ export const TestsPage: React.FC = () => {
                     </Box>
 
                     <Stack direction="row" spacing={1} flexWrap="wrap" sx={{ gap: 0.8, mb: 2 }}>
+                      {test.createdByUser && (
+                        <Chip
+                          size="small"
+                          icon={<PersonOutlineIcon fontSize="small" />}
+                          label={`Criado por ${test.createdByUser.name}`}
+                          component={Link}
+                          to={`/perfil/${test.createdByUser.id}`}
+                          clickable
+                          sx={{
+                            backgroundColor: isDark ? 'rgba(90, 166, 226, 0.12)' : 'rgba(90, 166, 226, 0.15)',
+                            color: PALETTE_COLORS.secondary,
+                            fontWeight: 600,
+                            border: '1px solid',
+                            borderColor: isDark ? 'rgba(90, 166, 226, 0.3)' : 'rgba(90, 166, 226, 0.4)',
+                            '&:hover': {
+                              backgroundColor: isDark ? 'rgba(90, 166, 226, 0.25)' : 'rgba(90, 166, 226, 0.3)',
+                              textDecoration: 'none',
+                            },
+                          }}
+                        />
+                      )}
                       <Chip
                         size="small"
                         label={`Ano ${test.year}`}
@@ -334,18 +357,18 @@ export const TestsPage: React.FC = () => {
                         sx={{ backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)' }}
                       />
 
-                      <Tooltip title={isOwner ? "Clique para alternar visibilidade (Pública/Privada)" : (isPublic ? "Prova pública" : "Prova privada")}>
+                      <Tooltip title={canEdit ? "Clique para alternar visibilidade (Pública/Privada)" : (isPublic ? "Prova pública" : "Prova privada")}>
                         <Chip
                           size="small"
                           icon={isPublic ? <PublicIcon fontSize="inherit" /> : <LockOutlinedIcon fontSize="inherit" />}
                           label={isPublic ? 'Pública' : 'Privada'}
-                          onClick={isOwner ? async () => {
+                          onClick={canEdit ? async () => {
                             try {
                               await toggleTestVisibility(test.id);
                               loadTests();
                             } catch (e) { console.error(e); }
                           } : undefined}
-                          clickable={isOwner}
+                          clickable={canEdit}
                           sx={{
                             backgroundColor: isPublic
                               ? (isDark ? 'rgba(75, 241, 81, 0.12)' : 'rgba(75, 241, 81, 0.15)')
@@ -354,7 +377,7 @@ export const TestsPage: React.FC = () => {
                             border: '1px solid',
                             borderColor: isPublic ? PALETTE_COLORS.success : PALETTE_COLORS.danger,
                             fontWeight: 700,
-                            cursor: isOwner ? 'pointer' : 'default',
+                            cursor: canEdit ? 'pointer' : 'default',
                           }}
                         />
                       </Tooltip>
@@ -438,13 +461,13 @@ export const TestsPage: React.FC = () => {
       >
         <DialogTitle sx={{ fontWeight: 700 }}>
           {isAdmin && deletingTest?.createdByUser?.id !== user?.id
-            ? 'Moderação: Excluir Prova Pública'
+            ? 'Moderação: Excluir Prova'
             : 'Excluir Prova'}
         </DialogTitle>
         <DialogContent>
           <DialogContentText sx={{ mb: 2 }}>
             {isAdmin && deletingTest?.createdByUser?.id !== user?.id
-              ? `Como Administrador, você está prestes a remover a prova pública "${deletingTest?.name}" criada por outro usuário. Deseja continuar?`
+              ? `Como Administrador, você está prestes a remover a prova "${deletingTest?.name}" criada por outro usuário. Deseja continuar?`
               : `Tem certeza que deseja excluir a prova "${deletingTest?.name}"?`}
           </DialogContentText>
 

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams, Link } from 'react-router-dom';
 import {
   Alert,
   Avatar,
@@ -43,6 +43,7 @@ import {
 } from '@mui/material';
 import { ProfileSkeleton, ListItemsSkeleton, CardGridSkeleton } from '../components/skeletons';
 import PersonIcon from '@mui/icons-material/Person';
+import PersonOutlineIcon from '@mui/icons-material/PersonOutline';
 import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
@@ -1854,6 +1855,27 @@ export const UserProfilePage: React.FC = () => {
                               color="primary"
                               sx={{ fontWeight: 'bold' }}
                             />
+                            {q.createdByUser && (
+                              <Chip
+                                size="small"
+                                icon={<PersonOutlineIcon fontSize="small" />}
+                                label={`Adicionado por ${q.createdByUser.name}`}
+                                component={Link}
+                                to={`/perfil/${q.createdByUser.id}`}
+                                clickable
+                                sx={{
+                                  backgroundColor: isDark ? 'rgba(90, 166, 226, 0.12)' : 'rgba(90, 166, 226, 0.15)',
+                                  color: PALETTE_COLORS.secondary,
+                                  fontWeight: 600,
+                                  border: '1px solid',
+                                  borderColor: isDark ? 'rgba(90, 166, 226, 0.3)' : 'rgba(90, 166, 226, 0.4)',
+                                  '&:hover': {
+                                    backgroundColor: isDark ? 'rgba(90, 166, 226, 0.25)' : 'rgba(90, 166, 226, 0.3)',
+                                    textDecoration: 'none',
+                                  },
+                                }}
+                              />
+                            )}
                             {q.areaName && <Chip label={q.areaName} size="small" variant="outlined" />}
                             {q.originName && <Chip label={q.originName} size="small" variant="outlined" />}
                             {q.subjectName && <Chip label={q.subjectName} size="small" variant="outlined" />}
@@ -2007,6 +2029,27 @@ export const UserProfilePage: React.FC = () => {
                           </Typography>
 
                           <Stack direction="row" spacing={1} alignItems="center" sx={{ mt: 0.5, flexWrap: 'wrap', gap: 0.5 }}>
+                            {t.createdByUser && (
+                              <Chip
+                                size="small"
+                                icon={<PersonOutlineIcon fontSize="small" />}
+                                label={`Criado por ${t.createdByUser.name}`}
+                                component={Link}
+                                to={`/perfil/${t.createdByUser.id}`}
+                                clickable
+                                sx={{
+                                  backgroundColor: isDark ? 'rgba(90, 166, 226, 0.12)' : 'rgba(90, 166, 226, 0.15)',
+                                  color: PALETTE_COLORS.secondary,
+                                  fontWeight: 600,
+                                  border: '1px solid',
+                                  borderColor: isDark ? 'rgba(90, 166, 226, 0.3)' : 'rgba(90, 166, 226, 0.4)',
+                                  '&:hover': {
+                                    backgroundColor: isDark ? 'rgba(90, 166, 226, 0.25)' : 'rgba(90, 166, 226, 0.3)',
+                                    textDecoration: 'none',
+                                  },
+                                }}
+                              />
+                            )}
                             {t.originName && <Chip label={`Banca: ${t.originName}`} size="small" variant="outlined" />}
                             {t.areaName && <Chip label={`Área: ${t.areaName}`} size="small" variant="outlined" />}
                             <Chip label={`Ano: ${t.year}`} size="small" variant="outlined" />
@@ -2117,7 +2160,7 @@ export const UserProfilePage: React.FC = () => {
               </Tabs>
 
               {loadingFolders ? (
-                <CardGridSkeleton count={3} columns={{ xs: 12, sm: 6, md: 4 }} cardHeight={180} />
+                <CardGridSkeleton count={3} columns={{ xs: 12, sm: 12, md: 6, xl: 4 }} cardHeight={180} />
               ) : myFolders.length === 0 ? (
                 <Box sx={{ textAlign: 'center', py: 6 }}>
                   <Typography color="text.secondary" sx={{ mb: 2 }}>
@@ -2134,7 +2177,7 @@ export const UserProfilePage: React.FC = () => {
               ) : (
                 <Grid container spacing={2.5}>
                   {myFolders.map((folder) => (
-                    <Grid item xs={12} sm={6} md={4} key={folder.id}>
+                    <Grid item xs={12} sm={12} md={6} xl={4} key={folder.id}>
                       <Paper
                         variant="outlined"
                         sx={{
@@ -2307,7 +2350,7 @@ export const UserProfilePage: React.FC = () => {
               {flashcardSubTab === 'DECKS' && (
                 <>
                   {loadingFlashcardFolders ? (
-                    <CardGridSkeleton count={3} columns={{ xs: 12, sm: 6, md: 4 }} cardHeight={180} />
+                    <CardGridSkeleton count={3} columns={{ xs: 12, sm: 12, md: 6, xl: 4 }} cardHeight={200} />
                   ) : myFlashcardFolders.length === 0 ? (
                     <Box sx={{ textAlign: 'center', py: 6 }}>
                       <Typography color="text.secondary" sx={{ mb: 2 }}>
@@ -2334,28 +2377,32 @@ export const UserProfilePage: React.FC = () => {
                             : true
                         )
                         .map((folder) => (
-                          <Grid item xs={12} sm={6} md={4} key={folder.id}>
+                          <Grid item xs={12} sm={12} md={6} xl={4} key={folder.id}>
                             <Paper
                               variant="outlined"
                               sx={{
                                 p: 2.5,
                                 borderRadius: 2.5,
                                 height: '100%',
+                                minHeight: 220,
                                 display: 'flex',
                                 flexDirection: 'column',
                                 justifyContent: 'space-between',
                                 borderTop: `4px solid ${folder.color || PALETTE_COLORS.primary}`,
+                                transition: 'all 0.2s ease-in-out',
                                 '&:hover': {
-                                  boxShadow: 3,
+                                  boxShadow: 4,
+                                  borderColor: folder.color || PALETTE_COLORS.primary,
+                                  transform: 'translateY(-2px)',
                                 },
                               }}
                             >
-                              <Box>
-                                <Stack direction="row" justifyContent="space-between" alignItems="flex-start" sx={{ mb: 1 }}>
-                                  <Typography variant="h6" fontWeight="bold" sx={{ wordBreak: 'break-word' }}>
+                              <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+                                <Stack direction="row" justifyContent="space-between" alignItems="flex-start" sx={{ mb: 1, gap: 1 }}>
+                                  <Typography variant="h6" fontWeight="bold" sx={{ wordBreak: 'break-word', lineHeight: 1.35, fontSize: '1.05rem', flex: 1 }}>
                                     {folder.name}
                                   </Typography>
-                                  <Stack direction="row" spacing={0.5} alignItems="center">
+                                  <Stack direction="row" spacing={0.5} alignItems="center" sx={{ flexShrink: 0 }}>
                                     <Tooltip title="Editar Deck">
                                       <IconButton
                                         size="small"
@@ -2389,13 +2436,15 @@ export const UserProfilePage: React.FC = () => {
                                   </Stack>
                                 </Stack>
 
-                                {folder.description && (
-                                  <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5, wordBreak: 'break-word' }}>
+                                {folder.description ? (
+                                  <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5, wordBreak: 'break-word', flex: 1 }}>
                                     {folder.description}
                                   </Typography>
+                                ) : (
+                                  <Box sx={{ flex: 1, mb: 1.5 }} />
                                 )}
 
-                                <Stack direction="row" spacing={1} alignItems="center" sx={{ flexWrap: 'wrap', gap: 0.5 }}>
+                                <Stack direction="row" spacing={1} alignItems="center" sx={{ flexWrap: 'wrap', gap: 0.8, mt: 'auto' }}>
                                   <Chip
                                     size="small"
                                     icon={<StyleOutlinedIcon />}
@@ -2411,7 +2460,7 @@ export const UserProfilePage: React.FC = () => {
                                 </Stack>
                               </Box>
 
-                              <Box sx={{ mt: 2, pt: 1.5, borderTop: 1, borderColor: 'divider', display: 'flex', gap: 1, justifyContent: 'space-between', alignItems: 'center' }}>
+                              <Box sx={{ mt: 2, pt: 1.5, borderTop: 1, borderColor: 'divider', display: 'flex', gap: 1.5, justifyContent: 'space-between', alignItems: 'center' }}>
                                 <Button
                                   size="small"
                                   variant="outlined"
@@ -2420,7 +2469,7 @@ export const UserProfilePage: React.FC = () => {
                                       state: { from: `/perfil/${userId}?tab=flashcards`, fromTitle: 'Voltar para Meus Flashcards' },
                                     })
                                   }
-                                  sx={{ textTransform: 'none', fontWeight: 600, borderRadius: 2 }}
+                                  sx={{ textTransform: 'none', fontWeight: 600, borderRadius: 2, flex: 1 }}
                                 >
                                   Ver Cards
                                 </Button>
@@ -2439,6 +2488,7 @@ export const UserProfilePage: React.FC = () => {
                                     borderRadius: 2,
                                     backgroundColor: PALETTE_COLORS.primary,
                                     color: '#1a1e24',
+                                    flex: 1,
                                   }}
                                 >
                                   Estudar
@@ -2455,7 +2505,7 @@ export const UserProfilePage: React.FC = () => {
               {flashcardSubTab === 'CARDS' && (
                 <>
                   {loadingFlashcards ? (
-                    <CardGridSkeleton count={4} columns={{ xs: 12, sm: 6, md: 4 }} cardHeight={220} />
+                    <CardGridSkeleton count={4} columns={{ xs: 12, sm: 12, md: 6, xl: 4 }} cardHeight={220} />
                   ) : myFlashcards.length === 0 ? (
                     <Box sx={{ textAlign: 'center', py: 6 }}>
                       <Typography color="text.secondary" sx={{ mb: 2 }}>
@@ -2483,7 +2533,7 @@ export const UserProfilePage: React.FC = () => {
                         .map((card) => {
                           const isFlipped = flippedProfileCards[card.id] || false;
                           return (
-                            <Grid item xs={12} sm={6} md={4} key={card.id}>
+                            <Grid item xs={12} sm={12} md={6} xl={4} key={card.id}>
                               <Paper
                                 variant="outlined"
                                 sx={{

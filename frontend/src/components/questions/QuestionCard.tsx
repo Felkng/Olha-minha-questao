@@ -27,6 +27,7 @@ import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import MenuBookIcon from '@mui/icons-material/MenuBook';
 import BorderColorIcon from '@mui/icons-material/BorderColor';
+import PersonOutlineIcon from '@mui/icons-material/PersonOutline';
 import { Link, useLocation } from 'react-router-dom';
 import { DifficultyLevel, Question } from '../../types';
 import { PALETTE_COLORS } from '../../theme/theme';
@@ -92,7 +93,8 @@ export const QuestionCard: React.FC<QuestionCardProps> = ({
   const [isDeleting, setIsDeleting] = useState<boolean>(false);
 
   const isOwner = Boolean(user?.id && question.createdByUser?.id && user.id === question.createdByUser.id);
-  const canDelete = isOwner || (isAdmin && isPublicState);
+  const canEdit = isOwner || isAdmin;
+  const canDelete = isOwner || isAdmin;
 
   const handleToggleVisibility = async () => {
     try {
@@ -354,30 +356,35 @@ export const QuestionCard: React.FC<QuestionCardProps> = ({
           )}
 
           {question.createdByUser && (
-            <Typography
+            <Chip
+              size="small"
+              icon={<PersonOutlineIcon fontSize="small" />}
+              label={`Adicionado por ${question.createdByUser.name}`}
               component={Link}
               to={`/perfil/${question.createdByUser.id}`}
-              variant="caption"
+              clickable
               sx={{
+                backgroundColor: isDark ? 'rgba(90, 166, 226, 0.12)' : 'rgba(90, 166, 226, 0.15)',
                 color: PALETTE_COLORS.secondary,
                 fontWeight: 600,
-                textDecoration: 'none',
-                ml: 1,
-                '&:hover': { textDecoration: 'underline' },
+                border: '1px solid',
+                borderColor: isDark ? 'rgba(90, 166, 226, 0.3)' : 'rgba(90, 166, 226, 0.4)',
+                '&:hover': {
+                  backgroundColor: isDark ? 'rgba(90, 166, 226, 0.25)' : 'rgba(90, 166, 226, 0.3)',
+                  textDecoration: 'none',
+                },
               }}
-            >
-              Adicionado por {question.createdByUser.name}
-            </Typography>
+            />
           )}
 
           {isPublicState !== undefined && (
-            <Tooltip title={isOwner ? "Clique para alternar visibilidade (Pública/Privada)" : (isPublicState ? "Questão pública" : "Questão privada")}>
+            <Tooltip title={canEdit ? "Clique para alternar visibilidade (Pública/Privada)" : (isPublicState ? "Questão pública" : "Questão privada")}>
               <Chip
                 size="small"
                 icon={isPublicState ? <PublicIcon fontSize="inherit" /> : <LockOutlinedIcon fontSize="inherit" />}
                 label={isPublicState ? 'Pública' : 'Privada'}
-                onClick={isOwner ? handleToggleVisibility : undefined}
-                clickable={isOwner}
+                onClick={canEdit ? handleToggleVisibility : undefined}
+                clickable={canEdit}
                 sx={{
                   backgroundColor: isPublicState
                     ? (isDark ? 'rgba(75, 241, 81, 0.12)' : 'rgba(75, 241, 81, 0.15)')
@@ -386,7 +393,7 @@ export const QuestionCard: React.FC<QuestionCardProps> = ({
                   border: '1px solid',
                   borderColor: isPublicState ? PALETTE_COLORS.success : PALETTE_COLORS.danger,
                   fontWeight: 700,
-                  cursor: isOwner ? 'pointer' : 'default',
+                  cursor: canEdit ? 'pointer' : 'default',
                 }}
               />
             </Tooltip>
@@ -428,7 +435,7 @@ export const QuestionCard: React.FC<QuestionCardProps> = ({
             </Tooltip>
           )}
 
-          {isOwner && (
+          {canEdit && (
             <Tooltip title="Editar questão">
               <IconButton
                 size="small"
@@ -829,12 +836,12 @@ export const QuestionCard: React.FC<QuestionCardProps> = ({
         onClose={() => !isDeleting && setDeleteDialogOpen(false)}
       >
         <DialogTitle sx={{ fontWeight: 700 }}>
-          {isAdmin && !isOwner ? 'Moderação: Excluir Questão Pública' : 'Excluir Questão'}
+          {isAdmin && !isOwner ? 'Moderação: Excluir Questão' : 'Excluir Questão'}
         </DialogTitle>
         <DialogContent>
           <DialogContentText>
             {isAdmin && !isOwner
-              ? 'Como Administrador, você está prestes a remover esta questão pública criada por outro usuário. Deseja continuar?'
+              ? 'Como Administrador, você está prestes a remover esta questão criada por outro usuário. Deseja continuar?'
               : 'Tem certeza que deseja excluir esta questão? Esta ação não pode ser desfeita.'}
           </DialogContentText>
         </DialogContent>

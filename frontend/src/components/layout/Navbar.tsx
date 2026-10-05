@@ -264,17 +264,6 @@ export const Navbar: React.FC = () => {
                   <MenuItem
                     onClick={() => {
                       handleCloseUserMenu();
-                      navigate(`/perfil/${user.id}?tab=flashcards`);
-                    }}
-                  >
-                    <ListItemIcon>
-                      <StyleOutlinedIcon fontSize="small" />
-                    </ListItemIcon>
-                    <ListItemText primary="Meus Flashcards" />
-                  </MenuItem>
-                  <MenuItem
-                    onClick={() => {
-                      handleCloseUserMenu();
                       logout();
                     }}
                   >
@@ -447,18 +436,6 @@ export const Navbar: React.FC = () => {
                   <PersonIcon fontSize="small" />
                 </ListItemIcon>
                 <ListItemText primary="Meu Perfil" />
-              </ListItemButton>
-              <ListItemButton
-                onClick={() => {
-                  setMobileNavOpen(false);
-                  navigate(`/perfil/${user.id}?tab=flashcards`);
-                }}
-                sx={{ borderRadius: 2, mb: 0.5 }}
-              >
-                <ListItemIcon sx={{ minWidth: 38 }}>
-                  <StyleOutlinedIcon fontSize="small" />
-                </ListItemIcon>
-                <ListItemText primary="Meus Flashcards" />
               </ListItemButton>
               <ListItemButton
                 onClick={() => {

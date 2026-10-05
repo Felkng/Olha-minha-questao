@@ -46,6 +46,7 @@ public class TestService {
     private final QuestionMapper questionMapper;
     private final github.felkng.olha_minha_questao.mapper.AlternativeMapper alternativeMapper;
     private final github.felkng.olha_minha_questao.mapper.TextualReferenceMapper textualReferenceMapper;
+    private final github.felkng.olha_minha_questao.mapper.UserMapper userMapper;
 
     @Transactional(readOnly = true)
     public List<TestCardDTO> findTestCards() {
@@ -54,9 +55,13 @@ public class TestService {
 
     @Transactional(readOnly = true)
     public List<TestCardDTO> findTestCards(Long currentUserId) {
+        github.felkng.olha_minha_questao.domain.entity.User currentUser = currentUserId != null
+                ? userRepository.findById(currentUserId).orElse(null)
+                : null;
+        boolean isAdmin = currentUser != null && currentUser.getRole() == github.felkng.olha_minha_questao.domain.entity.UserRole.ADMIN;
         List<Test> tests = testRepository.findAllByOrderByYearDescIdDesc();
         return tests.stream()
-                .filter(t -> Boolean.TRUE.equals(t.getIsPublic()) || (currentUserId != null && t.getCreatedByUser() != null && t.getCreatedByUser().getId().equals(currentUserId)))
+                .filter(t -> isAdmin || Boolean.TRUE.equals(t.getIsPublic()) || (currentUser != null && t.getCreatedByUser() != null && t.getCreatedByUser().getId().equals(currentUser.getId())))
                 .map(test -> {
                     TestStatistic stat = test.getStatistic();
                     int qCount = questionRepository.findAllQuestionsByTestId(test.getId()).size();
@@ -72,6 +77,8 @@ public class TestService {
                             .difficultyLevel(stat != null ? stat.getDifficultyLevel() : DifficultyLevel.SEM_DADOS)
                             .averageScore(stat != null ? stat.getAverageScore() : 0.0)
                             .totalAttempts(stat != null ? stat.getTotalAttempts() : 0L)
+                            .createdByUser(userMapper.toSummaryDTO(test.getCreatedByUser()))
+                            .isPublic(test.getIsPublic())
                             .build();
                 }).toList();
     }
@@ -111,6 +118,11 @@ public class TestService {
 
     @Transactional(readOnly = true)
     public List<TestResponseDTO> findAll(Long originId, Long areaId, Integer year, Long createdByUserId, Long currentUserId) {
+        github.felkng.olha_minha_questao.domain.entity.User currentUser = currentUserId != null
+                ? userRepository.findById(currentUserId).orElse(null)
+                : null;
+        boolean isAdmin = currentUser != null && currentUser.getRole() == github.felkng.olha_minha_questao.domain.entity.UserRole.ADMIN;
+
         List<Test> tests;
         if (createdByUserId != null) {
             tests = testRepository.findByCreatedByUserIdOrderByYearDescIdDesc(createdByUserId);
@@ -128,6 +140,9 @@ public class TestService {
 
         return tests.stream()
                 .filter(t -> {
+                    if (isAdmin) {
+                        return true;
+                    }
                     if (createdByUserId != null && createdByUserId.equals(currentUserId)) {
                         return true;
                     }
@@ -444,14 +459,7 @@ public class TestService {
         if (userId != null) {
             github.felkng.olha_minha_questao.domain.entity.User user = userRepository.findById(userId)
                     .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado com o id: " + userId));
-            if (user.getRole() == github.felkng.olha_minha_questao.domain.entity.UserRole.ADMIN) {
-                // Admin pode excluir se for público ou criado por ele mesmo
-                if (!Boolean.TRUE.equals(test.getIsPublic()) && (test.getCreatedByUser() == null || !test.getCreatedByUser().getId().equals(user.getId()))) {
-                    throw new org.springframework.web.server.ResponseStatusException(
-                            org.springframework.http.HttpStatus.FORBIDDEN,
-                            "Administradores podem moderar apenas conteúdos públicos de terceiros.");
-                }
-            } else {
+            if (user.getRole() != github.felkng.olha_minha_questao.domain.entity.UserRole.ADMIN) {
                 // Usuário comum só pode excluir suas próprias provas
                 if (test.getCreatedByUser() == null || !test.getCreatedByUser().getId().equals(user.getId())) {
                     throw new org.springframework.web.server.ResponseStatusException(
