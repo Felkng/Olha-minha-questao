@@ -50,9 +50,9 @@ def sanitize_text_noise(text: str) -> str:
     if not text:
         return ""
     text = decode_symbols(text)
-    # Remove reversed/spaced watermarks like O H N U C S A R, R A S C U N H O
-    text = re.sub(r'(?i)\bO\s*H\s*N\s*U\s*C\s*S\s*A\s*R\b', '', text)
-    text = re.sub(r'(?i)\bR\s*A\s*S\s*C\s*U\s*N\s*H\s*O\b', '', text)
+    # Remove reversed/spaced watermarks like O H N U C S A R, R A S C U N H O (with optional markdown markup)
+    text = re.sub(r'(?i)(?:(?:\*|_)*O(?:\*|_)*\s*(?:\*|_)*H(?:\*|_)*\s*(?:\*|_)*N(?:\*|_)*\s*(?:\*|_)*U(?:\*|_)*\s*(?:\*|_)*C(?:\*|_)*\s*(?:\*|_)*S(?:\*|_)*\s*(?:\*|_)*A(?:\*|_)*\s*(?:\*|_)*R(?:\*|_)*)', '', text)
+    text = re.sub(r'(?i)(?:(?:\*|_)*R(?:\*|_)*\s*(?:\*|_)*A(?:\*|_)*\s*(?:\*|_)*S(?:\*|_)*\s*(?:\*|_)*C(?:\*|_)*\s*(?:\*|_)*U(?:\*|_)*\s*(?:\*|_)*N(?:\*|_)*\s*(?:\*|_)*H(?:\*|_)*\s*(?:\*|_)*O(?:\*|_)*)', '', text)
     text = re.sub(r'(?i)\bG\s*A\s*B\s*A\s*R\s*I\s*T\s*O\b', '', text)
     text = re.sub(r'(?i)\bD\s+E\s+S\s+T\s+A\s+Q\s+U\s+E\b', '', text)
     text = re.sub(r'(?i)\bF\s*O\s*L\s*H\s*A\s+D\s*E\s+R\s*E\s*S\s*P\s*O\s*S\s*T\s*A\s*S?\b', '', text)
@@ -341,7 +341,7 @@ def extract_rich_text_from_crop(crop: Any) -> str:
             h = abs(l.get('bottom', 0) - l.get('top', 0))
             top = l.get('top', 0)
             bot = l.get('bottom', 0)
-            if top <= crop_bbox[1] + 25 or bot >= crop_bbox[3] - 25:
+            if top <= 10 or bot >= crop_h - 10:
                 continue
             if w > crop_w * 0.75 or h > crop_h * 0.75:
                 continue
@@ -350,11 +350,13 @@ def extract_rich_text_from_crop(crop: Any) -> str:
 
         diag_rects = []
         for r in getattr(crop, 'rects', []):
+            if r.get('tag') == 'Artifact' or (not r.get('stroke') and r.get('non_stroking_color') in [(0, 0, 0, 0), None]):
+                continue
             w = r.get('width', 0)
             h = r.get('height', 0)
             top = r.get('top', 0)
             bot = r.get('bottom', 0)
-            if top <= crop_bbox[1] + 25 or bot >= crop_bbox[3] - 25:
+            if top <= 10 or bot >= crop_h - 10:
                 continue
             if w >= 8 and h >= 8 and w < crop_w * 0.75 and h < crop_h * 0.75:
                 diag_rects.append(r)
@@ -415,18 +417,22 @@ def extract_rich_text_from_crop(crop: Any) -> str:
                 if has_alts:
                     continue
 
-                words_in_c = [w for w in words if c['x0']-25 <= w.get('x0',0) and w.get('x1',0) <= c['x1']+25 and c['y0']-15 <= w.get('top',0) and w.get('bottom',0) <= c['y1']+15]
+                words_in_c = [
+                    w for w in words
+                    if c['x0'] - 10 <= w.get('x0', 0) and w.get('x1', 0) <= c['x1'] + 10
+                    and c['y0'] - 10 <= w.get('top', 0) and w.get('bottom', 0) <= c['y1'] + 10
+                ]
 
-                pad_x0 = max(crop_bbox[0], c['x0'] - 6)
-                pad_y0 = max(crop_bbox[1], c['y0'] - 6)
-                pad_x1 = min(crop_bbox[2], c['x1'] + 6)
-                pad_y1 = min(crop_bbox[3], c['y1'] + 6)
+                pad_x0 = max(0, c['x0'] - 4)
+                pad_y0 = max(0, c['y0'] - 4)
+                pad_x1 = min(crop_w, c['x1'] + 4)
+                pad_y1 = min(crop_h, c['y1'] + 4)
 
                 if words_in_c:
-                    pad_x0 = max(crop_bbox[0], min(pad_x0, min(w['x0'] for w in words_in_c) - 2))
-                    pad_y0 = max(crop_bbox[1], min(pad_y0, min(w['top'] for w in words_in_c) - 2))
-                    pad_x1 = min(crop_bbox[2], max(pad_x1, max(w['x1'] for w in words_in_c) + 2))
-                    pad_y1 = min(crop_bbox[3], max(pad_y1, max(w['bottom'] for w in words_in_c) + 2))
+                    pad_x0 = max(0, min(pad_x0, min(w['x0'] for w in words_in_c) - 2))
+                    pad_y0 = max(0, min(pad_y0, min(w['top'] for w in words_in_c) - 2))
+                    pad_x1 = min(crop_w, max(pad_x1, max(w['x1'] for w in words_in_c) + 2))
+                    pad_y1 = min(crop_h, max(pad_y1, max(w['bottom'] for w in words_in_c) + 2))
 
                 diag_bbox = (pad_x0, pad_y0, pad_x1, pad_y1)
                 try:
@@ -541,7 +547,7 @@ def is_two_column_page(page: Any, width: float, height: float) -> bool:
         return False
 
     mid = width / 2
-    body_words = [w for w in words if 40 <= w.get("top", 0) <= height - 40]
+    body_words = [w for w in words if 35 <= w.get("top", 0) <= height - 55]
     if len(body_words) < 25:
         return False
 
@@ -580,13 +586,119 @@ def is_two_column_page(page: Any, width: float, height: float) -> bool:
                     two_col_lines += 1
                     break
 
-    if two_col_lines >= 15 and two_col_lines > 2 * full_sentence_lines:
+    if (two_col_lines >= 15 and two_col_lines > 2 * full_sentence_lines) or (full_sentence_lines <= 1 and two_col_lines >= 4):
         return True
 
-    if full_sentence_lines >= 2:
-        return False
+    return False
 
-    return two_col_lines >= 3
+def get_page_crops(p: Any, width: float, height: float) -> List[str]:
+    """
+    Decomposes a page into logical column crops, supporting single-column, pure 2-column,
+    and hybrid layouts (where top is single-column full-width and bottom is 2-column).
+    """
+    top_m = 35
+    bot_m = height - 55
+    mid = width / 2
+    if not hasattr(p, 'extract_words'):
+        return [extract_rich_text_from_crop(p)]
+
+    try:
+        words = p.extract_words()
+    except Exception:
+        words = []
+
+    body_words = [w for w in words if top_m <= w.get('top', 0) <= bot_m]
+    if len(body_words) < 15:
+        try:
+            return [extract_rich_text_from_crop(p.crop((0, top_m, width, bot_m)))]
+        except Exception:
+            return [extract_rich_text_from_crop(p)]
+
+    lines = []
+    curr_line = []
+    curr_top = None
+    for w in sorted(body_words, key=lambda x: (x.get('top', 0), x.get('x0', 0))):
+        w_top = w.get('top', 0)
+        if curr_top is None or abs(w_top - curr_top) <= 3.5:
+            curr_line.append(w)
+            curr_top = w_top if curr_top is None else (curr_top + w_top) / 2
+        else:
+            lines.append({'top': curr_top, 'words': sorted(curr_line, key=lambda x: x.get('x0', 0))})
+            curr_line = [w]
+            curr_top = w_top
+    if curr_line:
+        lines.append({'top': curr_top, 'words': sorted(curr_line, key=lambda x: x.get('x0', 0))})
+
+    classified = []
+    for l in lines:
+        l_words = l['words']
+        txt = ' '.join(w.get('text', '') for w in l_words)
+        if any(n in txt.lower() for n in ['pcimarkpci', 'analista de sistemas', 'transpetro', 'rascunho', 'concursos', 'terra']):
+            continue
+        is_crossing = False
+        is_two_col = False
+        for i in range(len(l_words) - 1):
+            w1 = l_words[i]
+            w2 = l_words[i+1]
+            if w1.get('x0', 0) < mid and w2.get('x1', 0) > mid:
+                gap = w2.get('x0', 0) - w1.get('x1', 0)
+                if gap <= 18:
+                    is_crossing = True
+                    break
+                elif gap >= 22:
+                    is_two_col = True
+                    break
+        l_x0 = l_words[0]['x0']
+        l_x1 = l_words[-1]['x1']
+        if is_crossing or (l_x0 < mid - 25 and l_x1 > mid + 25 and not is_two_col):
+            classified.append((l['top'], 'full', l_words))
+        elif is_two_col:
+            classified.append((l['top'], 'two_col', l_words))
+        else:
+            classified.append((l['top'], 'other', l_words))
+
+    full_count = sum(1 for _, t, _ in classified if t == 'full')
+    two_col_count = sum(1 for _, t, _ in classified if t == 'two_col')
+
+    # Pure 2-column page
+    if (two_col_count >= 15 and two_col_count > 2 * full_count) or (full_count <= 1 and two_col_count >= 4):
+        try:
+            return [
+                extract_rich_text_from_crop(p.crop((0, top_m, mid, bot_m))),
+                extract_rich_text_from_crop(p.crop((mid, top_m, width, bot_m)))
+            ]
+        except Exception:
+            return [extract_rich_text_from_crop(p)]
+
+    # Check for hybrid split (e.g. Q46 top full-width, Q47-50 bottom 2-col)
+    split_candidates = []
+    for i in range(len(classified) - 1):
+        top_y, t, _ = classified[i]
+        next_window = classified[i+1:]
+        sub_full = sum(1 for _, st, _ in next_window if st == 'full')
+        sub_two = sum(1 for _, st, _ in next_window if st == 'two_col')
+        if sub_two >= 4 and sub_full == 0:
+            right_words = [w for w in body_words if w['top'] >= top_y and w['x0'] >= mid]
+            right_text = ' '.join(w['text'] for w in right_words)
+            q_nums_right = re.findall(r'(?:^|\s)([0-9]{1,3})(?:\s*[\.\-\)]|\s+[A-ZÀ-Ú]|\s*$)', right_text)
+            if q_nums_right:
+                split_candidates.append(top_y - 4)
+
+    if split_candidates:
+        split_y = split_candidates[0]
+        try:
+            return [
+                extract_rich_text_from_crop(p.crop((0, top_m, width, split_y))),
+                extract_rich_text_from_crop(p.crop((0, split_y, mid, bot_m))),
+                extract_rich_text_from_crop(p.crop((mid, split_y, width, bot_m)))
+            ]
+        except Exception:
+            return [extract_rich_text_from_crop(p)]
+
+    try:
+        return [extract_rich_text_from_crop(p.crop((0, top_m, width, bot_m)))]
+    except Exception:
+        return [extract_rich_text_from_crop(p)]
 
 def parse_column_text(text: str) -> List[Dict[str, Any]]:
     """
@@ -605,15 +717,19 @@ def parse_column_text(text: str) -> List[Dict[str, Any]]:
         r'^([0-9]{1,3})$'
     )
     alt_pattern = re.compile(
-        r'^[(\[]?([A-Ea-e])[)\]\.\-]\s*(.*)$'
+        r'^(?:\(([A-Ea-e])\)|\[([A-Ea-e])\]|([A-Ea-e])\s*[\)\.]|([A-Ea-e])\s*[-–—]\s+)(.*)$'
     )
     alt_inline_pattern = re.compile(
         r'(?:\(([A-Ea-e])\)|\[([A-Ea-e])\]|(?:\b|\s|^)([A-Ea-e])[\.\-\)])'
     )
     noise_pattern = re.compile(
-        r'(?i)^(?:pcimarkpci.*|transpetro|enem\s+\d{4}|vestibular|caderno\s+de\s+quest.*|confidencial|www\.pciconcursos.*|terra\s+prova|petro|transp|terra|prova\s*\d+\s*[-–].*|.*(?:analista|t[ée]cnico|engenheiro|m[ée]dico|administrador|advogado|contador|economista|enfermeiro|profissional)\s+.*prova\s*\d+.*)$'
+        r'(?i)^(?:pcimarkpci.*|transpetro|enem\s+\d{4}|vestibular|caderno\s+de\s+quest.*|confidencial|www\.pciconcursos.*|terra\s+prova|petro|transp|terra|prova\s*\d+\s*[-–].*|.*(?:analista|t[ée]cnico|engenheiro|m[ée]dico|administrador|advogado|contador|economista|enfermeiro|profissional)\s+.*prova\s*\d+.*|[-–—\s]*infraestrutura|[-–—\s]*[áa]rea\s+infraestrutura)$'
     )
     continuation_pattern = re.compile(r'(?i)^\(?continua[çc][ãa]o\s+da\s+quest[ãa]o\s*\d+\)?$')
+    passage_header_pattern = re.compile(
+        r'^(?:L[ÍI]NGUA\s+INGLESA|L[ÍI]NGUA\s+PORTUGUESA|L[ÍI]NGUA\s+ESPANHOLA|TEXTO\s+[I|V|X|\d]+|TEXTO\s+PARA\s+AS\s+QUEST[ÕO]ES|LEIA\s+O\s+TEXTO|TEXTO\s+\d+|INGL[ÊE]S|PORTUGU[ÊE]S|REDA[ÇC][ÃA]O|CONHECIMENTOS\s+B[ÁA]SICOS|CONHECIMENTOS\s+ESPEC[ÍI]FICOS)\b',
+        re.I
+    )
 
     raw_questions: List[Dict[str, Any]] = []
     current_q: Optional[Dict[str, Any]] = None
@@ -622,7 +738,19 @@ def parse_column_text(text: str) -> List[Dict[str, Any]]:
 
     for line in lines:
         line = line.strip()
-        if not line or noise_pattern.match(line) or continuation_pattern.match(line):
+        if not line or noise_pattern.match(strip_markup(line)) or continuation_pattern.match(strip_markup(line)):
+            continue
+
+        if passage_header_pattern.match(strip_markup(line)):
+            if current_q:
+                if current_alt:
+                    current_q["alternatives"].append(current_alt)
+                    current_alt = None
+                if len(current_q["alternatives"]) >= 2:
+                    current_q["alternatives"].sort(key=lambda x: ord(x["identifier"]) if len(x.get("identifier", "")) == 1 else 999)
+                    raw_questions.append(current_q)
+                current_q = None
+            state = "NONE"
             continue
 
         match_q = q_pattern_explicit.match(line) or q_pattern_numbered.match(line)
@@ -698,8 +826,8 @@ def parse_column_text(text: str) -> List[Dict[str, Any]]:
 
         match_alt = alt_pattern.match(line)
         if match_alt:
-            letter = match_alt.group(1).upper()
-            alt_text = match_alt.group(2).strip()
+            letter = (match_alt.group(1) or match_alt.group(2) or match_alt.group(3) or match_alt.group(4)).upper()
+            alt_text = match_alt.group(5).strip()
             if current_alt:
                 current_q["alternatives"].append(current_alt)
             current_alt = {
@@ -738,6 +866,24 @@ def parse_column_text(text: str) -> List[Dict[str, Any]]:
         q["enunciado"] = sanitize_text_noise(q.get("enunciado", ""))
         for alt in q.get("alternatives", []):
             alt["text"] = sanitize_text_noise(alt.get("text", ""))
+
+        alts = q.get("alternatives", [])
+        imgs = q.get("images", [])
+        empty_alts = [a for a in alts if not a.get("text", "").strip()]
+        
+        # If all alternatives are diagram/image options and match the number of images
+        if alts and len(empty_alts) == len(alts) and len(imgs) == len(alts):
+            for idx, a in enumerate(alts):
+                a["text"] = f"![Figura]({imgs[idx]})"
+            # Remove the alternative figures from the question enunciado
+            for img_url in imgs:
+                q["enunciado"] = q["enunciado"].replace(f"![Figura]({img_url})", "").strip()
+            q["images"] = []
+
+        # Ensure no alternative is left with blank text
+        for a in alts:
+            if not a.get("text", "").strip():
+                a["text"] = f"[Opção {a.get('identifier', '')}]"
 
     return raw_questions
 
@@ -849,7 +995,12 @@ def extract_textual_references_from_pdf(pdf: pdfplumber.PDF) -> List[Dict[str, A
     q_explicit_pattern = re.compile(r'^(?:QUEST[ÃA]O|ITEM)\s*([0-9]{1,3})[:\.\-\s]*(.*)$', re.IGNORECASE)
     q_pattern_numbered = re.compile(r'^([0-9]{1,3})[\.\-\)]\s+(.*)$')
     q_pattern_standalone = re.compile(r'^([0-9]{1,3})$')
-    alt_pattern = re.compile(r'^[(\[]?([A-Ea-e])[)\]\.\-]\s*(.*)$')
+    alt_pattern = re.compile(
+        r'^(?:\(([A-Ea-e])\)|\[([A-Ea-e])\]|([A-Ea-e])\s*[\)\.]|([A-Ea-e])\s*[-–—]\s+)(.*)$'
+    )
+    noise_pattern = re.compile(
+        r'(?i)^(?:pcimarkpci.*|transpetro|enem\s+\d{4}|vestibular|caderno\s+de\s+quest.*|confidencial|www\.pciconcursos.*|terra\s+prova|petro|transp|terra|prova\s*\d+\s*[-–].*|.*(?:analista|t[ée]cnico|engenheiro|m[ée]dico|administrador|advogado|contador|economista|enfermeiro|profissional)\s+.*prova\s*\d+.*|[-–—\s]*infraestrutura|[-–—\s]*[áa]rea\s+infraestrutura)$'
+    )
 
     # Step 1: Collect sequential line streams across all pages and columns with rich text formatting
     flat_lines: List[str] = []
@@ -862,21 +1013,7 @@ def extract_textual_references_from_pdf(pdf: pdfplumber.PDF) -> List[Dict[str, A
 
         col_texts = []
         if isinstance(width, (int, float)) and isinstance(height, (int, float)) and width > 0 and height > 0:
-            top_m = 35
-            bot_m = height - 40
-            if is_two_column_page(p, width, height):
-                midpoint = width / 2
-                try:
-                    l_crop = p.crop((0, top_m, midpoint, bot_m))
-                    r_crop = p.crop((midpoint, top_m, width, bot_m))
-                    col_texts = [extract_rich_text_from_crop(l_crop), extract_rich_text_from_crop(r_crop)]
-                except Exception:
-                    col_texts = [extract_rich_text_from_crop(p.crop((0, top_m, width, bot_m)))]
-            else:
-                try:
-                    col_texts = [extract_rich_text_from_crop(p.crop((0, top_m, width, bot_m)))]
-                except Exception:
-                    col_texts = [text]
+            col_texts = get_page_crops(p, width, height)
         else:
             col_texts = [text]
 
@@ -884,7 +1021,7 @@ def extract_textual_references_from_pdf(pdf: pdfplumber.PDF) -> List[Dict[str, A
             lines = [sanitize_text_noise(l) for l in col_t.splitlines()]
             valid_lines = [l for l in lines if l and not noise_pattern.match(strip_markup(l))]
             # If the very last line of the column is just the page number (e.g. '2', '4'), filter it out
-            if valid_lines and re.match(r'^\d{1,3}$', strip_markup(valid_lines[-1])):
+            while valid_lines and re.match(r'^(?:\*\*)?\d{1,3}(?:\*\*)?$', strip_markup(valid_lines[-1])):
                 valid_lines.pop()
             flat_lines.extend(valid_lines)
 
@@ -1067,7 +1204,7 @@ def parse_exam_pdf(pdf_bytes: bytes) -> Dict[str, Any]:
 
         # Extract questions via unified continuous stream across pages and columns
         noise_pattern = re.compile(
-            r'(?i)^(?:pcimarkpci.*|transpetro|enem\s+\d{4}|vestibular|caderno\s+de\s+quest.*|confidencial|www\.pciconcursos.*|terra\s+prova|petro|transp|terra|prova\s*\d+\s*[-–].*|.*(?:analista|t[ée]cnico|engenheiro|m[ée]dico|administrador|advogado|contador|economista|enfermeiro|profissional)\s+.*prova\s*\d+.*)$'
+            r'(?i)^(?:pcimarkpci.*|transpetro|enem\s+\d{4}|vestibular|caderno\s+de\s+quest.*|confidencial|www\.pciconcursos.*|terra\s+prova|petro|transp|terra|prova\s*\d+\s*[-–].*|.*(?:analista|t[ée]cnico|engenheiro|m[ée]dico|administrador|advogado|contador|economista|enfermeiro|profissional)\s+.*prova\s*\d+.*|[-–—\s]*infraestrutura|[-–—\s]*[áa]rea\s+infraestrutura)$'
         )
         flat_exam_lines = []
         for p in pdf.pages:
@@ -1076,32 +1213,17 @@ def parse_exam_pdf(pdf_bytes: bytes) -> Dict[str, Any]:
                 continue
 
             width, height = getattr(p, 'width', 0), getattr(p, 'height', 0)
-            top_m = 35
-            bot_m = height - 40
             col_texts = []
             if isinstance(width, (int, float)) and isinstance(height, (int, float)) and width > 0 and height > 0:
-                if is_two_column_page(p, width, height):
-                    midpoint = width / 2
-                    try:
-                        col_texts = [
-                            extract_rich_text_from_crop(p.crop((0, top_m, midpoint, bot_m))),
-                            extract_rich_text_from_crop(p.crop((midpoint, top_m, width, bot_m)))
-                        ]
-                    except Exception:
-                        col_texts = [extract_rich_text_from_crop(p.crop((0, top_m, width, bot_m)))]
-                else:
-                    try:
-                        col_texts = [extract_rich_text_from_crop(p.crop((0, top_m, width, bot_m)))]
-                    except Exception:
-                        col_texts = [extract_rich_text_from_crop(p)]
+                col_texts = get_page_crops(p, width, height)
             else:
                 col_texts = [extract_rich_text_from_crop(p)]
 
             for c_t in col_texts:
                 c_dec = decode_symbols(c_t)
                 lines = [sanitize_text_noise(l) for l in c_dec.splitlines()]
-                valid = [l for l in lines if l and not noise_pattern.match(l)]
-                while valid and re.match(r'^(?:\*\*)?\d{1,3}(?:\*\*)?$', valid[-1]):
+                valid = [l for l in lines if l and not noise_pattern.match(strip_markup(l))]
+                while valid and re.match(r'^(?:\*\*)?\d{1,3}(?:\*\*)?$', strip_markup(valid[-1])):
                     valid.pop()
                 flat_exam_lines.extend(valid)
 
