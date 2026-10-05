@@ -33,10 +33,24 @@ class TestRealPdfExtraction(unittest.TestCase):
             '/app/prova_pdf/gabaritos.pdf',
         ]
 
+        possible_infra2018_paths = [
+            os.path.join(base_dir, 'backend', 'src', 'test', 'prova_pdf', 'analista_de_sistemas_junior_infraestrutura.pdf'),
+            os.path.join(os.path.dirname(os.path.abspath(__file__)), 'prova_pdf', 'analista_de_sistemas_junior_infraestrutura.pdf'),
+            '/app/prova_pdf/analista_de_sistemas_junior_infraestrutura.pdf',
+        ]
+
+        possible_gab_definitivo_paths = [
+            os.path.join(base_dir, 'backend', 'src', 'test', 'prova_pdf', 'gabarito_definitivo.pdf'),
+            os.path.join(os.path.dirname(os.path.abspath(__file__)), 'prova_pdf', 'gabarito_definitivo.pdf'),
+            '/app/prova_pdf/gabarito_definitivo.pdf',
+        ]
+
         cls.exam_pdf_path = next((p for p in possible_exam_paths if os.path.exists(p)), None)
         cls.answer_key_pdf_path = next((p for p in possible_key_paths if os.path.exists(p)), None)
         cls.prova3_pdf_path = next((p for p in possible_prova3_paths if os.path.exists(p)), None)
         cls.gabaritos_pdf_path = next((p for p in possible_gabaritos_paths if os.path.exists(p)), None)
+        cls.infra2018_pdf_path = next((p for p in possible_infra2018_paths if os.path.exists(p)), None)
+        cls.gab_definitivo_pdf_path = next((p for p in possible_gab_definitivo_paths if os.path.exists(p)), None)
 
         possible_scanned_paths = [
             os.path.join(base_dir, 'backend', 'src', 'test', 'prova_pdf', 'CP-T-2024_INFORMÁTICA_AMARELA.pdf'),
@@ -72,6 +86,16 @@ class TestRealPdfExtraction(unittest.TestCase):
         if cls.gabaritos_pdf_path:
             with open(cls.gabaritos_pdf_path, 'rb') as f:
                 cls.gabaritos_bytes = f.read()
+
+        cls.infra2018_bytes = None
+        if cls.infra2018_pdf_path:
+            with open(cls.infra2018_pdf_path, 'rb') as f:
+                cls.infra2018_bytes = f.read()
+
+        cls.gab_definitivo_bytes = None
+        if cls.gab_definitivo_pdf_path:
+            with open(cls.gab_definitivo_pdf_path, 'rb') as f:
+                cls.gab_definitivo_bytes = f.read()
 
         cls.scanned_bytes = None
         if cls.scanned_pdf_path:
@@ -348,6 +372,65 @@ class TestRealPdfExtraction(unittest.TestCase):
         self.assertEqual(ref2["reference"], "http://www.ncsu.edu/ehs/www99/right/training/meeting/emplores.html")
         self.assertIn("Retrieved on: April 1st, 2012", ref2["source"])
 
+    def test_formatting_rich_text_and_code_blocks_prova_3(self):
+        if not self.prova3_bytes:
+            self.skipTest("Arquivo prova_3_analista_de_sistemas_jnior_area_infraestrutura.pdf não encontrado")
+
+        parsed = parse_exam_pdf(self.prova3_bytes)
+        q_map = {q["identifier"]: q for q in parsed["questions"]}
+
+        # 1. Bold text preserved in alternatives
+        q5 = q_map["5"]
+        self.assertIn("**trago**", q5["alternatives"][0]["text"])
+        self.assertIn("**suspendido**", q5["alternatives"][1]["text"])
+
+        # 2. Bash Code Block in Q27
+        q27 = q_map["27"]
+        self.assertIn("```bash", q27["enunciado"])
+        self.assertIn("#!/bin/bash", q27["enunciado"])
+        self.assertIn("```", q27["enunciado"])
+
+        # 3. Item structures on distinct lines in Q54
+        q54 = q_map["54"]
+        self.assertIn("I - Computação em grade", q54["enunciado"])
+        self.assertIn("II - Computadores de baixo custo", q54["enunciado"])
+        self.assertIn("III - É adequado construir", q54["enunciado"])
+        self.assertIn("**APENAS**", q54["enunciado"])
+
+        # 4. Java Code Block in Q58
+        q58 = q_map["58"]
+        self.assertIn("```java", q58["enunciado"])
+        self.assertIn("int encontrar(int chaveBusca, int limiteInferior, int limiteSuperior)", q58["enunciado"])
+
+        # 5. XML / DTD Code Block in Q62
+        q62 = q_map["62"]
+        self.assertIn("```xml", q62["enunciado"])
+        self.assertIn("<!ELEMENT livros", q62["enunciado"])
+
+        # 6. Tables and SQL Code Block in Q63
+        q63 = q_map["63"]
+        self.assertIn("| nome_loja | vendas |", q63["enunciado"])
+        self.assertIn("| nome_regiao | nome_loja |", q63["enunciado"])
+        self.assertIn("```sql", q63["enunciado"])
+        self.assertIn("SELECT SUM( vendas ) FROM Lojas", q63["enunciado"])
+
+        # 7. Non-textual image/diagram extraction in Q35 (network topology) and Q52 (memory partitions)
+        q35 = q_map["35"]
+        self.assertEqual(len(q35.get("images", [])), 1, "Questão 35 deve conter 1 imagem extraída da topologia de rede")
+        self.assertTrue(q35["images"][0].startswith("data:image/png;base64,"), "A imagem deve ser codificada em Base64 Data URL")
+        self.assertIn("![Figura](data:image/png;base64,", q35["enunciado"])
+
+        q52 = q_map["52"]
+        self.assertGreaterEqual(len(q52.get("images", [])), 1, "Questão 52 deve conter a imagem do diagrama de blocos de memória")
+        self.assertTrue(q52["images"][0].startswith("data:image/png;base64,"))
+        self.assertIn("![Figura](data:image/png;base64,", q52["enunciado"])
+
+        # 8. Text-aligned Table in Q55 (Job scheduling table)
+        q55 = q_map["55"]
+        self.assertIn("| Job | Tempo de Execução (ms) | Prioridade |", q55["enunciado"])
+        self.assertIn("| J1 | 13 | 4 |", q55["enunciado"])
+        self.assertIn("| J5 | 7 | 2 |", q55["enunciado"])
+
     def test_extract_gabaritos_multi_page_pdf(self):
         if not self.gabaritos_bytes:
             self.skipTest("Arquivo gabaritos.pdf não encontrado")
@@ -405,6 +488,91 @@ class TestRealPdfExtraction(unittest.TestCase):
                         break
 
         self.assertEqual(matched_count, 70, "Todas as 70 questões da Prova 3 devem ser associadas às respostas do gabarito")
+
+    def test_extract_analista_infraestrutura_2018(self):
+        if not self.infra2018_bytes:
+            self.skipTest("Arquivo analista_de_sistemas_junior_infraestrutura.pdf não encontrado")
+
+        parsed = parse_exam_pdf(self.infra2018_bytes)
+        questions = parsed["questions"]
+
+        # 1. Total questions count (70)
+        self.assertEqual(len(questions), 70, f"Deveriam ser extraídas 70 questões, mas foram extraídas {len(questions)}")
+
+        # 2. Identifiers sequence 1..70
+        expected_identifiers = [str(i) for i in range(1, 71)]
+        actual_identifiers = [q["identifier"] for q in questions]
+        self.assertEqual(actual_identifiers, expected_identifiers, "A sequência de identificadores deve ser de 1 a 70")
+
+        # 3. Check Questão 31 com proposições lógicas decodificadas
+        q31 = next(q for q in questions if q["identifier"] == "31")
+        self.assertIn("p∧¬(q∧r)", q31["enunciado"].replace(" ", ""), "Enunciado da Q31 deve conter proposição lógica decodificada")
+        self.assertEqual(len(q31["alternatives"]), 5, "Questão 31 deve ter 5 alternativas")
+        self.assertEqual([a["identifier"] for a in q31["alternatives"]], ["A", "B", "C", "D", "E"])
+        self.assertIn("(p∧¬q)∨(p∧¬r)", q31["alternatives"][2]["text"].replace(" ", ""), "Alternativa C deve ter fórmula lógica limpa")
+
+        # 4. Check Questão 64 (Modelo E-R / CREATE TABLE contínuo entre páginas 14 e 15)
+        q64 = next(q for q in questions if q["identifier"] == "64")
+        self.assertIn("CREATE TABLE", q64["enunciado"])
+        self.assertIn("Qual modelo E-R serviu de base", q64["enunciado"])
+        self.assertEqual(len(q64["alternatives"]), 5, "Questão 64 deve ter 5 alternativas")
+
+    def test_extract_gabarito_definitivo_prova_14(self):
+        if not self.gab_definitivo_bytes:
+            self.skipTest("Arquivo gabarito_definitivo.pdf não encontrado")
+
+        parsed = parse_answer_key_pdf(self.gab_definitivo_bytes, prova_name="PROVA 14")
+        answers = parsed["answers"]
+
+        # 1. Total answers count (70 respostas: 1-20 básicos + 21-70 específicos)
+        self.assertEqual(len(answers), 70, f"Deveriam ser extraídas 70 respostas do gabarito, mas foram {len(answers)}")
+        self.assertEqual(len(parsed["availableProvas"]), 32, "Devem ser detectadas 32 opções de prova no gabarito definitivo")
+        self.assertEqual(parsed["selectedProva"], "PROVA 14")
+
+        ans_map = {a["identifier"]: a["correctAlternative"] for a in answers}
+
+        # Conhecimentos Básicos - Português (1 a 10)
+        self.assertEqual(ans_map.get("1"), "A")
+        self.assertEqual(ans_map.get("2"), "A")
+        self.assertEqual(ans_map.get("3"), "B")
+        self.assertEqual(ans_map.get("4"), "D")
+        self.assertEqual(ans_map.get("5"), "E")
+        self.assertEqual(ans_map.get("10"), "C")
+
+        # Conhecimentos Básicos - Inglês (11 a 20)
+        self.assertEqual(ans_map.get("11"), "B")
+        self.assertEqual(ans_map.get("12"), "E")
+        self.assertEqual(ans_map.get("20"), "A")
+
+        # Conhecimentos Específicos - PROVA 14 (21 a 70)
+        self.assertEqual(ans_map.get("21"), "D")
+        self.assertEqual(ans_map.get("22"), "B")
+        self.assertEqual(ans_map.get("31"), "C")
+        self.assertEqual(ans_map.get("41"), "A")
+        self.assertEqual(ans_map.get("51"), "B")
+        self.assertEqual(ans_map.get("61"), "D")
+        self.assertEqual(ans_map.get("64"), "D")
+        self.assertEqual(ans_map.get("70"), "B")
+
+    def test_match_analista_infraestrutura_with_gabarito_definitivo(self):
+        if not self.infra2018_bytes or not self.gab_definitivo_bytes:
+            self.skipTest("Arquivos da prova de infraestrutura ou gabarito definitivo não encontrados")
+
+        questions = parse_exam_pdf(self.infra2018_bytes)["questions"]
+        answers = parse_answer_key_pdf(self.gab_definitivo_bytes, prova_name="PROVA 14")["answers"]
+
+        ans_map = {a["identifier"]: a["correctAlternative"] for a in answers}
+        matched_count = 0
+        for q in questions:
+            correct_letter = ans_map.get(q["identifier"])
+            if correct_letter:
+                for alt in q["alternatives"]:
+                    if alt["identifier"] == correct_letter:
+                        alt["isCorrect"] = True
+                        matched_count += 1
+                        break
+
+        self.assertEqual(matched_count, 70, "Todas as 70 questões da prova de infraestrutura 2018 devem ser associadas ao gabarito definitivo")
 
 if __name__ == '__main__':
     unittest.main()

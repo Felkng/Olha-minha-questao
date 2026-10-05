@@ -19,7 +19,7 @@ def sanitize_text_noise(text: str) -> str:
     text = re.sub(r'(?i)\bO\s*H\s*N\s*U\s*C\s*S\s*A\s*R\b', '', text)
     text = re.sub(r'(?i)\bR\s*A\s*S\s*C\s*U\s*N\s*H\s*O\b', '', text)
     text = re.sub(r'(?i)\bG\s*A\s*B\s*A\s*R\s*I\s*T\s*O\b', '', text)
-    text = re.sub(r'(?i)\bD\s*E\s*S\s*T\s*A\s*Q\s*U\s*E\b', '', text)
+    text = re.sub(r'(?i)\bD\s+E\s+S\s+T\s+A\s+Q\s+U\s+E\b', '', text)
     text = re.sub(r'(?i)\bF\s*O\s*L\s*H\s*A\s+D\s*E\s+R\s*E\s*S\s*P\s*O\s*S\s*T\s*A\s*S?\b', '', text)
     text = re.sub(r'(?i)\bP[ÁA]GINA:?\s*\d+\s*(?:DE|/)\s*\d+\b', '', text)
     text = re.sub(r'(?i)\bPROVA:?\s*[A-ZÀ-Úa-zà-ú]+\b', '', text)
@@ -81,8 +81,11 @@ def normalize_big_o_notation(text: str) -> str:
     t = re.sub(r'\bO\s*\(\s*n\^3\s*\)', 'O(n³)', t, flags=re.I)
     return t
 
-def clean_code_line(line: str) -> str:
+def clean_code_line(line: str, lang: str = "java") -> str:
     s = line.strip()
+    if lang.lower() in ['sql', 'xml', 'html', 'dtd', 'bash', 'sh']:
+        return s
+
     s = re.sub(r'Stringl\]', 'String[]', s)
     s = re.sub(r'int\s*\(\]\[\]', 'int[][]', s)
     s = re.sub(r'int\[\]\s*\[\]', 'int[][]', s)
@@ -113,11 +116,11 @@ def clean_code_line(line: str) -> str:
 def format_code_block(code_lines: List[str], lang: str = "java") -> str:
     """
     Applies structural indentation (4 spaces per block level) and syntax beautification
-    to OCR-extracted code lines.
+    to code lines.
     """
     cleaned_lines = []
     for l in code_lines:
-        c = clean_code_line(l)
+        c = clean_code_line(l, lang=lang)
         for part in c.split('\n'):
             if part.strip():
                 cleaned_lines.append(part.strip())
@@ -125,7 +128,7 @@ def format_code_block(code_lines: List[str], lang: str = "java") -> str:
     if not cleaned_lines:
         return ""
 
-    if lang.lower() in ['java', 'c', 'cpp', 'csharp', 'javascript', 'typescript', 'sql']:
+    if lang.lower() in ['java', 'c', 'cpp', 'csharp', 'javascript', 'typescript']:
         formatted = []
         indent = 0
         for line in cleaned_lines:
@@ -133,7 +136,7 @@ def format_code_block(code_lines: List[str], lang: str = "java") -> str:
             close_count = line.count('}')
             
             line_indent = indent
-            if line.startswith('}'):
+            if line.startswith('}') or line.startswith('case ') or line.startswith('default:'):
                 line_indent = max(0, indent - 1)
             
             formatted.append(('    ' * line_indent) + line)
@@ -157,25 +160,62 @@ def format_code_block(code_lines: List[str], lang: str = "java") -> str:
                 pass
         return '\n'.join(formatted)
 
+    elif lang.lower() in ['bash', 'sh']:
+        formatted = []
+        indent = 0
+        for line in cleaned_lines:
+            if re.match(r'^(?:done|fi|esac|else|elif)\b', line):
+                line_indent = max(0, indent - 1)
+            else:
+                line_indent = indent
+            formatted.append(('    ' * line_indent) + line)
+            if re.search(r'\b(?:then|do)\b', line) or line.endswith('{'):
+                indent += 1
+            elif re.match(r'^(?:done|fi|esac)\b', line):
+                indent = max(0, indent - 1)
+        return '\n'.join(formatted)
+
+    elif lang.lower() in ['xml', 'html', 'dtd']:
+        return '\n'.join(cleaned_lines)
+
+    elif lang.lower() == 'sql':
+        return '\n'.join(cleaned_lines)
+
     return '\n'.join(cleaned_lines)
 
 def format_enunciado_with_code_blocks(lines: List[str]) -> str:
     """
     Detects code blocks in question enunciado lines, preserves their formatting,
     repairs common OCR syntax errors, and wraps them in markdown ``` blocks with proper indentation.
+    Also preserves item lists (I, II, III, etc.), tables, and mathematical / logical statements.
     """
+    full_text = '\n'.join(lines)
+    if '```' in full_text:
+        return full_text
+
     code_start_keywords = [
-        'public class', 'public static', 'public void', 'public int', 'def ', 'class ',
-        '#include', 'import java', 'import os', 'import sys', 'int main(', 'void main(',
-        'SELECT ', 'CREATE TABLE ', 'struct '
+        '#!/bin/bash', '#!/bin/sh', 'public class', 'public static', 'public void',
+        'public int', 'def ', 'class ', '#include', 'import java', 'import os',
+        'import sys', 'int main(', 'void main(', 'SELECT ', 'CREATE TABLE ',
+        'struct ', '<?xml', '<!ELEMENT', '<!DOCTYPE', '<!ATTLIST'
     ]
 
     concl_keywords = [
         'assinale a opção', 'assinale a alternativa', 'com base no código',
         'considerando o código', 'a respeito do código', 'o resultado da execução',
         'a complexidade em notação', 'a saída do programa', 'o valor impresso',
-        'segundo ', 'de acordo com ', 'sobre o '
+        'segundo ', 'de acordo com ', 'sobre o ', 'qual o valor impresso',
+        'para implementar', 'quando a chave', 'porém, um programador',
+        'uma expressão relacional', 'o comportamento normal', 'seja esse programa',
+        'o trecho de documento', 'considerando as duas tabelas',
+        'apresentará o seguinte resultado', 'apresentará o resultado',
+        'apresenta o seguinte resultado', 'produzirá o seguinte resultado',
+        'retornará o seguinte resultado', 'é correto afirmar', 'é correto o que se afirma'
     ]
+
+    item_pattern = re.compile(
+        r'^\s*(?:\*\*)?(?:[IVXLCDMivxlcdm]+|\d+|[a-eA-E])(?:\*\*)?(?:[\.\)]|\s*[-–])\s+|\s*\((?:[IVXLCDMivxlcdm\d+a-eA-E]+|[ \t]*)\)\s+'
+    )
 
     is_code = [False] * len(lines)
     in_code = False
@@ -186,21 +226,26 @@ def format_enunciado_with_code_blocks(lines: List[str]) -> str:
         l_lower = l_clean.lower()
 
         if not in_code:
-            if any(l_clean.startswith(kw) or re.match(r'^(?:public|private|protected|static|def|class|#include)\b', l_clean) for kw in code_start_keywords):
+            # Check if this line starts a code block
+            if any(l_clean.startswith(kw) for kw in code_start_keywords) or re.match(r'^(?:public|private|protected|static|def|class|#include|int\s+\w+\s*\(|void\s+\w+\s*\()\b', l_clean):
                 in_code = True
                 is_code[i] = True
-                if l_clean.startswith('def ') or 'python' in lines[max(0, i-1)].lower():
+                if l_clean.startswith('#!/bin/') or 'bash' in full_text.lower() and ('shift' in l_clean or 'mkdir' in l_clean):
+                    detected_lang = "bash"
+                elif l_clean.startswith(('<?xml', '<!ELEMENT', '<!DOCTYPE', '<!ATTLIST')):
+                    detected_lang = "xml"
+                elif l_clean.upper().startswith(('SELECT ', 'CREATE TABLE ')):
+                    detected_lang = "sql"
+                elif l_clean.startswith('def ') or 'python' in full_text.lower():
                     detected_lang = "python"
                 elif '#include' in l_clean or 'struct ' in l_clean:
                     detected_lang = "c"
-                elif 'SELECT ' in l_clean.upper():
-                    detected_lang = "sql"
                 else:
                     detected_lang = "java"
                 continue
 
         if in_code:
-            if any(l_lower.startswith(ck) for ck in concl_keywords) and not any(ind in l_clean for ind in [';', '{', '}', '==', '!=', '+=', 'print']):
+            if any(l_lower.startswith(ck) for ck in concl_keywords) and not any(ind in l_clean for ind in [';', '{', '}', '==', '!=', '+=', 'print', '</', '/>', '$', 'done', 'fi']):
                 in_code = False
             else:
                 is_code[i] = True
@@ -209,10 +254,28 @@ def format_enunciado_with_code_blocks(lines: List[str]) -> str:
     curr_text_lines = []
     curr_code_lines = []
 
+    def flush_text_lines(text_lines: List[str]) -> List[str]:
+        if not text_lines:
+            return []
+        out = []
+        buf = []
+        for tl in text_lines:
+            # If line is a markdown table row, an image, or an item, flush previous buffer and keep on its own line
+            if tl.startswith('|') or tl.startswith('![') or item_pattern.match(tl):
+                if buf:
+                    out.append(' '.join(buf))
+                    buf = []
+                out.append(tl)
+            else:
+                buf.append(tl)
+        if buf:
+            out.append(' '.join(buf))
+        return out
+
     for i, line in enumerate(lines):
         if is_code[i]:
             if curr_text_lines:
-                result_parts.append(' '.join(curr_text_lines))
+                result_parts.extend(flush_text_lines(curr_text_lines))
                 curr_text_lines = []
             curr_code_lines.append(line)
         else:
@@ -226,9 +289,9 @@ def format_enunciado_with_code_blocks(lines: List[str]) -> str:
         code_text = format_code_block(curr_code_lines, detected_lang)
         result_parts.append(f'```{detected_lang}\n{code_text}\n```')
     if curr_text_lines:
-        result_parts.append(' '.join(curr_text_lines))
+        result_parts.extend(flush_text_lines(curr_text_lines))
 
-    return '\n\n'.join(result_parts)
+    return '\n\n'.join([p for p in result_parts if p.strip()])
 
 def parse_ocr_column_with_diagrams(col_img: Image.Image, lang: str = "por") -> List[Dict[str, Any]]:
     """

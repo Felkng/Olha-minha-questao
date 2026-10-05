@@ -315,8 +315,39 @@ class RealPdfExtractionServiceTest {
         ParsedQuestionDTO q50 = parsedQuestions.stream().filter(q -> q.getIdentifier().equals("50")).findFirst().orElseThrow();
         assertThat(q50.getAlternatives()).hasSize(5);
 
+        // Verifica formatação rica, blocos de código e tabelas na Prova 3
+        ParsedQuestionDTO q5 = parsedQuestions.stream().filter(q -> q.getIdentifier().equals("5")).findFirst().orElseThrow();
+        assertThat(q5.getAlternatives().get(0).getText()).contains("**trago**");
+
+        ParsedQuestionDTO q27 = parsedQuestions.stream().filter(q -> q.getIdentifier().equals("27")).findFirst().orElseThrow();
+        assertThat(q27.getEnunciado()).contains("```bash").contains("#!/bin/bash");
+
+        ParsedQuestionDTO q54 = parsedQuestions.stream().filter(q -> q.getIdentifier().equals("54")).findFirst().orElseThrow();
+        assertThat(q54.getEnunciado()).contains("I - Computação em grade").contains("II - Computadores").contains("**APENAS**");
+
+        ParsedQuestionDTO q58 = parsedQuestions.stream().filter(q -> q.getIdentifier().equals("58")).findFirst().orElseThrow();
+        assertThat(q58.getEnunciado()).contains("```java");
+
+        ParsedQuestionDTO q62 = parsedQuestions.stream().filter(q -> q.getIdentifier().equals("62")).findFirst().orElseThrow();
+        assertThat(q62.getEnunciado()).contains("```xml").contains("<!ELEMENT livros");
+
         ParsedQuestionDTO q63 = parsedQuestions.stream().filter(q -> q.getIdentifier().equals("63")).findFirst().orElseThrow();
         assertThat(q63.getAlternatives()).hasSize(5);
+        assertThat(q63.getEnunciado()).contains("| nome_loja | vendas |").contains("```sql");
+
+        ParsedQuestionDTO q35 = parsedQuestions.stream().filter(q -> q.getIdentifier().equals("35")).findFirst().orElseThrow();
+        assertThat(q35.getImages()).hasSize(1);
+        assertThat(q35.getImages().get(0)).startsWith("data:image/png;base64,");
+
+        ParsedQuestionDTO q52 = parsedQuestions.stream().filter(q -> q.getIdentifier().equals("52")).findFirst().orElseThrow();
+        assertThat(q52.getImages()).isNotEmpty();
+        assertThat(q52.getImages().get(0)).startsWith("data:image/png;base64,");
+        assertThat(q52.getEnunciado()).contains("![Figura](data:image/png;base64,");
+
+        ParsedQuestionDTO q55 = parsedQuestions.stream().filter(q -> q.getIdentifier().equals("55")).findFirst().orElseThrow();
+        assertThat(q55.getEnunciado()).contains("| Job | Tempo de Execução (ms) | Prioridade |")
+                .contains("| J1 | 13 | 4 |")
+                .contains("| J5 | 7 | 2 |");
 
         // 2. Extração do gabarito multi-página com PROVA 3
         github.felkng.olha_minha_questao.dto.parser.ParsedAnswerKeyResponseDTO keyResponse = examParserService.parseAnswerKeyPdf(keyMultipart, "PROVA 3");
@@ -370,6 +401,7 @@ class RealPdfExtractionServiceTest {
                     .year(2012)
                     .textualReferenceIndex(refIdx)
                     .alternatives(altRequests)
+                    .images(pq.getImages())
                     .build());
         }
 
@@ -392,6 +424,9 @@ class RealPdfExtractionServiceTest {
         List<Question> savedDbQuestions = questionRepository.findByTestIdOrderByIdAsc(createdTest.getId());
         assertThat(savedDbQuestions).hasSize(70);
 
+        Question q35Entity = savedDbQuestions.stream().filter(q -> "35".equals(q.getIdentifier())).findFirst().orElseThrow();
+        assertThat(q35Entity.getImages()).hasSize(1);
+
         Question q1Entity = savedDbQuestions.get(0);
         assertThat(q1Entity.getCorrectAlternative()).isNotNull();
         assertThat(q1Entity.getCorrectAlternative().getIdentifier()).isEqualTo("B");
@@ -399,6 +434,99 @@ class RealPdfExtractionServiceTest {
         Question q70Entity = savedDbQuestions.get(69);
         assertThat(q70Entity.getCorrectAlternative()).isNotNull();
         assertThat(q70Entity.getCorrectAlternative().getIdentifier()).isEqualTo("D");
+
+        // 5. Validação da prova cadastrada
+        TestEvaluationDTO evaluation = testService.getTestEvaluation(createdTest.getId());
+        assertThat(evaluation.getQuestionCount()).isEqualTo(70);
+        assertThat(evaluation.getQuestions()).hasSize(70);
+    }
+
+    @Test
+    @DisplayName("Deve extrair analista_de_sistemas_junior_infraestrutura.pdf e gabarito_definitivo.pdf, decodificando símbolos lógicos e persistindo com 70 questões")
+    void testRealPdfExtractionAndAtomicPersistenceAnalistaInfraestrutura2018() throws Exception {
+        Path examPath = Path.of("src", "test", "prova_pdf", "analista_de_sistemas_junior_infraestrutura.pdf");
+        Path keyPath = Path.of("src", "test", "prova_pdf", "gabarito_definitivo.pdf");
+
+        assertThat(Files.exists(examPath)).as("Arquivo da prova 2018 deve existir").isTrue();
+        assertThat(Files.exists(keyPath)).as("Arquivo do gabarito definitivo deve existir").isTrue();
+
+        MockMultipartFile examMultipart = new MockMultipartFile(
+                "file",
+                "analista_de_sistemas_junior_infraestrutura.pdf",
+                "application/pdf",
+                Files.readAllBytes(examPath)
+        );
+
+        MockMultipartFile keyMultipart = new MockMultipartFile(
+                "file",
+                "gabarito_definitivo.pdf",
+                "application/pdf",
+                Files.readAllBytes(keyPath)
+        );
+
+        // 1. Extração da prova
+        github.felkng.olha_minha_questao.dto.parser.ParsedExamResponseDTO examResponse = examParserService.parseExamPdf(examMultipart);
+        List<ParsedQuestionDTO> parsedQuestions = examResponse.getQuestions();
+        assertThat(parsedQuestions).hasSize(70);
+
+        // Verificar Questão 31 com símbolos lógicos decodificados
+        ParsedQuestionDTO q31 = parsedQuestions.stream()
+                .filter(q -> "31".equals(q.getIdentifier()))
+                .findFirst()
+                .orElseThrow();
+        assertThat(q31.getEnunciado().replace(" ", "")).contains("p∧¬(q∧r)");
+        assertThat(q31.getAlternatives()).hasSize(5);
+
+        // 2. Extração do gabarito definitivo para PROVA 14
+        github.felkng.olha_minha_questao.dto.parser.ParsedAnswerKeyResponseDTO keyResponse = examParserService.parseAnswerKeyPdf(keyMultipart, "PROVA 14");
+        assertThat(keyResponse.getSelectedProva()).isEqualTo("PROVA 14");
+        assertThat(keyResponse.getAvailableProvas()).hasSize(32);
+        assertThat(keyResponse.getAnswers()).hasSize(70);
+
+        Map<String, String> answerMap = keyResponse.getAnswers().stream()
+                .collect(Collectors.toMap(ParsedAnswerKeyDTO::getIdentifier, ParsedAnswerKeyDTO::getCorrectAlternative));
+
+        assertThat(answerMap.get("1")).isEqualTo("A");
+        assertThat(answerMap.get("11")).isEqualTo("B");
+        assertThat(answerMap.get("21")).isEqualTo("D");
+        assertThat(answerMap.get("31")).isEqualTo("C");
+        assertThat(answerMap.get("70")).isEqualTo("B");
+
+        // 3. Montagem do payload de criação
+        List<QuestionRequestDTO> questionRequests = new ArrayList<>();
+        for (ParsedQuestionDTO pq : parsedQuestions) {
+            String correctLetter = answerMap.get(pq.getIdentifier());
+
+            List<AlternativeRequestDTO> altRequests = pq.getAlternatives().stream()
+                    .map(alt -> AlternativeRequestDTO.builder()
+                            .identifier(alt.getIdentifier())
+                            .text(alt.getText())
+                            .isCorrect(alt.getIdentifier().equalsIgnoreCase(correctLetter))
+                            .build())
+                    .toList();
+
+            questionRequests.add(QuestionRequestDTO.builder()
+                    .identifier(pq.getIdentifier())
+                    .enunciado(pq.getEnunciado())
+                    .year(2018)
+                    .alternatives(altRequests)
+                    .build());
+        }
+
+        TestWithQuestionsRequestDTO wizardRequest = TestWithQuestionsRequestDTO.builder()
+                .name("Transpetro 2018 - Analista de Sistemas Júnior Infraestrutura")
+                .year(2018)
+                .description("Prova com símbolos lógicos e gabarito definitivo")
+                .questions(questionRequests)
+                .build();
+
+        // 4. Criação atômica no banco de dados
+        TestResponseDTO createdTest = testService.createWithQuestions(wizardRequest, null);
+        entityManager.flush();
+
+        assertThat(createdTest.getId()).isNotNull();
+        List<Question> savedDbQuestions = questionRepository.findByTestIdOrderByIdAsc(createdTest.getId());
+        assertThat(savedDbQuestions).hasSize(70);
 
         // 5. Validação da prova cadastrada
         TestEvaluationDTO evaluation = testService.getTestEvaluation(createdTest.getId());
