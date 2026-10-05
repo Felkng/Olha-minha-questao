@@ -29,7 +29,10 @@ import CategoryOutlinedIcon from '@mui/icons-material/CategoryOutlined';
 import StyleOutlinedIcon from '@mui/icons-material/StyleOutlined';
 import PersonIcon from '@mui/icons-material/Person';
 import LogoutIcon from '@mui/icons-material/Logout';
+import LoginIcon from '@mui/icons-material/Login';
+import PersonAddOutlinedIcon from '@mui/icons-material/PersonAddOutlined';
 import MenuIcon from '@mui/icons-material/Menu';
+import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings';
 import CloseIcon from '@mui/icons-material/Close';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAppTheme } from '../../theme/ThemeContext';
@@ -43,7 +46,7 @@ export const Navbar: React.FC = () => {
   const isDark = mode === 'dark';
   const location = useLocation();
   const navigate = useNavigate();
-  const { user, logout } = useAuth();
+  const { user, isAdmin, logout } = useAuth();
 
   const [userMenuAnchor, setUserMenuAnchor] = useState<null | HTMLElement>(null);
   const openUserMenu = Boolean(userMenuAnchor);
@@ -53,7 +56,7 @@ export const Navbar: React.FC = () => {
   const [openRegister, setOpenRegister] = useState(false);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
-  const navItems = [
+  const baseNavItems = [
     { id: 'questoes', path: '/questoes', label: 'Questões', icon: <QuizOutlinedIcon fontSize="small" /> },
     { id: 'provas', path: '/provas', label: 'Provas', icon: <MenuBookOutlinedIcon fontSize="small" /> },
     { id: 'flashcards', path: '/flashcards', label: 'Flashcards', icon: <StyleOutlinedIcon fontSize="small" /> },
@@ -61,8 +64,13 @@ export const Navbar: React.FC = () => {
     { id: 'areas', path: '/areas', label: 'Áreas', icon: <CategoryOutlinedIcon fontSize="small" /> },
   ];
 
+  const navItems = isAdmin
+    ? [...baseNavItems, { id: 'admin', path: '/admin', label: 'Administração', icon: <AdminPanelSettingsIcon fontSize="small" /> }]
+    : baseNavItems;
+
   const getActiveTab = () => {
     const p = location.pathname;
+    if (p.startsWith('/admin')) return 'admin';
     if (p.startsWith('/flashcards')) return 'flashcards';
     if (p.startsWith('/provas')) return 'provas';
     if (p.startsWith('/bancas')) return 'bancas';
@@ -106,17 +114,18 @@ export const Navbar: React.FC = () => {
             sx={{
               display: 'flex',
               alignItems: 'center',
-              gap: 1.5,
+              gap: { xs: 1, sm: 1.5 },
               cursor: 'pointer',
               userSelect: 'none',
-              mr: { xs: 1, md: 3 },
+              mr: { xs: 0.5, md: 3 },
+              minWidth: 0,
             }}
             onClick={() => navigate('/')}
           >
             <Box
               sx={{
-                width: 36,
-                height: 36,
+                width: { xs: 32, sm: 36 },
+                height: { xs: 32, sm: 36 },
                 borderRadius: 2,
                 backgroundColor: PALETTE_COLORS.primary,
                 display: 'flex',
@@ -124,17 +133,19 @@ export const Navbar: React.FC = () => {
                 justifyContent: 'center',
                 color: '#1a1e24',
                 fontWeight: 800,
-                fontSize: '1.2rem',
+                fontSize: { xs: '1.05rem', sm: '1.2rem' },
+                flexShrink: 0,
               }}
             >
               Q
             </Box>
-            <Box>
+            <Box sx={{ minWidth: 0 }}>
               <Typography
                 variant="h6"
+                noWrap
                 sx={{
                   fontWeight: 800,
-                  fontSize: { xs: '1.05rem', sm: '1.25rem' },
+                  fontSize: { xs: '0.95rem', sm: '1.25rem' },
                   lineHeight: 1.1,
                   display: 'flex',
                   alignItems: 'center',
@@ -145,6 +156,7 @@ export const Navbar: React.FC = () => {
               </Typography>
               <Typography
                 variant="caption"
+                noWrap
                 sx={{
                   color: 'text.secondary',
                   fontSize: '0.7rem',
@@ -250,6 +262,20 @@ export const Navbar: React.FC = () => {
                       sx={{ height: 18, fontSize: '0.65rem', fontWeight: 'bold' }}
                     />
                   </Box>
+                  {isAdmin && (
+                    <MenuItem
+                      onClick={() => {
+                        handleCloseUserMenu();
+                        navigate('/admin');
+                      }}
+                      sx={{ color: PALETTE_COLORS.primary, fontWeight: 700 }}
+                    >
+                      <ListItemIcon>
+                        <AdminPanelSettingsIcon fontSize="small" sx={{ color: PALETTE_COLORS.primary }} />
+                      </ListItemIcon>
+                      <ListItemText primary="Painel Administrativo" />
+                    </MenuItem>
+                  )}
                   <MenuItem
                     onClick={() => {
                       handleCloseUserMenu();
@@ -275,12 +301,18 @@ export const Navbar: React.FC = () => {
                 </Menu>
               </>
             ) : (
-              <Stack direction="row" spacing={1}>
+              <Stack direction="row" spacing={{ xs: 0.5, sm: 1 }} alignItems="center">
                 <Button
                   variant="outlined"
                   size="small"
                   onClick={() => setOpenLogin(true)}
-                  sx={{ fontWeight: 600, borderRadius: 2 }}
+                  sx={{
+                    fontWeight: 700,
+                    borderRadius: 2,
+                    px: { xs: 1.2, sm: 2 },
+                    py: { xs: 0.4, sm: 0.6 },
+                    fontSize: { xs: '0.8rem', sm: '0.875rem' },
+                  }}
                 >
                   Entrar
                 </Button>
@@ -289,7 +321,13 @@ export const Navbar: React.FC = () => {
                   color="secondary"
                   size="small"
                   onClick={() => setOpenRegister(true)}
-                  sx={{ fontWeight: 600, borderRadius: 2 }}
+                  sx={{
+                    fontWeight: 700,
+                    borderRadius: 2,
+                    display: { xs: 'none', sm: 'inline-flex' },
+                    px: 2,
+                    py: 0.6,
+                  }}
                 >
                   Cadastrar
                 </Button>
@@ -421,7 +459,7 @@ export const Navbar: React.FC = () => {
         </List>
 
         {/* User profile quick links if logged in */}
-        {user && (
+        {user ? (
           <>
             <Divider sx={{ my: 2 }} />
             <List sx={{ p: 0 }}>
@@ -451,6 +489,41 @@ export const Navbar: React.FC = () => {
               </ListItemButton>
             </List>
           </>
+        ) : (
+          <Box sx={{ mt: 'auto', pt: 2 }}>
+            <Divider sx={{ mb: 2 }} />
+            <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 700, display: 'block', mb: 1.5, px: 0.5, letterSpacing: '0.05em' }}>
+              SUA CONTA
+            </Typography>
+            <Stack spacing={1.5}>
+              <Button
+                variant="contained"
+                color="secondary"
+                fullWidth
+                startIcon={<LoginIcon fontSize="small" />}
+                onClick={() => {
+                  setMobileNavOpen(false);
+                  setOpenLogin(true);
+                }}
+                sx={{ fontWeight: 700, borderRadius: 2, py: 1 }}
+              >
+                Entrar
+              </Button>
+              <Button
+                variant="outlined"
+                color="primary"
+                fullWidth
+                startIcon={<PersonAddOutlinedIcon fontSize="small" />}
+                onClick={() => {
+                  setMobileNavOpen(false);
+                  setOpenRegister(true);
+                }}
+                sx={{ fontWeight: 700, borderRadius: 2, py: 1 }}
+              >
+                Criar Nova Conta
+              </Button>
+            </Stack>
+          </Box>
         )}
       </Drawer>
 
