@@ -218,15 +218,20 @@ def extract_rich_text_from_crop(crop: Any) -> str:
     if curr_line:
         prelim_lines.append({"top": curr_top, "words": sorted(curr_line, key=lambda x: x.get('x0', 0))})
 
-    # 2. Detect Text-Aligned Tables (e.g. Job scheduling table in Q55)
+    # 2. Detect Text-Aligned Tables via Pure Geometric Column Alignment
     text_table_words = []
     i = 0
     while i < len(prelim_lines):
         line_words = prelim_lines[i]['words']
-        line_txt = ' '.join(w.get('text', '') for w in line_words)
-        header_keywords = ['job', 'processo', 'coluna', 'atributo', 'entidade', 'serviço', 'servidor', 'tabela', 'instrução', 'instrucao', 'etapa', 'fase', 'prioridade', 'tempo', 'endereço', 'página', 'frame']
-        is_header = any(re.search(r'\b' + kw + r'\b', line_txt, re.I) for kw in header_keywords)
-        if is_header and len(line_words) >= 2:
+        line_txt = ' '.join(w.get('text', '') for w in line_words).strip()
+
+        # Skip question headers, alternatives, or caption starts
+        if re.match(r'^(?:\([A-E]\)|QUEST[ÃA]O|ITEM\s+\d+|\d{1,3}$|Tabela\s+|Quadro\s+|Figura\s+)', line_txt, re.I):
+            i += 1
+            continue
+
+        if len(line_words) >= 2:
+            # Cluster candidate header line words into columns by horizontal gaps >= 18px
             cols = []
             curr_col = [line_words[0]]
             for w in line_words[1:]:
@@ -238,15 +243,25 @@ def extract_rich_text_from_crop(crop: Any) -> str:
             if curr_col:
                 cols.append(curr_col)
 
-            if len(cols) >= 2:
+            # Must have at least 2 distinct columns separated by gaps
+            if len(cols) >= 2 and len(cols) <= 8:
                 col_ranges = [(c[0]['x0'] - 20, c[-1]['x1'] + 20) for c in cols]
                 data_rows = []
                 j = i + 1
-                while j < len(prelim_lines) and j < i + 15:
+                prev_top = prelim_lines[i]['top']
+                while j < len(prelim_lines) and j < i + 20:
                     r_words = prelim_lines[j]['words']
-                    r_txt = ' '.join(w.get('text', '') for w in r_words)
-                    if re.match(r'^(?:\([A-E]\)|\d{1,3}$|Tabela\s+de\s+|O\s+algoritmo|Considerando)', r_txt):
+                    r_txt = ' '.join(w.get('text', '') for w in r_words).strip()
+                    r_top = prelim_lines[j]['top']
+
+                    # Check vertical contiguous row spacing
+                    if r_top - prev_top > 25 or r_top - prev_top < 5:
                         break
+
+                    # Stop if next question, alternatives, caption, or prose paragraph
+                    if re.match(r'^(?:\([A-E]\)|\d{1,3}$|QUEST[ÃA]O|ITEM\s+\d+|Tabela\s+|Quadro\s+|Figura\s+|Fonte:\s*|Obs:\s*|Nota:\s*|O\s+|A\s+|Os\s+|As\s+|Considerando)', r_txt, re.I):
+                        break
+
                     row_cells = [''] * len(cols)
                     assigned = 0
                     for w in r_words:
@@ -257,12 +272,15 @@ def extract_rich_text_from_crop(crop: Any) -> str:
                                 assigned += 1
                                 break
                     non_empty = [c for c in row_cells if c]
-                    if len(non_empty) >= 2 and assigned >= len(r_words) * 0.7:
+                    # Validate that the line matches the column grid and cells are concise
+                    if len(non_empty) >= 2 and assigned >= len(r_words) * 0.7 and all(len(c) <= 35 for c in row_cells):
                         data_rows.append((j, row_cells))
+                        prev_top = r_top
                         j += 1
                     else:
                         break
 
+                # If at least 2 consecutive data rows matched the columnar grid
                 if len(data_rows) >= 2:
                     header_cells = [' '.join(w.get('text', '') for w in c) for c in cols]
                     num_c = len(cols)
