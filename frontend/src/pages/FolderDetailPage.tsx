@@ -11,6 +11,8 @@ import {
   Stack,
   IconButton,
   Tooltip,
+  TextField,
+  Autocomplete,
 } from '@mui/material';
 import { DetailPageSkeleton } from '../components/skeletons';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
@@ -27,14 +29,19 @@ import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import PublicIcon from '@mui/icons-material/Public';
 import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
 import ShuffleIcon from '@mui/icons-material/Shuffle';
+import SearchIcon from '@mui/icons-material/Search';
+import ClearIcon from '@mui/icons-material/Clear';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import { Flashcard, Folder, Question, TestCard } from '../types';
+import { Area, Flashcard, Folder, Question, Subject, TestCard } from '../types';
 import {
   deleteFlashcard,
   getFolderById,
   getFlashcardsInFolder,
   getQuestionsInFolder,
   getTestsInFolder,
+  getAreas,
+  getSubjects,
+  getSubjectsByArea,
   toggleFlashcardVisibility,
 } from '../services/api';
 import { QuestionCard } from '../components/questions/QuestionCard';
@@ -100,6 +107,13 @@ export const FolderDetailPage: React.FC<FolderDetailPageProps> = ({
   const [cardToEdit, setCardToEdit] = useState<Flashcard | null>(null);
   const [editFolderModalOpen, setEditFolderModalOpen] = useState<boolean>(false);
 
+  // Flashcards filters
+  const [search, setSearch] = useState<string>('');
+  const [selectedAreaId, setSelectedAreaId] = useState<number | ''>('');
+  const [selectedSubjectId, setSelectedSubjectId] = useState<number | ''>('');
+  const [areas, setAreas] = useState<Area[]>([]);
+  const [subjects, setSubjects] = useState<Subject[]>([]);
+
   useEffect(() => {
     if (id) {
       loadFolderData(Number(id));
@@ -116,8 +130,18 @@ export const FolderDetailPage: React.FC<FolderDetailPageProps> = ({
         const tList = await getTestsInFolder(fId);
         setTests(tList);
       } else if (folderData.folderType === 'FLASHCARD') {
-        const fList = await getFlashcardsInFolder(fId);
+        const [fList, aList, sList] = await Promise.all([
+          getFlashcardsInFolder(fId, {
+            areaId: selectedAreaId || undefined,
+            subjectId: selectedSubjectId || undefined,
+            search: search.trim() || undefined,
+          }),
+          getAreas(),
+          selectedAreaId ? getSubjectsByArea(Number(selectedAreaId)) : getSubjects(),
+        ]);
         setFlashcards(fList);
+        setAreas(aList);
+        setSubjects(sList);
       } else {
         const qList = await getQuestionsInFolder(fId);
         setQuestions(qList);
@@ -127,6 +151,77 @@ export const FolderDetailPage: React.FC<FolderDetailPageProps> = ({
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleFilterFlashcards = async (
+    areaId: number | '' = selectedAreaId,
+    subjectId: number | '' = selectedSubjectId,
+    searchTerm: string = search
+  ) => {
+    if (!id || !isFlashcardFolder) return;
+    try {
+      const fList = await getFlashcardsInFolder(Number(id), {
+        areaId: areaId || undefined,
+        subjectId: subjectId || undefined,
+        search: searchTerm.trim() || undefined,
+      });
+      setFlashcards(fList);
+    } catch (err) {
+      console.error('Erro ao filtrar flashcards:', err);
+    }
+  };
+
+  const handleAreaChange = async (areaId: number | '') => {
+    setSelectedAreaId(areaId);
+    setSelectedSubjectId('');
+    if (areaId) {
+      try {
+        const sList = await getSubjectsByArea(Number(areaId));
+        setSubjects(sList);
+      } catch (err) {
+        console.error('Erro ao carregar matérias:', err);
+      }
+    } else {
+      try {
+        const sList = await getSubjects();
+        setSubjects(sList);
+      } catch (err) {
+        console.error('Erro ao carregar matérias:', err);
+      }
+    }
+    handleFilterFlashcards(areaId, '', search);
+  };
+
+  const handleSubjectChange = (subjectId: number | '') => {
+    setSelectedSubjectId(subjectId);
+    handleFilterFlashcards(selectedAreaId, subjectId, search);
+  };
+
+  const handleSearchChange = (term: string) => {
+    setSearch(term);
+    handleFilterFlashcards(selectedAreaId, selectedSubjectId, term);
+  };
+
+  const handleClearFilters = () => {
+    setSearch('');
+    setSelectedAreaId('');
+    setSelectedSubjectId('');
+    handleFilterFlashcards('', '', '');
+  };
+
+  const hasActiveFilters = Boolean(search.trim() || selectedAreaId || selectedSubjectId);
+
+  const handleStartFolderStudy = (shuffle?: boolean) => {
+    if (!folder) return;
+    const params = new URLSearchParams();
+    params.append('folderId', String(folder.id));
+    if (selectedAreaId) params.append('areaId', String(selectedAreaId));
+    if (selectedSubjectId) params.append('subjectId', String(selectedSubjectId));
+    if (search.trim()) params.append('search', search.trim());
+    if (shuffle) params.append('shuffle', 'true');
+    navigate(`/flashcards/estudo?${params.toString()}`, {
+      state: { from: `/pastas/${folder.id}`, fromTitle: `Voltar para ${folder.name}` }
+    });
   };
 
   const handleShare = () => {
@@ -224,7 +319,7 @@ export const FolderDetailPage: React.FC<FolderDetailPageProps> = ({
               <Button
                 variant="contained"
                 startIcon={<PlayArrowIcon />}
-                onClick={() => navigate(`/flashcards/estudo?folderId=${folder.id}`)}
+                onClick={() => handleStartFolderStudy(false)}
                 disabled={flashcards.length === 0}
                 sx={{
                   flexGrow: 1,
@@ -242,7 +337,7 @@ export const FolderDetailPage: React.FC<FolderDetailPageProps> = ({
                   <Button
                     variant="outlined"
                     startIcon={<ShuffleIcon />}
-                    onClick={() => navigate(`/flashcards/estudo?folderId=${folder.id}&shuffle=true`)}
+                    onClick={() => handleStartFolderStudy(true)}
                     disabled={flashcards.length === 0}
                     sx={{
                       borderRadius: 2,
@@ -392,191 +487,270 @@ export const FolderDetailPage: React.FC<FolderDetailPageProps> = ({
           </Grid>
         )
       ) : isFlashcardFolder ? (
-        flashcards.length === 0 ? (
-          <Alert severity="info" sx={{ borderRadius: 2 }}>
-            Nenhum flashcard salvo neste deck ainda.
-          </Alert>
-        ) : (
-          <Grid container spacing={2.5}>
-            {flashcards.map((card) => {
-              const isFlipped = flippedCardIds.has(card.id);
-              const isOwner = user?.id && card.createdByUser?.id === user.id;
-              const canEdit = isOwner || isAdmin;
-              const canDelete = isOwner || (isAdmin && card.isPublic);
+        <Box>
+          {/* Barra de Filtros para Cards do Deck */}
+          <Paper elevation={2} sx={{ p: 2.5, borderRadius: 3, mb: 3 }}>
+            <Grid container spacing={2} alignItems="center">
+              <Grid item xs={12} md={4}>
+                <TextField
+                  fullWidth
+                  size="small"
+                  placeholder="Buscar cards neste deck por texto..."
+                  value={search}
+                  onChange={(e) => handleSearchChange(e.target.value)}
+                  InputProps={{
+                    startAdornment: <SearchIcon sx={{ color: 'text.secondary', mr: 1 }} />,
+                  }}
+                />
+              </Grid>
 
-              return (
-                <Grid item xs={12} sm={6} md={4} key={card.id}>
-                  <Paper
-                    elevation={3}
-                    sx={{
-                      p: 3,
-                      borderRadius: 3,
-                      height: '100%',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      justifyContent: 'space-between',
-                      border: '1px solid',
-                      borderColor: isFlipped ? PALETTE_COLORS.primary : 'divider',
-                      backgroundColor: isFlipped
-                        ? isDark
-                          ? 'rgba(217, 183, 99, 0.06)'
-                          : 'rgba(217, 183, 99, 0.08)'
-                        : 'background.paper',
-                      transition: 'all 0.2s ease',
-                    }}
-                  >
-                    <Box>
-                      {/* Top Metadata & Actions */}
-                      <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', mb: 2, gap: 1, flexWrap: 'wrap' }}>
-                        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.8, alignItems: 'center', flex: 1, minWidth: 0 }}>
-                          {card.areaName && (
-                            <Chip
-                              size="small"
-                              label={card.areaName}
-                              sx={{
-                                fontWeight: 700,
-                                maxWidth: '100%',
-                                backgroundColor: isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.06)',
-                                '& .MuiChip-label': {
-                                  overflow: 'hidden',
-                                  textOverflow: 'ellipsis',
-                                  whiteSpace: 'nowrap',
-                                },
-                              }}
-                            />
-                          )}
-                          {card.subjectName && (
-                            <Chip
-                              size="small"
-                              label={card.subjectName}
-                              variant="outlined"
-                              sx={{
-                                fontWeight: 600,
-                                maxWidth: '100%',
-                                '& .MuiChip-label': {
-                                  overflow: 'hidden',
-                                  textOverflow: 'ellipsis',
-                                  whiteSpace: 'nowrap',
-                                },
-                              }}
-                            />
-                          )}
-                        </Box>
+              <Grid item xs={12} sm={6} md={3}>
+                <Autocomplete
+                  size="small"
+                  fullWidth
+                  options={areas}
+                  getOptionLabel={(option) => (typeof option === 'string' ? option : option.name)}
+                  value={areas.find((a) => a.id === selectedAreaId) || null}
+                  onChange={(_e, newValue) => {
+                    handleAreaChange(newValue ? newValue.id : '');
+                  }}
+                  isOptionEqualToValue={(option, value) => option.id === value.id}
+                  renderInput={(params) => (
+                    <TextField {...params} label="Área" placeholder="Todas as áreas" />
+                  )}
+                />
+              </Grid>
 
-                        <Stack direction="row" spacing={0.5} alignItems="center" sx={{ flexShrink: 0, ml: 'auto' }}>
-                          {/* Salvar / Mover para Pasta */}
-                          <Tooltip title={card.folderId ? `Salvo na pasta "${card.folderName}" (Clique para alterar)` : 'Salvar em Pasta / Deck'}>
-                            <IconButton
-                              size="small"
-                              onClick={() => {
-                                setSelectedCardForFolder(card);
-                                setSaveToFolderOpen(true);
-                              }}
-                            >
-                              {card.folderId ? (
-                                <BookmarkIcon fontSize="small" sx={{ color: card.folderColor || PALETTE_COLORS.primary }} />
-                              ) : (
-                                <BookmarkBorderIcon fontSize="small" />
-                              )}
-                            </IconButton>
-                          </Tooltip>
+              <Grid item xs={12} sm={6} md={3}>
+                <Autocomplete
+                  size="small"
+                  fullWidth
+                  options={subjects}
+                  getOptionLabel={(option) => (typeof option === 'string' ? option : option.name)}
+                  value={subjects.find((s) => s.id === selectedSubjectId) || null}
+                  onChange={(_e, newValue) => {
+                    handleSubjectChange(newValue ? newValue.id : '');
+                  }}
+                  isOptionEqualToValue={(option, value) => option.id === value.id}
+                  renderInput={(params) => (
+                    <TextField {...params} label="Matéria" placeholder="Todas as matérias" />
+                  )}
+                />
+              </Grid>
 
-                          <Tooltip title={card.isPublic ? 'Público' : 'Privado'}>
-                            <IconButton
-                              size="small"
-                              onClick={() => isOwner && handleToggleFlashcardVisibility(card.id)}
-                              disabled={!isOwner}
-                              sx={{ cursor: isOwner ? 'pointer' : 'default' }}
-                            >
-                              {card.isPublic ? (
-                                <PublicIcon fontSize="small" sx={{ color: PALETTE_COLORS.success }} />
-                              ) : (
-                                <LockOutlinedIcon fontSize="small" sx={{ color: PALETTE_COLORS.primary }} />
-                              )}
-                            </IconButton>
-                          </Tooltip>
+              <Grid item xs={12} md={2}>
+                <Button
+                  fullWidth
+                  variant="outlined"
+                  startIcon={<ClearIcon />}
+                  onClick={handleClearFilters}
+                  disabled={!hasActiveFilters}
+                  sx={{ borderRadius: 2, height: 40, textTransform: 'none', fontWeight: 600 }}
+                >
+                  Limpar
+                </Button>
+              </Grid>
+            </Grid>
+          </Paper>
 
-                          {canEdit && (
-                            <Tooltip title="Editar flashcard">
+          {flashcards.length === 0 ? (
+            <Alert
+              severity="info"
+              sx={{ borderRadius: 2 }}
+              action={
+                hasActiveFilters ? (
+                  <Button color="inherit" size="small" onClick={handleClearFilters} sx={{ fontWeight: 700 }}>
+                    Limpar Filtros
+                  </Button>
+                ) : undefined
+              }
+            >
+              {hasActiveFilters
+                ? 'Nenhum flashcard encontrado com os filtros selecionados neste deck.'
+                : 'Nenhum flashcard salvo neste deck ainda.'}
+            </Alert>
+          ) : (
+            <Grid container spacing={2.5}>
+              {flashcards.map((card) => {
+                const isFlipped = flippedCardIds.has(card.id);
+                const isOwner = user?.id && card.createdByUser?.id === user.id;
+                const canEdit = isOwner || isAdmin;
+                const canDelete = isOwner || (isAdmin && card.isPublic);
+
+                return (
+                  <Grid item xs={12} sm={6} md={4} key={card.id}>
+                    <Paper
+                      elevation={3}
+                      sx={{
+                        p: 3,
+                        borderRadius: 3,
+                        height: '100%',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        justifyContent: 'space-between',
+                        border: '1px solid',
+                        borderColor: isFlipped ? PALETTE_COLORS.primary : 'divider',
+                        backgroundColor: isFlipped
+                          ? isDark
+                            ? 'rgba(217, 183, 99, 0.06)'
+                            : 'rgba(217, 183, 99, 0.08)'
+                          : 'background.paper',
+                        transition: 'all 0.2s ease',
+                      }}
+                    >
+                      <Box>
+                        {/* Top Metadata & Actions */}
+                        <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', mb: 2, gap: 1, flexWrap: 'wrap' }}>
+                          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.8, alignItems: 'center', flex: 1, minWidth: 0 }}>
+                            {card.areaName && (
+                              <Chip
+                                size="small"
+                                label={card.areaName}
+                                sx={{
+                                  fontWeight: 700,
+                                  maxWidth: '100%',
+                                  backgroundColor: isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.06)',
+                                  '& .MuiChip-label': {
+                                    overflow: 'hidden',
+                                    textOverflow: 'ellipsis',
+                                    whiteSpace: 'nowrap',
+                                  },
+                                }}
+                              />
+                            )}
+                            {card.subjectName && (
+                              <Chip
+                                size="small"
+                                label={card.subjectName}
+                                variant="outlined"
+                                sx={{
+                                  fontWeight: 600,
+                                  maxWidth: '100%',
+                                  '& .MuiChip-label': {
+                                    overflow: 'hidden',
+                                    textOverflow: 'ellipsis',
+                                    whiteSpace: 'nowrap',
+                                  },
+                                }}
+                              />
+                            )}
+                          </Box>
+
+                          <Stack direction="row" spacing={0.5} alignItems="center" sx={{ flexShrink: 0, ml: 'auto' }}>
+                            {/* Salvar / Mover para Pasta */}
+                            <Tooltip title={card.folderId ? `Salvo na pasta "${card.folderName}" (Clique para alterar)` : 'Salvar em Pasta / Deck'}>
                               <IconButton
                                 size="small"
                                 onClick={() => {
-                                  setCardToEdit(card);
-                                  setEditModalOpen(true);
+                                  setSelectedCardForFolder(card);
+                                  setSaveToFolderOpen(true);
                                 }}
                               >
-                                <EditIcon fontSize="small" />
+                                {card.folderId ? (
+                                  <BookmarkIcon fontSize="small" sx={{ color: card.folderColor || PALETTE_COLORS.primary }} />
+                                ) : (
+                                  <BookmarkBorderIcon fontSize="small" />
+                                )}
                               </IconButton>
                             </Tooltip>
-                          )}
 
-                          {canDelete && (
-                            <Tooltip title={isAdmin && !isOwner ? 'Excluir como Moderador Admin' : 'Excluir flashcard'}>
+                            <Tooltip title={card.isPublic ? 'Público' : 'Privado'}>
                               <IconButton
                                 size="small"
-                                onClick={() => handleDeleteFlashcard(card.id)}
-                                sx={{ color: 'text.secondary', '&:hover': { color: PALETTE_COLORS.danger } }}
+                                onClick={() => isOwner && handleToggleFlashcardVisibility(card.id)}
+                                disabled={!isOwner}
+                                sx={{ cursor: isOwner ? 'pointer' : 'default' }}
                               >
-                                <DeleteOutlineIcon fontSize="small" />
+                                {card.isPublic ? (
+                                  <PublicIcon fontSize="small" sx={{ color: PALETTE_COLORS.success }} />
+                                ) : (
+                                  <LockOutlinedIcon fontSize="small" sx={{ color: PALETTE_COLORS.primary }} />
+                                )}
                               </IconButton>
                             </Tooltip>
-                          )}
-                        </Stack>
+
+                            {canEdit && (
+                              <Tooltip title="Editar flashcard">
+                                <IconButton
+                                  size="small"
+                                  onClick={() => {
+                                    setCardToEdit(card);
+                                    setEditModalOpen(true);
+                                  }}
+                                >
+                                  <EditIcon fontSize="small" />
+                                </IconButton>
+                              </Tooltip>
+                            )}
+
+                            {canDelete && (
+                              <Tooltip title={isAdmin && !isOwner ? 'Excluir como Moderador Admin' : 'Excluir flashcard'}>
+                                <IconButton
+                                  size="small"
+                                  onClick={() => handleDeleteFlashcard(card.id)}
+                                  sx={{ color: 'text.secondary', '&:hover': { color: PALETTE_COLORS.danger } }}
+                                >
+                                  <DeleteOutlineIcon fontSize="small" />
+                                </IconButton>
+                              </Tooltip>
+                            )}
+                          </Stack>
+                        </Box>
+
+                        {/* Content Section */}
+                        <Box sx={{ my: 2 }}>
+                          <Typography
+                            variant="caption"
+                            sx={{
+                              fontWeight: 800,
+                              color: isFlipped ? PALETTE_COLORS.primary : 'text.secondary',
+                              display: 'block',
+                              mb: 0.5,
+                            }}
+                          >
+                            {isFlipped ? 'VERSO (RESPOSTA):' : 'FRENTE (PERGUNTA):'}
+                          </Typography>
+
+                          <Typography
+                            variant="body1"
+                            sx={{
+                              fontWeight: isFlipped ? 500 : 700,
+                              minHeight: 64,
+                              lineHeight: 1.5,
+                              wordBreak: 'break-word',
+                              overflowWrap: 'break-word',
+                              whiteSpace: 'pre-line',
+                            }}
+                          >
+                            {isFlipped ? card.back : card.front}
+                          </Typography>
+                        </Box>
                       </Box>
 
-                      {/* Content Section */}
-                      <Box sx={{ my: 2 }}>
-                        <Typography
-                          variant="caption"
-                          sx={{
-                            fontWeight: 800,
-                            color: isFlipped ? PALETTE_COLORS.primary : 'text.secondary',
-                            display: 'block',
-                            mb: 0.5,
-                          }}
+                      {/* Bottom Actions */}
+                      <Box sx={{ pt: 2, borderTop: '1px solid', borderColor: 'divider', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <Button
+                          size="small"
+                          startIcon={<FlipCameraAndroidIcon />}
+                          onClick={() => toggleCardFlip(card.id)}
+                          sx={{ fontWeight: 700, textTransform: 'none' }}
                         >
-                          {isFlipped ? 'VERSO (RESPOSTA):' : 'FRENTE (PERGUNTA):'}
-                        </Typography>
+                          {isFlipped ? 'Ver Pergunta' : 'Revelar Resposta'}
+                        </Button>
 
-                        <Typography
-                          variant="body1"
-                          sx={{
-                            fontWeight: isFlipped ? 500 : 700,
-                            minHeight: 64,
-                            lineHeight: 1.5,
-                            wordBreak: 'break-word',
-                            overflowWrap: 'break-word',
-                            whiteSpace: 'pre-line',
-                          }}
-                        >
-                          {isFlipped ? card.back : card.front}
-                        </Typography>
+                        {card.createdByUser && (
+                          <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                            Por: {card.createdByUser.name}
+                          </Typography>
+                        )}
                       </Box>
-                    </Box>
-
-                    {/* Bottom Actions */}
-                    <Box sx={{ pt: 2, borderTop: '1px solid', borderColor: 'divider', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                      <Button
-                        size="small"
-                        startIcon={<FlipCameraAndroidIcon />}
-                        onClick={() => toggleCardFlip(card.id)}
-                        sx={{ fontWeight: 700, textTransform: 'none' }}
-                      >
-                        {isFlipped ? 'Ver Pergunta' : 'Revelar Resposta'}
-                      </Button>
-
-                      {card.createdByUser && (
-                        <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-                          Por: {card.createdByUser.name}
-                        </Typography>
-                      )}
-                    </Box>
-                  </Paper>
-                </Grid>
-              );
-            })}
-          </Grid>
-        )
+                    </Paper>
+                  </Grid>
+                );
+              })}
+            </Grid>
+          )}
+        </Box>
       ) : (
         questions.length === 0 ? (
           <Alert severity="info" sx={{ borderRadius: 2 }}>

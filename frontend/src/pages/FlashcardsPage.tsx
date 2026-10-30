@@ -17,6 +17,7 @@ import {
   DialogContent,
   DialogActions,
   Autocomplete,
+  Pagination,
 } from '@mui/material';
 import { CardGridSkeleton } from '../components/skeletons';
 import AddIcon from '@mui/icons-material/Add';
@@ -80,6 +81,12 @@ export const FlashcardsPage: React.FC = () => {
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // Paginação de cards avulsos
+  const [page, setPage] = useState<number>(1);
+  const [pageSize] = useState<number>(24);
+  const [totalPages, setTotalPages] = useState<number>(1);
+  const [totalElements, setTotalElements] = useState<number>(0);
+
   // Filters for Cards
   const [search, setSearch] = useState('');
   const [selectedAreaId, setSelectedAreaId] = useState<number | ''>('');
@@ -121,7 +128,7 @@ export const FlashcardsPage: React.FC = () => {
     });
   };
 
-  const loadData = async () => {
+  const loadData = async (targetPage = page) => {
     setLoading(true);
     try {
       const [fCards, fFolders, aList, sList] = await Promise.all([
@@ -130,7 +137,9 @@ export const FlashcardsPage: React.FC = () => {
           subjectId: selectedSubjectId,
           folderId: selectedFolderId,
           search: search.trim() || undefined,
-          size: 100,
+          page: targetPage - 1,
+          size: pageSize,
+          sort: 'updatedAt,desc',
         }),
         getFolders('FLASHCARD'),
         getAreas(),
@@ -138,6 +147,8 @@ export const FlashcardsPage: React.FC = () => {
       ]);
 
       setFlashcards(fCards.content);
+      setTotalPages(fCards.totalPages || 1);
+      setTotalElements(fCards.totalElements || 0);
       setFolders(fFolders);
       setAreas(aList);
       setSubjects(sList);
@@ -149,8 +160,16 @@ export const FlashcardsPage: React.FC = () => {
   };
 
   useEffect(() => {
-    loadData();
+    if (page !== 1) {
+      setPage(1);
+    } else {
+      loadData(1);
+    }
   }, [selectedAreaId, selectedSubjectId, selectedFolderId, user?.id]);
+
+  useEffect(() => {
+    loadData(page);
+  }, [page]);
 
   const handleAreaFilterChange = async (areaId: number | '') => {
     setSelectedAreaId(areaId);
@@ -174,7 +193,11 @@ export const FlashcardsPage: React.FC = () => {
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    loadData();
+    if (page !== 1) {
+      setPage(1);
+    } else {
+      loadData(1);
+    }
   };
 
   const handleCreateFolder = async () => {
@@ -244,9 +267,14 @@ export const FlashcardsPage: React.FC = () => {
   const handleStartStudy = (fId?: number, shuffle?: boolean) => {
     let url = '/flashcards/estudo';
     const params = new URLSearchParams();
-    if (fId) params.append('folderId', String(fId));
-    if (selectedAreaId) params.append('areaId', String(selectedAreaId));
-    if (selectedSubjectId) params.append('subjectId', String(selectedSubjectId));
+    if (fId) {
+      params.append('folderId', String(fId));
+    } else {
+      if (selectedFolderId) params.append('folderId', String(selectedFolderId));
+      if (selectedAreaId) params.append('areaId', String(selectedAreaId));
+      if (selectedSubjectId) params.append('subjectId', String(selectedSubjectId));
+      if (search.trim()) params.append('search', search.trim());
+    }
     if (shuffle) params.append('shuffle', 'true');
 
     const qs = params.toString();
@@ -650,7 +678,7 @@ export const FlashcardsPage: React.FC = () => {
                     fullWidth
                     startIcon={<PlayArrowIcon />}
                     onClick={() => handleStartStudy()}
-                    disabled={flashcards.length === 0}
+                    disabled={totalElements === 0}
                     sx={{
                       fontWeight: 700,
                       borderRadius: 2,
@@ -659,7 +687,7 @@ export const FlashcardsPage: React.FC = () => {
                       whiteSpace: 'nowrap',
                     }}
                   >
-                    Praticar ({flashcards.length})
+                    Praticar ({totalElements})
                   </Button>
 
                   <Tooltip title="Praticar em ordem aleatória">
@@ -667,7 +695,7 @@ export const FlashcardsPage: React.FC = () => {
                       <Button
                         variant="outlined"
                         onClick={() => handleStartStudy(undefined, true)}
-                        disabled={flashcards.length === 0}
+                        disabled={totalElements === 0}
                         sx={{
                           borderRadius: 2,
                           minWidth: 44,
@@ -689,7 +717,8 @@ export const FlashcardsPage: React.FC = () => {
           {loading ? (
             <CardGridSkeleton count={6} columns={{ xs: 12, sm: 6, md: 4 }} cardHeight={220} />
           ) : flashcards.length > 0 ? (
-            <Grid container spacing={2.5}>
+            <>
+              <Grid container spacing={2.5}>
               {flashcards.map((card) => {
                 const isFlipped = flippedCardIds.has(card.id);
                 const isOwner = user?.id && card.createdByUser?.id === user.id;
@@ -887,7 +916,23 @@ export const FlashcardsPage: React.FC = () => {
                 );
               })}
             </Grid>
-          ) : (
+
+            {totalPages > 1 && (
+              <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4, mb: 2 }}>
+                <Pagination
+                  count={totalPages}
+                  page={page}
+                  onChange={(_e, val) => setPage(val)}
+                  color="primary"
+                  shape="rounded"
+                  showFirstButton
+                  showLastButton
+                  size="medium"
+                />
+              </Box>
+            )}
+          </>
+        ) : (
             <Paper elevation={3} sx={{ p: 6, textAlign: 'center', borderRadius: 3 }}>
               <StyleOutlinedIcon sx={{ fontSize: 52, color: 'text.secondary', mb: 2 }} />
               <Typography variant="h6" fontWeight="bold" sx={{ mb: 1 }}>

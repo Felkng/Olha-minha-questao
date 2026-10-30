@@ -76,8 +76,12 @@ public class FolderController {
 
     // Flashcards na Pasta
     @GetMapping("/{id}/flashcards")
-    public ResponseEntity<List<github.felkng.olha_minha_questao.dto.flashcard.FlashcardResponseDTO>> getFlashcardsInFolder(@PathVariable Long id) {
-        return ResponseEntity.ok(folderService.getFlashcardsInFolder(id));
+    public ResponseEntity<List<github.felkng.olha_minha_questao.dto.flashcard.FlashcardResponseDTO>> getFlashcardsInFolder(
+            @PathVariable Long id,
+            @RequestParam(required = false) Long areaId,
+            @RequestParam(required = false) Long subjectId,
+            @RequestParam(required = false) String search) {
+        return ResponseEntity.ok(folderService.getFlashcardsInFolder(id, areaId, subjectId, search));
     }
 
     @PostMapping("/{id}/flashcards/{flashcardId}")

@@ -43,6 +43,14 @@ public class FlashcardSession {
     @JoinColumn(name = "folder_id")
     private Folder folder;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "area_id")
+    private Area area;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "subject_id")
+    private Subject subject;
+
     @Column(name = "total_cards", nullable = false)
     @Builder.Default
     private Integer totalCards = 0;
@@ -58,6 +66,10 @@ public class FlashcardSession {
     @Column(name = "skipped_count", nullable = false)
     @Builder.Default
     private Integer skippedCount = 0;
+
+    @Column(name = "time_spent_seconds", nullable = false)
+    @Builder.Default
+    private Integer timeSpentSeconds = 0;
 
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)

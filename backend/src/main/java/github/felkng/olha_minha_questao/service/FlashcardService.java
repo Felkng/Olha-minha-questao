@@ -6,6 +6,7 @@ import github.felkng.olha_minha_questao.domain.entity.FlashcardSession;
 import github.felkng.olha_minha_questao.domain.entity.FlashcardSessionItem;
 import github.felkng.olha_minha_questao.domain.entity.Folder;
 import github.felkng.olha_minha_questao.domain.entity.FolderType;
+import github.felkng.olha_minha_questao.domain.entity.SavedFlashcard;
 import github.felkng.olha_minha_questao.domain.entity.Subject;
 import github.felkng.olha_minha_questao.domain.entity.User;
 import github.felkng.olha_minha_questao.domain.entity.UserRole;
@@ -91,7 +92,15 @@ public class FlashcardService {
             }
 
             if (folderId != null) {
-                predicates.add(cb.equal(root.get("folder").get("id"), folderId));
+                jakarta.persistence.criteria.Subquery<Long> savedSubquery = query.subquery(Long.class);
+                jakarta.persistence.criteria.Root<SavedFlashcard> savedRoot = savedSubquery.from(SavedFlashcard.class);
+                savedSubquery.select(savedRoot.get("flashcard").get("id"))
+                        .where(cb.equal(savedRoot.get("folder").get("id"), folderId));
+
+                predicates.add(cb.or(
+                        cb.equal(root.get("folder").get("id"), folderId),
+                        root.get("id").in(savedSubquery)
+                ));
             }
 
             if (search != null && !search.isBlank()) {
@@ -261,18 +270,33 @@ public class FlashcardService {
             folder = folderRepository.findById(dto.getFolderId()).orElse(null);
         }
 
+        Area area = null;
+        if (dto.getAreaId() != null) {
+            area = areaRepository.findById(dto.getAreaId()).orElse(null);
+        }
+
+        Subject subject = null;
+        if (dto.getSubjectId() != null) {
+            subject = subjectRepository.findById(dto.getSubjectId()).orElse(null);
+        }
+
         int correct = 0;
         int wrong = 0;
         int skipped = 0;
 
         List<FlashcardSessionItem> sessionItems = new ArrayList<>();
+        List<Flashcard> participatingCards = new ArrayList<>();
+
         FlashcardSession session = FlashcardSession.builder()
                 .user(user)
                 .folder(folder)
+                .area(area)
+                .subject(subject)
                 .totalCards(dto.getItems().size())
                 .correctCount(0)
                 .wrongCount(0)
                 .skippedCount(0)
+                .timeSpentSeconds(dto.getTimeSpentSeconds() != null ? dto.getTimeSpentSeconds() : 0)
                 .build();
 
         FlashcardSession savedSession = flashcardSessionRepository.save(session);
@@ -280,6 +304,7 @@ public class FlashcardService {
         for (FlashcardSessionItemDTO itemDTO : dto.getItems()) {
             Flashcard card = flashcardRepository.findById(itemDTO.getFlashcardId()).orElse(null);
             if (card == null) continue;
+            participatingCards.add(card);
 
             String status = itemDTO.getStatus() != null ? itemDTO.getStatus().toUpperCase() : "SKIPPED";
             if ("CORRECT".equals(status)) {
@@ -300,6 +325,22 @@ public class FlashcardService {
             sessionItems.add(flashcardSessionItemRepository.save(item));
         }
 
+        // Se area ou subject não foram explicitamente informados, derivar das cartas praticadas se forem homogêneas
+        if (area == null && !participatingCards.isEmpty()) {
+            Area firstArea = participatingCards.get(0).getArea();
+            if (firstArea != null && participatingCards.stream().allMatch(c -> c.getArea() != null && c.getArea().getId().equals(firstArea.getId()))) {
+                area = firstArea;
+            }
+        }
+        if (subject == null && !participatingCards.isEmpty()) {
+            Subject firstSubject = participatingCards.get(0).getSubject();
+            if (firstSubject != null && participatingCards.stream().allMatch(c -> c.getSubject() != null && c.getSubject().getId().equals(firstSubject.getId()))) {
+                subject = firstSubject;
+            }
+        }
+
+        savedSession.setArea(area);
+        savedSession.setSubject(subject);
         savedSession.setCorrectCount(correct);
         savedSession.setWrongCount(wrong);
         savedSession.setSkippedCount(skipped);

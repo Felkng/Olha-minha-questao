@@ -216,6 +216,12 @@ public class FolderService {
 
     @Transactional(readOnly = true)
     public List<github.felkng.olha_minha_questao.dto.flashcard.FlashcardResponseDTO> getFlashcardsInFolder(Long folderId) {
+        return getFlashcardsInFolder(folderId, null, null, null);
+    }
+
+    @Transactional(readOnly = true)
+    public List<github.felkng.olha_minha_questao.dto.flashcard.FlashcardResponseDTO> getFlashcardsInFolder(
+            Long folderId, Long areaId, Long subjectId, String search) {
         if (!folderRepository.existsById(folderId)) {
             throw new ResourceNotFoundException("Pasta não encontrada com o id: " + folderId);
         }
@@ -230,7 +236,21 @@ public class FolderService {
                 map.put(sf.getFlashcard().getId(), sf.getFlashcard());
             }
         }
-        return map.values().stream().map(flashcardMapper::toDTO).toList();
+        return map.values().stream()
+                .filter(f -> areaId == null || (f.getArea() != null && f.getArea().getId().equals(areaId)))
+                .filter(f -> subjectId == null || (f.getSubject() != null && f.getSubject().getId().equals(subjectId)))
+                .filter(f -> {
+                    if (search == null || search.isBlank()) return true;
+                    String term = search.trim().toLowerCase();
+                    return (f.getFront() != null && f.getFront().toLowerCase().contains(term)) ||
+                           (f.getBack() != null && f.getBack().toLowerCase().contains(term));
+                })
+                .sorted(java.util.Comparator.comparing(
+                        github.felkng.olha_minha_questao.domain.entity.Flashcard::getUpdatedAt,
+                        java.util.Comparator.nullsLast(java.util.Comparator.reverseOrder())
+                ).thenComparing(github.felkng.olha_minha_questao.domain.entity.Flashcard::getId, java.util.Comparator.reverseOrder()))
+                .map(flashcardMapper::toDTO)
+                .toList();
     }
 
     @Transactional

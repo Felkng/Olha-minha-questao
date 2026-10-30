@@ -21,10 +21,15 @@ public class FlashcardSessionResponseDTO {
     private UserSummaryDTO user;
     private Long folderId;
     private String folderName;
+    private Long areaId;
+    private String areaName;
+    private Long subjectId;
+    private String subjectName;
     private Integer totalCards;
     private Integer correctCount;
     private Integer wrongCount;
     private Integer skippedCount;
+    private Integer timeSpentSeconds;
     private Double accuracyPercentage;
     private Instant createdAt;
     @Builder.Default

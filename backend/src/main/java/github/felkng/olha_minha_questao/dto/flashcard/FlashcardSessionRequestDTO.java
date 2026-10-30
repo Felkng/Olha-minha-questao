@@ -18,6 +18,10 @@ import java.util.List;
 @Builder
 public class FlashcardSessionRequestDTO {
     private Long folderId;
+    private Long areaId;
+    private Long subjectId;
+
+    private Integer timeSpentSeconds;
 
     @Valid
     @NotEmpty(message = "A sessão deve conter ao menos um item praticado")
