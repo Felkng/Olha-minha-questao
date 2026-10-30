@@ -41,3 +41,8 @@ backend/storage/
 __pycache__/
 *.pyc
 
+### Environment Variables ###
+.env
+.env.*
+!.env.example
+
