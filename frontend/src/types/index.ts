@@ -221,11 +221,16 @@ export interface FlashcardSessionItem {
   flashcardId: number;
   flashcardFront?: string;
   flashcardBack?: string;
+  areaName?: string;
+  subjectName?: string;
   status: FlashcardItemStatus;
 }
 
 export interface FlashcardSessionRequest {
   folderId?: number;
+  areaId?: number;
+  subjectId?: number;
+  timeSpentSeconds?: number;
   items: FlashcardSessionItem[];
 }
 
@@ -234,10 +239,15 @@ export interface FlashcardSession {
   user?: UserSummary;
   folderId?: number;
   folderName?: string;
+  areaId?: number;
+  areaName?: string;
+  subjectId?: number;
+  subjectName?: string;
   totalCards: number;
   correctCount: number;
   wrongCount: number;
   skippedCount: number;
+  timeSpentSeconds?: number;
   accuracyPercentage: number;
   createdAt: string;
   items: FlashcardSessionItem[];

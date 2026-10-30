@@ -686,11 +686,16 @@ export const getFlashcards = async (params?: {
   createdByUserId?: number | '';
   page?: number;
   size?: number;
+  sort?: string;
 }): Promise<PageResponse<Flashcard>> => {
   try {
     const page = params?.page ?? 0;
     const size = params?.size ?? 50;
-    const queryParams: Record<string, any> = { page, size };
+    const queryParams: Record<string, any> = {
+      page,
+      size,
+      sort: params?.sort || 'updatedAt,desc',
+    };
 
     if (params?.areaId) queryParams.areaId = params.areaId;
     if (params?.subjectId) queryParams.subjectId = params.subjectId;
@@ -752,9 +757,23 @@ export const deleteFlashcard = async (id: number): Promise<void> => {
   await apiClient.delete(`/flashcards/${id}`);
 };
 
-export const getFlashcardsInFolder = async (folderId: number): Promise<Flashcard[]> => {
+export const getFlashcardsInFolder = async (
+  folderId: number,
+  filters?: {
+    areaId?: number | '';
+    subjectId?: number | '';
+    search?: string;
+  }
+): Promise<Flashcard[]> => {
   try {
-    const response = await apiClient.get<Flashcard[]>(`/folders/${folderId}/flashcards`);
+    const queryParams: Record<string, any> = {};
+    if (filters?.areaId) queryParams.areaId = filters.areaId;
+    if (filters?.subjectId) queryParams.subjectId = filters.subjectId;
+    if (filters?.search) queryParams.search = filters.search;
+
+    const response = await apiClient.get<Flashcard[]>(`/folders/${folderId}/flashcards`, {
+      params: queryParams,
+    });
     return Array.isArray(response.data) ? response.data : [];
   } catch (err) {
     console.warn(`API /folders/${folderId}/flashcards error:`, err);
@@ -769,14 +788,19 @@ export const submitFlashcardSession = async (
   return response.data;
 };
 
-export const getMyFlashcardSessions = async (): Promise<FlashcardSession[]> => {
+export const getUserFlashcardSessions = async (userId?: number): Promise<FlashcardSession[]> => {
   try {
-    const response = await apiClient.get<FlashcardSession[]>('/flashcards/sessions/my');
+    const url = userId ? `/flashcards/sessions/user/${userId}` : '/flashcards/sessions/my';
+    const response = await apiClient.get<FlashcardSession[]>(url);
     return Array.isArray(response.data) ? response.data : [];
   } catch (err) {
-    console.warn('API /flashcards/sessions/my error:', err);
+    console.warn('API flashcards sessions error:', err);
     return [];
   }
+};
+
+export const getMyFlashcardSessions = async (): Promise<FlashcardSession[]> => {
+  return getUserFlashcardSessions();
 };
 
 // Histórico de Questões do Usuário (Tentativas)
