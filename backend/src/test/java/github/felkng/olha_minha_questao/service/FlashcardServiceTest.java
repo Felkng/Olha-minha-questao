@@ -168,6 +168,7 @@ class FlashcardServiceTest {
     @DisplayName("Deve registrar sessão de estudo de flashcards")
     void shouldSaveFlashcardSession() {
         FlashcardSessionRequestDTO sessionReq = FlashcardSessionRequestDTO.builder()
+                .timeSpentSeconds(125)
                 .items(List.of(
                         FlashcardSessionItemDTO.builder().flashcardId(10L).status("CORRECT").build(),
                         FlashcardSessionItemDTO.builder().flashcardId(20L).status("WRONG").build()
@@ -183,19 +184,53 @@ class FlashcardServiceTest {
             return s;
         });
         when(flashcardSessionItemRepository.save(any(FlashcardSessionItem.class))).thenAnswer(inv -> inv.getArgument(0));
-        when(flashcardMapper.toSessionDTO(any(FlashcardSession.class))).thenReturn(FlashcardSessionResponseDTO.builder()
-                .id(55L)
-                .totalCards(2)
-                .correctCount(1)
-                .wrongCount(1)
-                .skippedCount(0)
-                .accuracyPercentage(50.0)
-                .build());
+        when(flashcardMapper.toSessionDTO(any(FlashcardSession.class))).thenAnswer(inv -> {
+            FlashcardSession s = inv.getArgument(0);
+            return FlashcardSessionResponseDTO.builder()
+                    .id(55L)
+                    .totalCards(s.getTotalCards())
+                    .correctCount(s.getCorrectCount())
+                    .wrongCount(s.getWrongCount())
+                    .skippedCount(s.getSkippedCount())
+                    .timeSpentSeconds(s.getTimeSpentSeconds())
+                    .accuracyPercentage(50.0)
+                    .build();
+        });
 
         FlashcardSessionResponseDTO sessionRes = flashcardService.saveSession(sessionReq, 1L);
         assertNotNull(sessionRes);
         assertEquals(2, sessionRes.getTotalCards());
         assertEquals(1, sessionRes.getCorrectCount());
         assertEquals(1, sessionRes.getWrongCount());
+        assertEquals(125, sessionRes.getTimeSpentSeconds());
+    }
+
+    @Test
+    @DisplayName("Deve listar histórico de sessões do usuário")
+    void shouldGetUserSessions() {
+        FlashcardSession session = FlashcardSession.builder()
+                .id(100L)
+                .user(user1)
+                .totalCards(5)
+                .correctCount(4)
+                .wrongCount(1)
+                .skippedCount(0)
+                .timeSpentSeconds(90)
+                .build();
+
+        when(flashcardSessionRepository.findByUserIdOrderByCreatedAtDesc(1L)).thenReturn(List.of(session));
+        when(flashcardMapper.toSessionDTO(session)).thenReturn(FlashcardSessionResponseDTO.builder()
+                .id(100L)
+                .totalCards(5)
+                .correctCount(4)
+                .wrongCount(1)
+                .timeSpentSeconds(90)
+                .accuracyPercentage(80.0)
+                .build());
+
+        List<FlashcardSessionResponseDTO> list = flashcardService.getUserSessions(1L);
+        assertNotNull(list);
+        assertEquals(1, list.size());
+        assertEquals(90, list.get(0).getTimeSpentSeconds());
     }
 }

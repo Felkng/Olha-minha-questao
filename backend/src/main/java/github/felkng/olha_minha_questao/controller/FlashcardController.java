@@ -8,7 +8,9 @@ import github.felkng.olha_minha_questao.service.FlashcardService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -41,8 +43,16 @@ public class FlashcardController {
             @RequestParam(required = false) String search,
             @RequestParam(required = false) Long createdByUserId,
             @RequestHeader(value = "X-User-Id", required = false) Long currentUserId,
-            @PageableDefault(size = 50) Pageable pageable) {
-        return ResponseEntity.ok(flashcardService.findAll(areaId, subjectId, folderId, search, createdByUserId, currentUserId, pageable));
+            @PageableDefault(size = 24, sort = "updatedAt", direction = Sort.Direction.DESC) Pageable pageable) {
+        Pageable effectivePageable = pageable;
+        if (pageable.getSort().isUnsorted()) {
+            effectivePageable = PageRequest.of(
+                    pageable.getPageNumber(),
+                    pageable.getPageSize(),
+                    Sort.by(Sort.Direction.DESC, "updatedAt").and(Sort.by(Sort.Direction.DESC, "id"))
+            );
+        }
+        return ResponseEntity.ok(flashcardService.findAll(areaId, subjectId, folderId, search, createdByUserId, currentUserId, effectivePageable));
     }
 
     @GetMapping("/{id}")
@@ -94,5 +104,11 @@ public class FlashcardController {
     public ResponseEntity<List<FlashcardSessionResponseDTO>> getUserSessions(
             @RequestHeader(value = "X-User-Id", required = false) Long userId) {
         return ResponseEntity.ok(flashcardService.getUserSessions(userId));
+    }
+
+    @GetMapping("/sessions/user/{targetUserId}")
+    public ResponseEntity<List<FlashcardSessionResponseDTO>> getUserSessionsByTarget(
+            @PathVariable Long targetUserId) {
+        return ResponseEntity.ok(flashcardService.getUserSessions(targetUserId));
     }
 }

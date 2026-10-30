@@ -44,10 +44,16 @@ public interface FlashcardMapper {
     @Mapping(target = "flashcardId", source = "flashcard.id")
     @Mapping(target = "flashcardFront", source = "flashcard.front")
     @Mapping(target = "flashcardBack", source = "flashcard.back")
+    @Mapping(target = "areaName", source = "flashcard.area.name")
+    @Mapping(target = "subjectName", source = "flashcard.subject.name")
     FlashcardSessionItemDTO toItemDTO(FlashcardSessionItem entity);
 
     @Mapping(target = "folderId", source = "folder.id")
     @Mapping(target = "folderName", source = "folder.name")
+    @Mapping(target = "areaId", source = "area.id")
+    @Mapping(target = "areaName", source = "area.name")
+    @Mapping(target = "subjectId", source = "subject.id")
+    @Mapping(target = "subjectName", source = "subject.name")
     @Mapping(target = "accuracyPercentage", expression = "java(entity.getTotalCards() != null && entity.getTotalCards() > 0 ? ((double) entity.getCorrectCount() / entity.getTotalCards()) * 100.0 : 0.0)")
     FlashcardSessionResponseDTO toSessionDTO(FlashcardSession entity);
 }

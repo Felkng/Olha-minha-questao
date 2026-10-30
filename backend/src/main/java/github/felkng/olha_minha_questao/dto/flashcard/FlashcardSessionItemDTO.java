@@ -21,6 +21,8 @@ public class FlashcardSessionItemDTO {
 
     private String flashcardFront;
     private String flashcardBack;
+    private String areaName;
+    private String subjectName;
 
     @NotBlank(message = "O status da carta na sessão é obrigatório (CORRECT, WRONG, SKIPPED)")
     private String status;
