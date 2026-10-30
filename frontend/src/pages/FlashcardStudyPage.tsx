@@ -23,6 +23,7 @@ import FolderSpecialOutlinedIcon from '@mui/icons-material/FolderSpecialOutlined
 import KeyboardIcon from '@mui/icons-material/Keyboard';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import ShuffleIcon from '@mui/icons-material/Shuffle';
+import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import { useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import { Flashcard, FlashcardItemStatus, FlashcardSessionItem } from '../types';
 import { getFlashcards, getFlashcardsInFolder, submitFlashcardSession } from '../services/api';
@@ -39,6 +40,17 @@ const shuffleArray = <T,>(array: T[]): T[] => {
   return arr;
 };
 
+const formatSeconds = (seconds: number): string => {
+  const mins = Math.floor(seconds / 60);
+  const secs = seconds % 60;
+  if (mins >= 60) {
+    const hours = Math.floor(mins / 60);
+    const remMins = mins % 60;
+    return `${hours}h ${remMins.toString().padStart(2, '0')}m ${secs.toString().padStart(2, '0')}s`;
+  }
+  return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+};
+
 export const FlashcardStudyPage: React.FC = () => {
   const { mode } = useAppTheme();
   const isDark = mode === 'dark';
@@ -50,6 +62,7 @@ export const FlashcardStudyPage: React.FC = () => {
   const folderIdParam = searchParams.get('folderId');
   const areaIdParam = searchParams.get('areaId');
   const subjectIdParam = searchParams.get('subjectId');
+  const searchParam = searchParams.get('search');
   const shuffleParam = searchParams.get('shuffle') === 'true' || searchParams.get('random') === 'true';
   const folderId = folderIdParam ? Number(folderIdParam) : undefined;
 
@@ -77,6 +90,11 @@ export const FlashcardStudyPage: React.FC = () => {
   const [isRandomMode, setIsRandomMode] = useState<boolean>(shuffleParam);
   const [loading, setLoading] = useState(true);
 
+  // Timer state
+  const [elapsedSeconds, setElapsedSeconds] = useState<number>(0);
+  const startTimeRef = React.useRef<number>(Date.now());
+  const timerIntervalRef = React.useRef<any>(null);
+
   // Session State
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isFlipped, setIsFlipped] = useState(false);
@@ -86,18 +104,37 @@ export const FlashcardStudyPage: React.FC = () => {
   const [isFinished, setIsFinished] = useState(false);
   const [submittingSession, setSubmittingSession] = useState(false);
 
+  useEffect(() => {
+    if (!loading && !isFinished && cards.length > 0) {
+      startTimeRef.current = Date.now() - elapsedSeconds * 1000;
+      timerIntervalRef.current = setInterval(() => {
+        setElapsedSeconds(Math.floor((Date.now() - startTimeRef.current) / 1000));
+      }, 1000);
+    }
+
+    return () => {
+      if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
+    };
+  }, [loading, isFinished, cards.length]);
+
   // Load cards for study
   const loadCards = async () => {
     setLoading(true);
     try {
       let fetchedCards: Flashcard[] = [];
       if (folderId) {
-        fetchedCards = await getFlashcardsInFolder(folderId);
+        fetchedCards = await getFlashcardsInFolder(folderId, {
+          areaId: areaIdParam ? Number(areaIdParam) : undefined,
+          subjectId: subjectIdParam ? Number(subjectIdParam) : undefined,
+          search: searchParam || undefined,
+        });
       } else {
         const res = await getFlashcards({
           areaId: areaIdParam ? Number(areaIdParam) : '',
           subjectId: subjectIdParam ? Number(subjectIdParam) : '',
-          size: 100,
+          search: searchParam || undefined,
+          size: 1000,
+          sort: 'updatedAt,desc',
         });
         fetchedCards = res.content;
       }
@@ -112,7 +149,7 @@ export const FlashcardStudyPage: React.FC = () => {
 
   useEffect(() => {
     loadCards();
-  }, [folderIdParam, areaIdParam, subjectIdParam]);
+  }, [folderIdParam, areaIdParam, subjectIdParam, searchParam]);
 
   const toggleRandomMode = () => {
     const nextRandom = !isRandomMode;
@@ -157,6 +194,10 @@ export const FlashcardStudyPage: React.FC = () => {
     finalResults: { card: Flashcard; status: FlashcardItemStatus }[]
   ) => {
     setIsFinished(true);
+    if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
+    const finalSeconds = Math.max(1, Math.floor((Date.now() - startTimeRef.current) / 1000));
+    setElapsedSeconds(finalSeconds);
+
     if (user?.id) {
       setSubmittingSession(true);
       try {
@@ -166,6 +207,9 @@ export const FlashcardStudyPage: React.FC = () => {
         }));
         await submitFlashcardSession({
           folderId,
+          areaId: areaIdParam ? Number(areaIdParam) : undefined,
+          subjectId: subjectIdParam ? Number(subjectIdParam) : undefined,
+          timeSpentSeconds: finalSeconds,
           items,
         });
       } catch (err) {
@@ -198,6 +242,8 @@ export const FlashcardStudyPage: React.FC = () => {
     if (isRandomMode && originalCards.length > 0) {
       setCards(shuffleArray(originalCards));
     }
+    setElapsedSeconds(0);
+    startTimeRef.current = Date.now();
     setCurrentIndex(0);
     setIsFlipped(false);
     setSessionResults([]);
@@ -211,6 +257,8 @@ export const FlashcardStudyPage: React.FC = () => {
     if (missedCards.length === 0) return;
 
     setCards(isRandomMode ? shuffleArray(missedCards) : missedCards);
+    setElapsedSeconds(0);
+    startTimeRef.current = Date.now();
     setCurrentIndex(0);
     setIsFlipped(false);
     setSessionResults([]);
@@ -320,7 +368,27 @@ export const FlashcardStudyPage: React.FC = () => {
 
           {/* Metrics Grid */}
           <Grid container spacing={2} sx={{ mb: 4 }}>
-            <Grid item xs={6} sm={3}>
+            <Grid item xs={6} sm={2.4}>
+              <Paper
+                elevation={0}
+                sx={{
+                  p: 2,
+                  borderRadius: 2.5,
+                  border: '1px solid',
+                  borderColor: PALETTE_COLORS.primary,
+                  backgroundColor: isDark ? 'rgba(217, 183, 99, 0.08)' : 'rgba(217, 183, 99, 0.1)',
+                }}
+              >
+                <Typography variant="h5" sx={{ fontWeight: 800, color: PALETTE_COLORS.primary }}>
+                  {formatSeconds(elapsedSeconds)}
+                </Typography>
+                <Typography variant="caption" sx={{ fontWeight: 700, color: 'text.secondary' }}>
+                  TEMPO TOTAL
+                </Typography>
+              </Paper>
+            </Grid>
+
+            <Grid item xs={6} sm={2.4}>
               <Paper
                 elevation={0}
                 sx={{
@@ -331,16 +399,16 @@ export const FlashcardStudyPage: React.FC = () => {
                   backgroundColor: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)',
                 }}
               >
-                <Typography variant="h4" sx={{ fontWeight: 800, color: PALETTE_COLORS.primary }}>
+                <Typography variant="h5" sx={{ fontWeight: 800, color: PALETTE_COLORS.primary }}>
                   {accuracy}%
                 </Typography>
                 <Typography variant="caption" sx={{ fontWeight: 700, color: 'text.secondary' }}>
-                  TAXA DE ACERTO
+                  APROVEITAMENTO
                 </Typography>
               </Paper>
             </Grid>
 
-            <Grid item xs={6} sm={3}>
+            <Grid item xs={4} sm={2.4}>
               <Paper
                 elevation={0}
                 sx={{
@@ -351,7 +419,7 @@ export const FlashcardStudyPage: React.FC = () => {
                   backgroundColor: isDark ? 'rgba(75, 241, 81, 0.08)' : 'rgba(75, 241, 81, 0.1)',
                 }}
               >
-                <Typography variant="h4" sx={{ fontWeight: 800, color: PALETTE_COLORS.success }}>
+                <Typography variant="h5" sx={{ fontWeight: 800, color: PALETTE_COLORS.success }}>
                   {correctCount}
                 </Typography>
                 <Typography variant="caption" sx={{ fontWeight: 700, color: PALETTE_COLORS.success }}>
@@ -360,7 +428,7 @@ export const FlashcardStudyPage: React.FC = () => {
               </Paper>
             </Grid>
 
-            <Grid item xs={6} sm={3}>
+            <Grid item xs={4} sm={2.4}>
               <Paper
                 elevation={0}
                 sx={{
@@ -371,7 +439,7 @@ export const FlashcardStudyPage: React.FC = () => {
                   backgroundColor: isDark ? 'rgba(250, 66, 75, 0.08)' : 'rgba(250, 66, 75, 0.1)',
                 }}
               >
-                <Typography variant="h4" sx={{ fontWeight: 800, color: PALETTE_COLORS.danger }}>
+                <Typography variant="h5" sx={{ fontWeight: 800, color: PALETTE_COLORS.danger }}>
                   {wrongCount}
                 </Typography>
                 <Typography variant="caption" sx={{ fontWeight: 700, color: PALETTE_COLORS.danger }}>
@@ -380,7 +448,7 @@ export const FlashcardStudyPage: React.FC = () => {
               </Paper>
             </Grid>
 
-            <Grid item xs={6} sm={3}>
+            <Grid item xs={4} sm={2.4}>
               <Paper
                 elevation={0}
                 sx={{
@@ -391,7 +459,7 @@ export const FlashcardStudyPage: React.FC = () => {
                   backgroundColor: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)',
                 }}
               >
-                <Typography variant="h4" sx={{ fontWeight: 800, color: 'text.secondary' }}>
+                <Typography variant="h5" sx={{ fontWeight: 800, color: 'text.secondary' }}>
                   {skippedCount}
                 </Typography>
                 <Typography variant="caption" sx={{ fontWeight: 700, color: 'text.secondary' }}>
@@ -555,6 +623,16 @@ export const FlashcardStudyPage: React.FC = () => {
         </Stack>
 
         <Stack direction="row" spacing={1.5} alignItems="center">
+          <Chip
+            size="small"
+            icon={<AccessTimeIcon fontSize="small" sx={{ color: `${PALETTE_COLORS.primary} !important` }} />}
+            label={formatSeconds(elapsedSeconds)}
+            sx={{
+              fontWeight: 700,
+              backgroundColor: isDark ? 'rgba(217, 183, 99, 0.1)' : 'rgba(217, 183, 99, 0.15)',
+              color: PALETTE_COLORS.primary,
+            }}
+          />
           <Chip
             size="small"
             icon={<CheckCircleIcon style={{ color: PALETTE_COLORS.success }} />}
