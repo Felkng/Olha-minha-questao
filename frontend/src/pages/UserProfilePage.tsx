@@ -19,6 +19,7 @@ import {
   FormControl,
   Grid,
   IconButton,
+  InputAdornment,
   InputLabel,
   LinearProgress,
   List,
@@ -71,6 +72,7 @@ import FlipCameraAndroidIcon from '@mui/icons-material/FlipCameraAndroid';
 import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
 import PublicIcon from '@mui/icons-material/Public';
 import BookmarkBorderIcon from '@mui/icons-material/BookmarkBorder';
+import AccessTimeIcon from '@mui/icons-material/AccessTime';
 
 import {
   getUserProfile,
@@ -94,11 +96,13 @@ import {
   getUserQuestionAttempts,
   getFlashcards,
   deleteFlashcard,
+  getUserFlashcardSessions,
 } from '../services/api';
 import {
   Area,
   CategoryPerformance,
   Flashcard,
+  FlashcardSession,
   Folder,
   FolderType,
   Origin,
@@ -139,6 +143,7 @@ type ProfileTab =
   | 'visao_geral'
   | 'questoes_respondidas'
   | 'meus_simulados'
+  | 'sessoes_estudo'
   | 'minhas_questoes'
   | 'minhas_provas'
   | 'minhas_pastas'
@@ -206,8 +211,12 @@ export const UserProfilePage: React.FC = () => {
   const [loadingFlashcards, setLoadingFlashcards] = useState(false);
   const [myFlashcardFolders, setMyFlashcardFolders] = useState<Folder[]>([]);
   const [loadingFlashcardFolders, setLoadingFlashcardFolders] = useState(false);
+  const [flashcardSessions, setFlashcardSessions] = useState<FlashcardSession[]>([]);
+  const [loadingFlashcardSessions, setLoadingFlashcardSessions] = useState(false);
+  const [selectedSessionDetail, setSelectedSessionDetail] = useState<FlashcardSession | null>(null);
   const [flashcardSearch, setFlashcardSearch] = useState('');
-  const [flashcardSubTab, setFlashcardSubTab] = useState<'DECKS' | 'CARDS'>('DECKS');
+  const [flashcardSessionSearch, setFlashcardSessionSearch] = useState('');
+  const [flashcardSubTab, setFlashcardSubTab] = useState<'DECKS' | 'CARDS' | 'SESSIONS'>('DECKS');
   const [flippedProfileCards, setFlippedProfileCards] = useState<Record<number, boolean>>({});
   const [openCreateFlashcard, setOpenCreateFlashcard] = useState(false);
   const [selectedFlashcardForEdit, setSelectedFlashcardForEdit] = useState<Flashcard | null>(null);
@@ -323,6 +332,8 @@ export const UserProfilePage: React.FC = () => {
     const tabParam = searchParams.get('tab');
     if (tabParam === 'flashcards' || tabParam === 'meus_flashcards') {
       setActiveNavTab('meus_flashcards');
+    } else if (tabParam === 'sessoes' || tabParam === 'sessoes_estudo' || tabParam === 'estudo') {
+      setActiveNavTab('sessoes_estudo');
     } else if (tabParam === 'simulados' || tabParam === 'meus_simulados') {
       setActiveNavTab('meus_simulados');
     } else if (tabParam === 'questoes' || tabParam === 'minhas_questoes') {
@@ -343,6 +354,8 @@ export const UserProfilePage: React.FC = () => {
       loadMyQuestionAttempts();
     } else if (activeNavTab === 'meus_simulados') {
       loadMyTestAttempts();
+    } else if (activeNavTab === 'sessoes_estudo') {
+      loadMyFlashcardSessions();
     } else if (activeNavTab === 'minhas_questoes') {
       loadMyQuestions();
     } else if (activeNavTab === 'minhas_provas') {
@@ -352,6 +365,7 @@ export const UserProfilePage: React.FC = () => {
     } else if (activeNavTab === 'meus_flashcards') {
       loadMyFlashcards();
       loadMyFlashcardFolders();
+      loadMyFlashcardSessions();
     } else if (activeNavTab === 'admin_bancas' && isAdmin) {
       loadAllOrigins();
     } else if (activeNavTab === 'admin_areas' && isAdmin) {
@@ -451,6 +465,33 @@ export const UserProfilePage: React.FC = () => {
     } finally {
       setLoadingFlashcardFolders(false);
     }
+  };
+
+  const loadMyFlashcardSessions = async () => {
+    setLoadingFlashcardSessions(true);
+    try {
+      const res = await getUserFlashcardSessions(userId || undefined);
+      setFlashcardSessions(res);
+    } catch (err) {
+      console.error('Erro ao carregar histórico de sessões de flashcards:', err);
+    } finally {
+      setLoadingFlashcardSessions(false);
+    }
+  };
+
+  const formatStudyDuration = (seconds?: number): string => {
+    if (!seconds || seconds <= 0) return '0s';
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    if (mins >= 60) {
+      const hours = Math.floor(mins / 60);
+      const remMins = mins % 60;
+      return `${hours}h ${remMins}m ${secs}s`;
+    }
+    if (mins > 0) {
+      return `${mins}m ${secs}s`;
+    }
+    return `${secs}s`;
   };
 
   const handleToggleProfileCardFlip = (cardId: number) => {
@@ -772,6 +813,25 @@ export const UserProfilePage: React.FC = () => {
                     <EmojiEventsIcon fontSize="small" />
                   </ListItemIcon>
                   <ListItemText primary="Simulados Realizados" primaryTypographyProps={{ fontWeight: activeNavTab === 'meus_simulados' ? 700 : 500 }} />
+                </ListItemButton>
+
+                <ListItemButton
+                  selected={activeNavTab === 'sessoes_estudo'}
+                  onClick={() => setActiveNavTab('sessoes_estudo')}
+                  sx={{
+                    borderRadius: 2,
+                    mb: 0.5,
+                    '&.Mui-selected': {
+                      backgroundColor: isDark ? 'rgba(217, 183, 99, 0.15)' : 'rgba(217, 183, 99, 0.12)',
+                      color: PALETTE_COLORS.primary,
+                      fontWeight: 700,
+                    },
+                  }}
+                >
+                  <ListItemIcon sx={{ minWidth: 40, color: activeNavTab === 'sessoes_estudo' ? PALETTE_COLORS.primary : 'inherit' }}>
+                    <AccessTimeIcon fontSize="small" />
+                  </ListItemIcon>
+                  <ListItemText primary="Sessões de Estudo" primaryTypographyProps={{ fontWeight: activeNavTab === 'sessoes_estudo' ? 700 : 500 }} />
                 </ListItemButton>
 
                 {(isOwner || isAdmin) && (
@@ -1771,6 +1831,384 @@ export const UserProfilePage: React.FC = () => {
             </Paper>
           )}
 
+          {/* ABA: SESSÕES DE ESTUDO */}
+          {activeNavTab === 'sessoes_estudo' && (
+            <Paper elevation={3} sx={{ p: 3, borderRadius: 3 }}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3, flexWrap: 'wrap', gap: 2 }}>
+                <Box>
+                  <Typography variant="h5" fontWeight="bold">
+                    Sessões de Estudo
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Histórico completo de sessões de flashcards, com acertos, erros, tempo respondido, área e matéria.
+                  </Typography>
+                </Box>
+                <Button
+                  variant="contained"
+                  startIcon={<PlayArrowIcon />}
+                  onClick={() => navigate('/flashcards')}
+                  sx={{
+                    fontWeight: 700,
+                    backgroundColor: PALETTE_COLORS.primary,
+                    color: '#1a1e24',
+                    textTransform: 'none',
+                    borderRadius: 2,
+                    '&:hover': {
+                      backgroundColor: '#c4a251',
+                    },
+                  }}
+                >
+                  Praticar Flashcards
+                </Button>
+              </Box>
+
+              {/* Cards de Resumo Métrico */}
+              {(() => {
+                const totalSessions = flashcardSessions.length;
+                const totalSeconds = flashcardSessions.reduce((acc, s) => acc + (s.timeSpentSeconds || 0), 0);
+                const totalCards = flashcardSessions.reduce((acc, s) => acc + (s.totalCards || 0), 0);
+                const totalCorrect = flashcardSessions.reduce((acc, s) => acc + (s.correctCount || 0), 0);
+                const totalWrong = flashcardSessions.reduce((acc, s) => acc + (s.wrongCount || 0), 0);
+                const avgAccuracy = totalCards > 0 ? Math.round((totalCorrect / totalCards) * 100) : 0;
+
+                return (
+                  <Grid container spacing={2} sx={{ mb: 3 }}>
+                    <Grid item xs={12} sm={6} md={3}>
+                      <Paper
+                        variant="outlined"
+                        sx={{
+                          p: 2,
+                          borderRadius: 2.5,
+                          backgroundColor: isDark ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.02)',
+                        }}
+                      >
+                        <Typography variant="caption" color="text.secondary" fontWeight={600}>
+                          Sessões Realizadas
+                        </Typography>
+                        <Typography variant="h5" fontWeight={800} sx={{ mt: 0.5, color: PALETTE_COLORS.primary }}>
+                          {totalSessions}
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          execuções finalizadas
+                        </Typography>
+                      </Paper>
+                    </Grid>
+
+                    <Grid item xs={12} sm={6} md={3}>
+                      <Paper
+                        variant="outlined"
+                        sx={{
+                          p: 2,
+                          borderRadius: 2.5,
+                          backgroundColor: isDark ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.02)',
+                        }}
+                      >
+                        <Typography variant="caption" color="text.secondary" fontWeight={600}>
+                          Tempo Total Respondido
+                        </Typography>
+                        <Typography variant="h5" fontWeight={800} sx={{ mt: 0.5 }}>
+                          {formatStudyDuration(totalSeconds)}
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          tempo em estudo ativo
+                        </Typography>
+                      </Paper>
+                    </Grid>
+
+                    <Grid item xs={12} sm={6} md={3}>
+                      <Paper
+                        variant="outlined"
+                        sx={{
+                          p: 2,
+                          borderRadius: 2.5,
+                          backgroundColor: isDark ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.02)',
+                        }}
+                      >
+                        <Typography variant="caption" color="text.secondary" fontWeight={600}>
+                          Cards Praticados
+                        </Typography>
+                        <Typography variant="h5" fontWeight={800} sx={{ mt: 0.5 }}>
+                          {totalCards}
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          {totalCorrect} acertos • {totalWrong} erros
+                        </Typography>
+                      </Paper>
+                    </Grid>
+
+                    <Grid item xs={12} sm={6} md={3}>
+                      <Paper
+                        variant="outlined"
+                        sx={{
+                          p: 2,
+                          borderRadius: 2.5,
+                          backgroundColor: isDark ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.02)',
+                        }}
+                      >
+                        <Typography variant="caption" color="text.secondary" fontWeight={600}>
+                          Taxa Média de Acerto
+                        </Typography>
+                        <Typography
+                          variant="h5"
+                          fontWeight={800}
+                          sx={{
+                            mt: 0.5,
+                            color: avgAccuracy >= 70 ? PALETTE_COLORS.success : PALETTE_COLORS.primary,
+                          }}
+                        >
+                          {avgAccuracy}%
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          aproveitamento global
+                        </Typography>
+                      </Paper>
+                    </Grid>
+                  </Grid>
+                );
+              })()}
+
+              {/* Barra de Filtro e Busca */}
+              <TextField
+                placeholder="Buscar por pasta/deck, área ou matéria..."
+                size="small"
+                fullWidth
+                value={flashcardSessionSearch}
+                onChange={(e) => setFlashcardSessionSearch(e.target.value)}
+                sx={{ mb: 3 }}
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <SearchIcon fontSize="small" sx={{ color: 'text.secondary' }} />
+                    </InputAdornment>
+                  ),
+                }}
+              />
+
+              {/* Lista de Sessões */}
+              {loadingFlashcardSessions ? (
+                <ListItemsSkeleton count={4} />
+              ) : (
+                (() => {
+                  const filtered = flashcardSessions.filter((s) => {
+                    if (!flashcardSessionSearch.trim()) return true;
+                    const q = flashcardSessionSearch.toLowerCase();
+                    const folderMatch = s.folderName ? s.folderName.toLowerCase().includes(q) : false;
+                    const areaMatch = s.areaName ? s.areaName.toLowerCase().includes(q) : false;
+                    const subjectMatch = s.subjectName ? s.subjectName.toLowerCase().includes(q) : false;
+                    return folderMatch || areaMatch || subjectMatch;
+                  });
+
+                  if (filtered.length === 0) {
+                    return (
+                      <Box sx={{ textAlign: 'center', py: 6 }}>
+                        <StyleOutlinedIcon sx={{ fontSize: 48, color: 'text.secondary', mb: 1, opacity: 0.5 }} />
+                        <Typography color="text.secondary" sx={{ mb: 2 }}>
+                          {flashcardSessionSearch.trim()
+                            ? 'Nenhuma sessão encontrada para a busca informada.'
+                            : 'Nenhuma sessão de estudo realizada ainda.'}
+                        </Typography>
+                        <Button
+                          variant="contained"
+                          startIcon={<PlayArrowIcon />}
+                          onClick={() => navigate('/flashcards')}
+                          sx={{
+                            fontWeight: 700,
+                            backgroundColor: PALETTE_COLORS.primary,
+                            color: '#1a1e24',
+                            textTransform: 'none',
+                            borderRadius: 2,
+                          }}
+                        >
+                          Começar a Praticar Flashcards
+                        </Button>
+                      </Box>
+                    );
+                  }
+
+                  return (
+                    <Stack spacing={2}>
+                      {filtered.map((session) => {
+                        const total = session.totalCards || (session.correctCount + session.wrongCount + session.skippedCount);
+                        const accuracy = session.accuracyPercentage != null
+                          ? Math.round(session.accuracyPercentage)
+                          : total > 0 ? Math.round((session.correctCount / total) * 100) : 0;
+                        const durationStr = formatStudyDuration(session.timeSpentSeconds);
+                        const dateFormatted = new Date(session.createdAt).toLocaleDateString('pt-BR', {
+                          day: '2-digit',
+                          month: '2-digit',
+                          year: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        });
+
+                        return (
+                          <Paper
+                            key={session.id}
+                            variant="outlined"
+                            sx={{
+                              p: 2.5,
+                              borderRadius: 2.5,
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              flexWrap: 'wrap',
+                              gap: 2,
+                              transition: 'all 0.2s',
+                              '&:hover': {
+                                boxShadow: 2,
+                                borderColor: PALETTE_COLORS.primary,
+                              },
+                            }}
+                          >
+                            <Box sx={{ minWidth: 240 }}>
+                              <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" sx={{ mb: 1, gap: 0.5 }}>
+                                {session.folderName ? (
+                                  <Chip
+                                    size="small"
+                                    icon={<FolderSpecialOutlinedIcon fontSize="small" />}
+                                    label={session.folderName}
+                                    sx={{
+                                      fontWeight: 700,
+                                      backgroundColor: 'rgba(217, 183, 99, 0.15)',
+                                      color: PALETTE_COLORS.primary,
+                                    }}
+                                  />
+                                ) : (
+                                  <Chip
+                                    size="small"
+                                    icon={<StyleOutlinedIcon fontSize="small" />}
+                                    label="Cards Avulsos"
+                                    variant="outlined"
+                                    sx={{ fontWeight: 700 }}
+                                  />
+                                )}
+                                {session.areaName && (
+                                  <Chip
+                                    size="small"
+                                    label={`Área: ${session.areaName}`}
+                                    variant="outlined"
+                                    sx={{
+                                      fontWeight: 600,
+                                      borderColor: PALETTE_COLORS.primary,
+                                      color: PALETTE_COLORS.primary,
+                                    }}
+                                  />
+                                )}
+                                {session.subjectName && (
+                                  <Chip
+                                    size="small"
+                                    label={`Matéria: ${session.subjectName}`}
+                                    variant="outlined"
+                                    sx={{ fontWeight: 600 }}
+                                  />
+                                )}
+                                <Typography variant="caption" color="text.secondary">
+                                  {dateFormatted}
+                                </Typography>
+                              </Stack>
+
+                              <Typography
+                                variant="body2"
+                                sx={{ color: 'text.secondary', display: 'flex', alignItems: 'center', gap: 0.8 }}
+                              >
+                                <AccessTimeIcon fontSize="small" sx={{ fontSize: 16, color: PALETTE_COLORS.primary }} />
+                                Tempo Respondido: <strong>{durationStr}</strong>
+                              </Typography>
+                            </Box>
+
+                            <Stack direction="row" spacing={1.5} alignItems="center" flexWrap="wrap">
+                              <Chip
+                                size="small"
+                                label={`${session.totalCards} cards`}
+                                sx={{ fontWeight: 600 }}
+                              />
+                              <Chip
+                                size="small"
+                                label={`${session.correctCount} acertos`}
+                                sx={{
+                                  fontWeight: 700,
+                                  backgroundColor: 'rgba(75, 241, 81, 0.12)',
+                                  color: PALETTE_COLORS.success,
+                                }}
+                              />
+                              <Chip
+                                size="small"
+                                label={`${session.wrongCount} erros`}
+                                sx={{
+                                  fontWeight: 700,
+                                  backgroundColor: 'rgba(250, 66, 75, 0.12)',
+                                  color: PALETTE_COLORS.danger,
+                                }}
+                              />
+                              {session.skippedCount > 0 && (
+                                <Chip
+                                  size="small"
+                                  label={`${session.skippedCount} pulados`}
+                                  variant="outlined"
+                                  sx={{ fontWeight: 600 }}
+                                />
+                              )}
+                              <Chip
+                                size="small"
+                                label={`${accuracy}% acerto`}
+                                sx={{
+                                  fontWeight: 800,
+                                  backgroundColor:
+                                    accuracy >= 70
+                                      ? 'rgba(75, 241, 81, 0.15)'
+                                      : 'rgba(217, 183, 99, 0.15)',
+                                  color:
+                                    accuracy >= 70
+                                      ? PALETTE_COLORS.success
+                                      : PALETTE_COLORS.primary,
+                                }}
+                              />
+
+                              <Button
+                                size="small"
+                                variant="outlined"
+                                startIcon={<VisibilityIcon fontSize="small" />}
+                                onClick={() => setSelectedSessionDetail(session)}
+                                sx={{ borderRadius: 2, fontWeight: 700, textTransform: 'none' }}
+                              >
+                                Ver Detalhes
+                              </Button>
+
+                              <Button
+                                size="small"
+                                variant="contained"
+                                startIcon={<PlayArrowIcon fontSize="small" />}
+                                onClick={() => {
+                                  const params = new URLSearchParams();
+                                  if (session.folderId) params.set('folderId', session.folderId.toString());
+                                  if (session.areaId) params.set('areaId', session.areaId.toString());
+                                  if (session.subjectId) params.set('subjectId', session.subjectId.toString());
+                                  navigate(`/flashcards/study?${params.toString()}`);
+                                }}
+                                sx={{
+                                  borderRadius: 2,
+                                  fontWeight: 700,
+                                  textTransform: 'none',
+                                  backgroundColor: PALETTE_COLORS.primary,
+                                  color: '#1a1e24',
+                                  '&:hover': {
+                                    backgroundColor: '#c4a251',
+                                  },
+                                }}
+                              >
+                                Estudar Novamente
+                              </Button>
+                            </Stack>
+                          </Paper>
+                        );
+                      })}
+                    </Stack>
+                  );
+                })()
+              )}
+            </Paper>
+          )}
+
           {/* ABA 1: MINHAS QUESTÕES */}
           {activeNavTab === 'minhas_questoes' && (
             <Paper elevation={3} sx={{ p: 3, borderRadius: 3 }}>
@@ -2333,19 +2771,27 @@ export const UserProfilePage: React.FC = () => {
                   icon={<StyleOutlinedIcon fontSize="small" />}
                   iconPosition="start"
                 />
+                <Tab
+                  value="SESSIONS"
+                  label={`Histórico de Sessões (${flashcardSessions.length})`}
+                  icon={<HistoryIcon fontSize="small" />}
+                  iconPosition="start"
+                />
               </Tabs>
 
-              <TextField
-                placeholder={flashcardSubTab === 'DECKS' ? 'Buscar em meus decks...' : 'Buscar em meus flashcards...'}
-                size="small"
-                fullWidth
-                value={flashcardSearch}
-                onChange={(e) => setFlashcardSearch(e.target.value)}
-                InputProps={{
-                  startAdornment: <SearchIcon fontSize="small" sx={{ mr: 1, color: 'text.secondary' }} />,
-                }}
-                sx={{ mb: 3 }}
-              />
+              {flashcardSubTab !== 'SESSIONS' && (
+                <TextField
+                  placeholder={flashcardSubTab === 'DECKS' ? 'Buscar em meus decks...' : 'Buscar em meus flashcards...'}
+                  size="small"
+                  fullWidth
+                  value={flashcardSearch}
+                  onChange={(e) => setFlashcardSearch(e.target.value)}
+                  InputProps={{
+                    startAdornment: <SearchIcon fontSize="small" sx={{ mr: 1, color: 'text.secondary' }} />,
+                  }}
+                  sx={{ mb: 3 }}
+                />
+              )}
 
               {flashcardSubTab === 'DECKS' && (
                 <>
@@ -2684,6 +3130,162 @@ export const UserProfilePage: React.FC = () => {
                           );
                         })}
                     </Grid>
+                  )}
+                </>
+              )}
+
+              {flashcardSubTab === 'SESSIONS' && (
+                <>
+                  {loadingFlashcardSessions ? (
+                    <ListItemsSkeleton count={4} />
+                  ) : flashcardSessions.length === 0 ? (
+                    <Box sx={{ textAlign: 'center', py: 6 }}>
+                      <Typography color="text.secondary" sx={{ mb: 2 }}>
+                        Você ainda não realizou nenhuma sessão de estudo com flashcards.
+                      </Typography>
+                      <Button
+                        variant="contained"
+                        startIcon={<PlayArrowIcon />}
+                        onClick={() => navigate('/flashcards')}
+                        sx={{ fontWeight: 700, backgroundColor: PALETTE_COLORS.primary, color: '#1a1e24' }}
+                      >
+                        Começar a Praticar
+                      </Button>
+                    </Box>
+                  ) : (
+                    <Stack spacing={2}>
+                      {flashcardSessions.map((session) => {
+                        const total = session.totalCards || (session.correctCount + session.wrongCount + session.skippedCount);
+                        const accuracy = session.accuracyPercentage != null
+                          ? Math.round(session.accuracyPercentage)
+                          : total > 0 ? Math.round((session.correctCount / total) * 100) : 0;
+                        const durationStr = formatStudyDuration(session.timeSpentSeconds);
+                        const dateFormatted = new Date(session.createdAt).toLocaleDateString('pt-BR', {
+                          day: '2-digit',
+                          month: '2-digit',
+                          year: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        });
+
+                        return (
+                          <Paper
+                            key={session.id}
+                            variant="outlined"
+                            sx={{
+                              p: 2.5,
+                              borderRadius: 2.5,
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              flexWrap: 'wrap',
+                              gap: 2,
+                              transition: 'all 0.2s',
+                              '&:hover': {
+                                boxShadow: 2,
+                                borderColor: PALETTE_COLORS.primary,
+                              },
+                            }}
+                          >
+                            <Box sx={{ minWidth: 200 }}>
+                              <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" sx={{ mb: 0.5, gap: 0.5 }}>
+                                {session.folderName ? (
+                                  <Chip
+                                    size="small"
+                                    icon={<FolderSpecialOutlinedIcon fontSize="small" />}
+                                    label={session.folderName}
+                                    sx={{
+                                      fontWeight: 700,
+                                      backgroundColor: 'rgba(217, 183, 99, 0.15)',
+                                      color: PALETTE_COLORS.primary,
+                                    }}
+                                  />
+                                ) : (
+                                  <Chip
+                                    size="small"
+                                    icon={<StyleOutlinedIcon fontSize="small" />}
+                                    label="Cards Avulsos"
+                                    variant="outlined"
+                                    sx={{ fontWeight: 700 }}
+                                  />
+                                )}
+                                {session.areaName && (
+                                  <Chip
+                                    size="small"
+                                    label={`Área: ${session.areaName}`}
+                                    variant="outlined"
+                                    sx={{
+                                      fontWeight: 600,
+                                      borderColor: PALETTE_COLORS.primary,
+                                      color: PALETTE_COLORS.primary,
+                                    }}
+                                  />
+                                )}
+                                {session.subjectName && (
+                                  <Chip
+                                    size="small"
+                                    label={`Matéria: ${session.subjectName}`}
+                                    variant="outlined"
+                                    sx={{ fontWeight: 600 }}
+                                  />
+                                )}
+                                <Typography variant="caption" color="text.secondary">
+                                  {dateFormatted}
+                                </Typography>
+                              </Stack>
+                              <Typography variant="body2" sx={{ color: 'text.secondary', display: 'flex', alignItems: 'center', gap: 0.8, mt: 0.5 }}>
+                                <AccessTimeIcon fontSize="small" sx={{ fontSize: 16 }} /> Duração: <strong>{durationStr}</strong>
+                              </Typography>
+                            </Box>
+
+                            <Stack direction="row" spacing={1.5} alignItems="center" flexWrap="wrap">
+                              <Chip
+                                size="small"
+                                label={`${session.totalCards} cards`}
+                                sx={{ fontWeight: 600 }}
+                              />
+                              <Chip
+                                size="small"
+                                label={`${session.correctCount} acertos`}
+                                sx={{
+                                  fontWeight: 700,
+                                  backgroundColor: 'rgba(75, 241, 81, 0.12)',
+                                  color: PALETTE_COLORS.success,
+                                }}
+                              />
+                              <Chip
+                                size="small"
+                                label={`${session.wrongCount} erros`}
+                                sx={{
+                                  fontWeight: 700,
+                                  backgroundColor: 'rgba(250, 66, 75, 0.12)',
+                                  color: PALETTE_COLORS.danger,
+                                }}
+                              />
+                              <Chip
+                                size="small"
+                                label={`${accuracy}% acerto`}
+                                sx={{
+                                  fontWeight: 800,
+                                  backgroundColor: accuracy >= 70 ? 'rgba(75, 241, 81, 0.15)' : 'rgba(217, 183, 99, 0.15)',
+                                  color: accuracy >= 70 ? PALETTE_COLORS.success : PALETTE_COLORS.primary,
+                                }}
+                              />
+
+                              <Button
+                                size="small"
+                                variant="outlined"
+                                startIcon={<VisibilityIcon fontSize="small" />}
+                                onClick={() => setSelectedSessionDetail(session)}
+                                sx={{ borderRadius: 2, fontWeight: 700, textTransform: 'none' }}
+                              >
+                                Detalhes
+                              </Button>
+                            </Stack>
+                          </Paper>
+                        );
+                      })}
+                    </Stack>
                   )}
                 </>
               )}
@@ -3405,6 +4007,137 @@ export const UserProfilePage: React.FC = () => {
           onSuccess={handleProfileUpdated}
         />
       )}
+
+      {/* Dialog de Detalhes da Sessão de Flashcards */}
+      <Dialog
+        open={Boolean(selectedSessionDetail)}
+        onClose={() => setSelectedSessionDetail(null)}
+        maxWidth="md"
+        fullWidth
+      >
+        <DialogTitle sx={{ fontWeight: 800 }}>
+          Detalhes da Sessão de Estudo
+        </DialogTitle>
+        <DialogContent dividers>
+          {selectedSessionDetail && (
+            <Box>
+              <Stack direction="row" spacing={3} sx={{ mb: 3 }} flexWrap="wrap" useFlexGap>
+                <Box>
+                  <Typography variant="caption" color="text.secondary">Origem:</Typography>
+                  <Typography variant="body1" fontWeight={700}>
+                    {selectedSessionDetail.folderName || 'Cards Avulsos'}
+                  </Typography>
+                </Box>
+                {selectedSessionDetail.areaName && (
+                  <Box>
+                    <Typography variant="caption" color="text.secondary">Área:</Typography>
+                    <Typography variant="body1" fontWeight={700} sx={{ color: PALETTE_COLORS.primary }}>
+                      {selectedSessionDetail.areaName}
+                    </Typography>
+                  </Box>
+                )}
+                {selectedSessionDetail.subjectName && (
+                  <Box>
+                    <Typography variant="caption" color="text.secondary">Matéria:</Typography>
+                    <Typography variant="body1" fontWeight={700}>
+                      {selectedSessionDetail.subjectName}
+                    </Typography>
+                  </Box>
+                )}
+                <Box>
+                  <Typography variant="caption" color="text.secondary">Tempo Respondido:</Typography>
+                  <Typography variant="body1" fontWeight={700}>
+                    {formatStudyDuration(selectedSessionDetail.timeSpentSeconds)}
+                  </Typography>
+                </Box>
+                <Box>
+                  <Typography variant="caption" color="text.secondary">Acertos / Erros:</Typography>
+                  <Typography variant="body1" fontWeight={700}>
+                    <span style={{ color: PALETTE_COLORS.success }}>{selectedSessionDetail.correctCount} acertos</span>
+                    {' • '}
+                    <span style={{ color: PALETTE_COLORS.danger }}>{selectedSessionDetail.wrongCount} erros</span>
+                  </Typography>
+                </Box>
+                <Box>
+                  <Typography variant="caption" color="text.secondary">Aproveitamento:</Typography>
+                  <Typography variant="body1" fontWeight={700} sx={{ color: PALETTE_COLORS.primary }}>
+                    {Math.round(selectedSessionDetail.accuracyPercentage || 0)}%
+                  </Typography>
+                </Box>
+              </Stack>
+
+              <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1.5 }}>
+                Cards praticados ({selectedSessionDetail.items?.length || 0}):
+              </Typography>
+              <Stack spacing={1.5}>
+                {selectedSessionDetail.items?.map((item, idx) => (
+                  <Paper
+                    key={item.id || idx}
+                    variant="outlined"
+                    sx={{
+                      p: 2,
+                      borderRadius: 2,
+                      borderLeft: `5px solid ${
+                        item.status === 'CORRECT'
+                          ? PALETTE_COLORS.success
+                          : item.status === 'WRONG'
+                          ? PALETTE_COLORS.danger
+                          : 'gray'
+                      }`,
+                    }}
+                  >
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.5, flexWrap: 'wrap', gap: 1 }}>
+                      <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
+                        <Typography variant="caption" fontWeight={700} color="text.secondary">
+                          Carta #{idx + 1}
+                        </Typography>
+                        {item.areaName && (
+                          <Chip size="small" variant="outlined" label={item.areaName} sx={{ height: 20, fontSize: '0.7rem', color: PALETTE_COLORS.primary, borderColor: PALETTE_COLORS.primary }} />
+                        )}
+                        {item.subjectName && (
+                          <Chip size="small" variant="outlined" label={item.subjectName} sx={{ height: 20, fontSize: '0.7rem' }} />
+                        )}
+                      </Stack>
+                      <Chip
+                        size="small"
+                        label={item.status === 'CORRECT' ? 'Acerto' : item.status === 'WRONG' ? 'Erro' : 'Pulado'}
+                        sx={{
+                          fontWeight: 700,
+                          backgroundColor:
+                            item.status === 'CORRECT'
+                              ? 'rgba(75, 241, 81, 0.15)'
+                              : item.status === 'WRONG'
+                              ? 'rgba(250, 66, 75, 0.15)'
+                              : 'rgba(0,0,0,0.08)',
+                          color:
+                            item.status === 'CORRECT'
+                              ? PALETTE_COLORS.success
+                              : item.status === 'WRONG'
+                              ? PALETTE_COLORS.danger
+                              : 'text.secondary',
+                        }}
+                      />
+                    </Box>
+                    <Typography variant="body2" fontWeight={600} sx={{ mb: 0.5 }}>
+                      {item.flashcardFront || 'Flashcard'}
+                    </Typography>
+                    {item.flashcardBack && (
+                      <Typography variant="caption" color="text.secondary" display="block">
+                        <strong>Resposta:</strong> {item.flashcardBack}
+                      </Typography>
+                    )}
+                  </Paper>
+                ))}
+              </Stack>
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions sx={{ p: 2 }}>
+          <Button onClick={() => setSelectedSessionDetail(null)} sx={{ fontWeight: 700 }}>
+            Fechar
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 };
