@@ -5,6 +5,7 @@ import {
   Avatar,
   Box,
   Button,
+  ButtonGroup,
   Card,
   CardContent,
   Chip,
@@ -73,6 +74,11 @@ import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
 import PublicIcon from '@mui/icons-material/Public';
 import BookmarkBorderIcon from '@mui/icons-material/BookmarkBorder';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
+import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
+import ShowChartIcon from '@mui/icons-material/ShowChart';
+import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
+import ChevronRightIcon from '@mui/icons-material/ChevronRight';
+import TodayIcon from '@mui/icons-material/Today';
 
 import {
   getUserProfile,
@@ -153,6 +159,742 @@ type ProfileTab =
   | 'admin_areas'
   | 'admin_materias';
 
+interface StudySessionLineChartProps {
+  sessions: FlashcardSession[];
+  isDark: boolean;
+  formatStudyDuration: (seconds?: number, includeSeconds?: boolean) => string;
+}
+
+export const StudySessionLineChart: React.FC<StudySessionLineChartProps> = ({
+  sessions,
+  isDark,
+  formatStudyDuration,
+}) => {
+  const [period, setPeriod] = useState<'30days' | '12months'>('30days');
+  const [metric, setMetric] = useState<'time' | 'cards'>('time');
+  const [hoverIndex, setHoverIndex] = useState<number | null>(null);
+
+  const sessionsByDate = useMemo(() => {
+    const map = new Map<string, FlashcardSession[]>();
+    for (const s of sessions) {
+      if (!s.createdAt) continue;
+      const key = new Date(s.createdAt).toLocaleDateString('en-CA');
+      const arr = map.get(key) || [];
+      arr.push(s);
+      map.set(key, arr);
+    }
+    return map;
+  }, [sessions]);
+
+  const chartData = useMemo(() => {
+    const today = new Date();
+    if (period === '30days') {
+      const list = [];
+      for (let i = 29; i >= 0; i--) {
+        const d = new Date(today);
+        d.setDate(today.getDate() - i);
+        const key = d.toLocaleDateString('en-CA');
+        const daySessions = sessionsByDate.get(key) || [];
+        const seconds = daySessions.reduce((acc, s) => acc + (s.timeSpentSeconds || 0), 0);
+        const cards = daySessions.reduce((acc, s) => acc + (s.totalCards || 0), 0);
+        const correct = daySessions.reduce((acc, s) => acc + (s.correctCount || 0), 0);
+        const wrong = daySessions.reduce((acc, s) => acc + (s.wrongCount || 0), 0);
+        const dayNum = String(d.getDate()).padStart(2, '0');
+        const monthNum = String(d.getMonth() + 1).padStart(2, '0');
+
+        list.push({
+          key,
+          label: `${dayNum}/${monthNum}`,
+          fullDate: d.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' }),
+          seconds,
+          minutes: Math.round(seconds / 60),
+          cards,
+          correct,
+          wrong,
+          accuracy: cards > 0 ? (correct / cards) * 100 : 0,
+        });
+      }
+      return list;
+    } else {
+      const list = [];
+      for (let i = 11; i >= 0; i--) {
+        const d = new Date(today.getFullYear(), today.getMonth() - i, 1);
+        const year = d.getFullYear();
+        const month = d.getMonth();
+        const monthKey = `${year}-${String(month + 1).padStart(2, '0')}`;
+        const label = d.toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' });
+        const fullDate = d.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+
+        const monthSessions = sessions.filter((s) => {
+          if (!s.createdAt) return false;
+          const sDate = new Date(s.createdAt);
+          return sDate.getFullYear() === year && sDate.getMonth() === month;
+        });
+
+        const seconds = monthSessions.reduce((acc, s) => acc + (s.timeSpentSeconds || 0), 0);
+        const cards = monthSessions.reduce((acc, s) => acc + (s.totalCards || 0), 0);
+        const correct = monthSessions.reduce((acc, s) => acc + (s.correctCount || 0), 0);
+        const wrong = monthSessions.reduce((acc, s) => acc + (s.wrongCount || 0), 0);
+
+        list.push({
+          key: monthKey,
+          label,
+          fullDate,
+          seconds,
+          minutes: Math.round(seconds / 60),
+          cards,
+          correct,
+          wrong,
+          accuracy: cards > 0 ? (correct / cards) * 100 : 0,
+        });
+      }
+      return list;
+    }
+  }, [period, sessionsByDate, sessions]);
+
+  const totalPeriodSeconds = useMemo(() => chartData.reduce((acc, d) => acc + d.seconds, 0), [chartData]);
+  const totalPeriodCards = useMemo(() => chartData.reduce((acc, d) => acc + d.cards, 0), [chartData]);
+  const activeCount = useMemo(() => chartData.filter((d) => d.seconds > 0).length, [chartData]);
+
+  const svgWidth = 850;
+  const svgHeight = 380;
+  const padLeft = 65;
+  const padRight = 35;
+  const padTop = 45;
+  const padBottom = 55;
+  const plotWidth = svgWidth - padLeft - padRight;
+  const plotHeight = svgHeight - padTop - padBottom;
+
+  const rawMax = Math.max(...chartData.map((d) => (metric === 'time' ? d.minutes : d.cards)), 0);
+  const maxY = rawMax === 0 ? 10 : Math.ceil(rawMax * 1.2);
+
+  const points = chartData.map((d, i) => {
+    const val = metric === 'time' ? d.minutes : d.cards;
+    const x = padLeft + (i / Math.max(1, chartData.length - 1)) * plotWidth;
+    const y = padTop + plotHeight - (val / maxY) * plotHeight;
+    return { ...d, x, y, val };
+  });
+
+  const pathD = points.reduce((acc, pt, i, arr) => {
+    if (i === 0) return `M ${pt.x} ${pt.y}`;
+    const prev = arr[i - 1];
+    const cpX = (prev.x + pt.x) / 2;
+    return `${acc} C ${cpX} ${prev.y}, ${cpX} ${pt.y}, ${pt.x} ${pt.y}`;
+  }, '');
+
+  const areaD = points.length > 0 ? `${pathD} L ${points[points.length - 1].x} ${padTop + plotHeight} L ${points[0].x} ${padTop + plotHeight} Z` : '';
+
+  const hoveredPoint = hoverIndex !== null && points[hoverIndex] ? points[hoverIndex] : null;
+
+  const yTicks = [0, Math.round(maxY * 0.33), Math.round(maxY * 0.66), maxY];
+
+  return (
+    <Paper
+      variant="outlined"
+      sx={{
+        p: { xs: 2, sm: 3 },
+        borderRadius: 3,
+        bgcolor: isDark ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.01)',
+        borderColor: 'divider',
+        mb: 3,
+      }}
+    >
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2, mb: 2 }}>
+        <Box>
+          <Stack direction="row" spacing={1} alignItems="center">
+            <ShowChartIcon sx={{ color: PALETTE_COLORS.primary }} />
+            <Typography variant="subtitle1" fontWeight="bold">
+              Gráfico de Linhas: Evolução do Estudo
+            </Typography>
+          </Stack>
+          <Typography variant="caption" color="text.secondary">
+            Visualização contínua de {metric === 'time' ? 'tempo dedicado' : 'cards respondidos'} ao longo do tempo.
+          </Typography>
+        </Box>
+
+        <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
+          <ButtonGroup size="small" variant="outlined" sx={{ borderRadius: 2 }}>
+            <Button
+              onClick={() => setMetric('time')}
+              variant={metric === 'time' ? 'contained' : 'outlined'}
+              sx={{
+                textTransform: 'none',
+                fontWeight: 600,
+                ...(metric === 'time' ? { bgcolor: PALETTE_COLORS.primary, color: '#1a1e24', '&:hover': { bgcolor: '#c4a251' } } : {}),
+              }}
+            >
+              Tempo (min)
+            </Button>
+            <Button
+              onClick={() => setMetric('cards')}
+              variant={metric === 'cards' ? 'contained' : 'outlined'}
+              sx={{
+                textTransform: 'none',
+                fontWeight: 600,
+                ...(metric === 'cards' ? { bgcolor: PALETTE_COLORS.primary, color: '#1a1e24', '&:hover': { bgcolor: '#c4a251' } } : {}),
+              }}
+            >
+              Cards
+            </Button>
+          </ButtonGroup>
+
+          <ButtonGroup size="small" variant="outlined" sx={{ borderRadius: 2 }}>
+            <Button
+              onClick={() => { setPeriod('30days'); setHoverIndex(null); }}
+              variant={period === '30days' ? 'contained' : 'outlined'}
+              sx={{
+                textTransform: 'none',
+                fontWeight: 600,
+                ...(period === '30days' ? { bgcolor: PALETTE_COLORS.primary, color: '#1a1e24', '&:hover': { bgcolor: '#c4a251' } } : {}),
+              }}
+            >
+              30 Dias
+            </Button>
+            <Button
+              onClick={() => { setPeriod('12months'); setHoverIndex(null); }}
+              variant={period === '12months' ? 'contained' : 'outlined'}
+              sx={{
+                textTransform: 'none',
+                fontWeight: 600,
+                ...(period === '12months' ? { bgcolor: PALETTE_COLORS.primary, color: '#1a1e24', '&:hover': { bgcolor: '#c4a251' } } : {}),
+              }}
+            >
+              12 Meses
+            </Button>
+          </ButtonGroup>
+        </Stack>
+      </Box>
+
+      {/* Resumo do Período */}
+      <Box
+        sx={{
+          display: 'flex',
+          gap: 2,
+          flexWrap: 'wrap',
+          p: 1.5,
+          borderRadius: 2,
+          bgcolor: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)',
+          mb: 2,
+        }}
+      >
+        <Typography variant="caption" color="text.secondary">
+          Total no período: <b>{formatStudyDuration(totalPeriodSeconds)}</b>
+        </Typography>
+        <Typography variant="caption" color="text.secondary">
+          Cards praticados: <b>{totalPeriodCards}</b>
+        </Typography>
+        <Typography variant="caption" color="text.secondary">
+          {period === '30days' ? 'Dias com estudo' : 'Meses com estudo'}: <b>{activeCount}</b> de {chartData.length}
+        </Typography>
+      </Box>
+
+      {/* Container SVG com altura expandida e sem corte de overflow */}
+      <Box sx={{ width: '100%', position: 'relative', overflow: 'visible', minHeight: { xs: 300, sm: 380 } }}>
+        <svg
+          viewBox={`0 0 ${svgWidth} ${svgHeight}`}
+          style={{ width: '100%', height: 'auto', display: 'block' }}
+          onMouseLeave={() => setHoverIndex(null)}
+        >
+          <defs>
+            <linearGradient id="studyChartGradient" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor={PALETTE_COLORS.primary} stopOpacity={0.4} />
+              <stop offset="100%" stopColor={PALETTE_COLORS.primary} stopOpacity={0.0} />
+            </linearGradient>
+          </defs>
+
+          {yTicks.map((tickVal, idx) => {
+            const yPos = padTop + plotHeight - (tickVal / maxY) * plotHeight;
+            return (
+              <g key={`ytick-${idx}`}>
+                <line
+                  x1={padLeft}
+                  y1={yPos}
+                  x2={padLeft + plotWidth}
+                  y2={yPos}
+                  stroke={isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)'}
+                  strokeDasharray="4 4"
+                />
+                <text
+                  x={padLeft - 10}
+                  y={yPos + 4}
+                  textAnchor="end"
+                  fontSize="11"
+                  fill={isDark ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.5)'}
+                >
+                  {metric === 'time' ? `${tickVal}m` : tickVal}
+                </text>
+              </g>
+            );
+          })}
+
+          {areaD && <path d={areaD} fill="url(#studyChartGradient)" />}
+
+          {pathD && (
+            <path
+              d={pathD}
+              fill="none"
+              stroke={PALETTE_COLORS.primary}
+              strokeWidth={3}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          )}
+
+          {hoveredPoint && (
+            <line
+              x1={hoveredPoint.x}
+              y1={padTop}
+              x2={hoveredPoint.x}
+              y2={padTop + plotHeight}
+              stroke={isDark ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.3)'}
+              strokeDasharray="3 3"
+            />
+          )}
+
+          {points.map((pt, i) => {
+            const isHovered = hoverIndex === i;
+            return (
+              <g
+                key={`pt-${i}`}
+                onMouseEnter={() => setHoverIndex(i)}
+                style={{ cursor: 'pointer' }}
+              >
+                <circle cx={pt.x} cy={pt.y} r={14} fill="transparent" />
+                <circle
+                  cx={pt.x}
+                  cy={pt.y}
+                  r={isHovered ? 6 : pt.val > 0 ? 3.5 : 2}
+                  fill={isHovered ? '#ffffff' : pt.val > 0 ? PALETTE_COLORS.primary : (isDark ? '#444' : '#ccc')}
+                  stroke={PALETTE_COLORS.primary}
+                  strokeWidth={isHovered ? 2.5 : 1.5}
+                />
+              </g>
+            );
+          })}
+
+          {points.map((pt, i) => {
+            if (period === '30days' && i % 5 !== 0 && i !== points.length - 1) return null;
+            return (
+              <text
+                key={`xlabel-${i}`}
+                x={pt.x}
+                y={padTop + plotHeight + 20}
+                textAnchor="middle"
+                fontSize="11"
+                fill={isDark ? 'rgba(255,255,255,0.6)' : 'rgba(0,0,0,0.6)'}
+                fontWeight={hoverIndex === i ? 700 : 400}
+              >
+                {pt.label}
+              </text>
+            );
+          })}
+        </svg>
+
+        {hoveredPoint && (
+          <Box
+            sx={{
+              position: 'absolute',
+              top: `${(hoveredPoint.y / svgHeight) * 100}%`,
+              left: `${Math.min(88, Math.max(12, (hoveredPoint.x / svgWidth) * 100))}%`,
+              transform: hoveredPoint.y < svgHeight * 0.45 ? 'translate(-50%, 15px)' : 'translate(-50%, -100%) translateY(-15px)',
+              bgcolor: isDark ? 'rgba(20, 24, 30, 0.96)' : 'rgba(255, 255, 255, 0.96)',
+              border: '1px solid',
+              borderColor: PALETTE_COLORS.primary,
+              boxShadow: '0 8px 24px rgba(0,0,0,0.3)',
+              borderRadius: 2,
+              p: 1.5,
+              pointerEvents: 'none',
+              zIndex: 30,
+              minWidth: 150,
+            }}
+          >
+            <Typography variant="caption" fontWeight="bold" sx={{ display: 'block', color: PALETTE_COLORS.primary }}>
+              {hoveredPoint.fullDate}
+            </Typography>
+            <Typography variant="caption" sx={{ display: 'flex', alignItems: 'center', mt: 0.5 }}>
+              <AccessTimeIcon sx={{ fontSize: 13, mr: 0.5, color: 'text.secondary' }} />
+              <span>Tempo: <b>{formatStudyDuration(hoveredPoint.seconds)}</b></span>
+            </Typography>
+            <Typography variant="caption" sx={{ display: 'flex', alignItems: 'center', mt: 0.3 }}>
+              <StyleOutlinedIcon sx={{ fontSize: 13, mr: 0.5, color: 'text.secondary' }} />
+              <span>Cards: <b>{hoveredPoint.cards}</b> ({hoveredPoint.correct} acertos)</span>
+            </Typography>
+            {hoveredPoint.cards > 0 && (
+              <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+                Taxa: <b>{hoveredPoint.accuracy.toFixed(1)}%</b>
+              </Typography>
+            )}
+          </Box>
+        )}
+      </Box>
+    </Paper>
+  );
+};
+
+interface StudySessionCalendarProps {
+  sessions: FlashcardSession[];
+  isDark: boolean;
+  formatStudyDuration: (seconds?: number, includeSeconds?: boolean) => string;
+  onSelectSession?: (session: FlashcardSession) => void;
+}
+
+export const StudySessionCalendar: React.FC<StudySessionCalendarProps> = ({
+  sessions,
+  isDark,
+  formatStudyDuration,
+  onSelectSession,
+}) => {
+  const [currentDate, setCurrentDate] = useState(() => new Date());
+  const [selectedDateKey, setSelectedDateKey] = useState<string | null>(null);
+
+  const year = currentDate.getFullYear();
+  const month = currentDate.getMonth();
+
+  const sessionsByDate = useMemo(() => {
+    const map = new Map<string, FlashcardSession[]>();
+    for (const s of sessions) {
+      if (!s.createdAt) continue;
+      const key = new Date(s.createdAt).toLocaleDateString('en-CA');
+      const arr = map.get(key) || [];
+      arr.push(s);
+      map.set(key, arr);
+    }
+    return map;
+  }, [sessions]);
+
+  const monthName = currentDate.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+  const formattedMonthName = monthName.charAt(0).toUpperCase() + monthName.slice(1);
+
+  const firstDayOfWeek = new Date(year, month, 1).getDay();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+  const handlePrevMonth = () => setCurrentDate(new Date(year, month - 1, 1));
+  const handleNextMonth = () => setCurrentDate(new Date(year, month + 1, 1));
+  const handleToday = () => setCurrentDate(new Date());
+
+  const daysArray = Array.from({ length: daysInMonth }, (_, i) => i + 1);
+
+  const currentMonthSessions = useMemo(() => {
+    return sessions.filter((s) => {
+      if (!s.createdAt) return false;
+      const d = new Date(s.createdAt);
+      return d.getFullYear() === year && d.getMonth() === month;
+    });
+  }, [sessions, year, month]);
+
+  const monthTotalSeconds = currentMonthSessions.reduce((acc, s) => acc + (s.timeSpentSeconds || 0), 0);
+  const monthTotalCards = currentMonthSessions.reduce((acc, s) => acc + (s.totalCards || 0), 0);
+  const monthActiveDays = useMemo(() => {
+    const set = new Set<string>();
+    for (const s of currentMonthSessions) {
+      if (s.createdAt) set.add(new Date(s.createdAt).toLocaleDateString('en-CA'));
+    }
+    return set.size;
+  }, [currentMonthSessions]);
+
+  const selectedDaySessions = selectedDateKey ? sessionsByDate.get(selectedDateKey) || [] : [];
+  const selectedDaySeconds = selectedDaySessions.reduce((acc, s) => acc + (s.timeSpentSeconds || 0), 0);
+  const selectedDayCards = selectedDaySessions.reduce((acc, s) => acc + (s.totalCards || 0), 0);
+  const selectedDayCorrect = selectedDaySessions.reduce((acc, s) => acc + (s.correctCount || 0), 0);
+  const selectedDayWrong = selectedDaySessions.reduce((acc, s) => acc + (s.wrongCount || 0), 0);
+  const selectedDayAccuracy = selectedDayCards > 0 ? (selectedDayCorrect / selectedDayCards) * 100 : 0;
+
+  const todayStr = new Date().toLocaleDateString('en-CA');
+
+  return (
+    <Paper
+      variant="outlined"
+      sx={{
+        p: { xs: 2, sm: 3 },
+        borderRadius: 3,
+        bgcolor: isDark ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.01)',
+        borderColor: 'divider',
+        mb: 3,
+      }}
+    >
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2, mb: 2 }}>
+        <Box>
+          <Stack direction="row" spacing={1} alignItems="center">
+            <CalendarMonthIcon sx={{ color: PALETTE_COLORS.primary }} />
+            <Typography variant="subtitle1" fontWeight="bold">
+              Calendário de Estudos
+            </Typography>
+          </Stack>
+          <Typography variant="caption" color="text.secondary">
+            Navegue pelos dias para verificar as sessões e métricas detalhadas.
+          </Typography>
+        </Box>
+
+        <Stack direction="row" spacing={1} alignItems="center">
+          <Button
+            size="small"
+            variant="outlined"
+            startIcon={<TodayIcon fontSize="small" />}
+            onClick={handleToday}
+            sx={{ textTransform: 'none', borderRadius: 2, fontWeight: 600 }}
+          >
+            Hoje
+          </Button>
+          <IconButton size="small" onClick={handlePrevMonth} sx={{ border: '1px solid', borderColor: 'divider' }}>
+            <ChevronLeftIcon fontSize="small" />
+          </IconButton>
+          <Typography variant="subtitle2" fontWeight="bold" sx={{ minWidth: 140, textAlign: 'center' }}>
+            {formattedMonthName}
+          </Typography>
+          <IconButton size="small" onClick={handleNextMonth} sx={{ border: '1px solid', borderColor: 'divider' }}>
+            <ChevronRightIcon fontSize="small" />
+          </IconButton>
+        </Stack>
+      </Box>
+
+      {/* Resumo do Mês */}
+      <Box
+        sx={{
+          display: 'flex',
+          gap: 2,
+          flexWrap: 'wrap',
+          p: 1.5,
+          borderRadius: 2,
+          bgcolor: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)',
+          mb: 2,
+        }}
+      >
+        <Typography variant="caption" color="text.secondary">
+          Tempo no mês: <b>{formatStudyDuration(monthTotalSeconds)}</b>
+        </Typography>
+        <Typography variant="caption" color="text.secondary">
+          Cards praticados: <b>{monthTotalCards}</b>
+        </Typography>
+        <Typography variant="caption" color="text.secondary">
+          Dias ativos: <b>{monthActiveDays}</b> de {daysInMonth}
+        </Typography>
+      </Box>
+
+      {/* Grade do Calendário */}
+      <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: { xs: 0.5, sm: 1 }, textAlign: 'center', mb: 2 }}>
+        {['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'].map((d) => (
+          <Typography key={d} variant="caption" fontWeight="bold" color="text.secondary" sx={{ py: 0.5 }}>
+            {d}
+          </Typography>
+        ))}
+
+        {Array.from({ length: firstDayOfWeek }).map((_, i) => (
+          <Box key={`empty-${i}`} sx={{ minHeight: { xs: 48, sm: 64 } }} />
+        ))}
+
+        {daysArray.map((d) => {
+          const dayKey = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+          const daySessions = sessionsByDate.get(dayKey) || [];
+          const daySeconds = daySessions.reduce((acc, s) => acc + (s.timeSpentSeconds || 0), 0);
+          const hasStudy = daySeconds > 0;
+          const isSelected = selectedDateKey === dayKey;
+          const isToday = dayKey === todayStr;
+
+          return (
+            <Paper
+              key={d}
+              onClick={() => setSelectedDateKey(isSelected ? null : dayKey)}
+              variant="outlined"
+              sx={{
+                minHeight: { xs: 48, sm: 64 },
+                p: 0.5,
+                borderRadius: 2,
+                cursor: 'pointer',
+                transition: 'all 0.2s',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                borderColor: isSelected
+                  ? PALETTE_COLORS.primary
+                  : isToday
+                  ? PALETTE_COLORS.secondary
+                  : hasStudy
+                  ? 'rgba(217, 183, 99, 0.4)'
+                  : 'divider',
+                borderWidth: isSelected || isToday ? 2 : 1,
+                bgcolor: isSelected
+                  ? isDark ? 'rgba(217, 183, 99, 0.15)' : 'rgba(217, 183, 99, 0.12)'
+                  : hasStudy
+                  ? isDark ? 'rgba(217, 183, 99, 0.08)' : 'rgba(217, 183, 99, 0.06)'
+                  : 'transparent',
+                '&:hover': {
+                  borderColor: PALETTE_COLORS.primary,
+                  bgcolor: isDark ? 'rgba(217, 183, 99, 0.12)' : 'rgba(217, 183, 99, 0.08)',
+                },
+              }}
+            >
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', width: '100%', px: 0.5 }}>
+                <Typography
+                  variant="caption"
+                  fontWeight={isToday || isSelected ? 800 : hasStudy ? 700 : 400}
+                  color={isSelected ? PALETTE_COLORS.primary : isToday ? PALETTE_COLORS.secondary : 'text.primary'}
+                >
+                  {d}
+                </Typography>
+                {hasStudy && (
+                  <Box
+                    sx={{
+                      width: 6,
+                      height: 6,
+                      borderRadius: '50%',
+                      bgcolor: PALETTE_COLORS.primary,
+                      mt: 0.5,
+                    }}
+                  />
+                )}
+              </Box>
+
+              {hasStudy ? (
+                <Chip
+                  size="small"
+                  label={formatStudyDuration(daySeconds)}
+                  sx={{
+                    height: 18,
+                    fontSize: '0.65rem',
+                    fontWeight: 700,
+                    bgcolor: isDark ? 'rgba(217, 183, 99, 0.25)' : 'rgba(217, 183, 99, 0.2)',
+                    color: isDark ? '#f4d88e' : '#8c6f21',
+                    maxWidth: '100%',
+                  }}
+                />
+              ) : (
+                <Box sx={{ height: 18 }} />
+              )}
+            </Paper>
+          );
+        })}
+      </Box>
+
+      {/* Painel do Dia Selecionado */}
+      {selectedDateKey && (
+        <Paper
+          variant="outlined"
+          sx={{
+            p: 2,
+            borderRadius: 2.5,
+            bgcolor: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)',
+            borderColor: PALETTE_COLORS.primary,
+          }}
+        >
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5, flexWrap: 'wrap', gap: 1 }}>
+            <Stack direction="row" spacing={1} alignItems="center">
+              <CalendarMonthIcon sx={{ fontSize: 18, color: PALETTE_COLORS.primary }} />
+              <Typography variant="subtitle2" fontWeight="bold">
+                Métricas do Dia:{' '}
+                {(() => {
+                  const parts = selectedDateKey.split('-');
+                  return `${parts[2]}/${parts[1]}/${parts[0]}`;
+                })()}
+              </Typography>
+            </Stack>
+            <Button size="small" variant="text" onClick={() => setSelectedDateKey(null)} sx={{ textTransform: 'none', py: 0 }}>
+              Fechar
+            </Button>
+          </Box>
+
+          {selectedDaySessions.length === 0 ? (
+            <Typography variant="body2" color="text.secondary">
+              Nenhuma sessão de estudo registrada neste dia.
+            </Typography>
+          ) : (
+            <>
+              <Grid container spacing={1.5} sx={{ mb: 2 }}>
+                <Grid item xs={6} sm={3}>
+                  <Box sx={{ p: 1, borderRadius: 2, bgcolor: isDark ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.02)', border: '1px solid', borderColor: 'divider' }}>
+                    <Typography variant="caption" color="text.secondary">Tempo Estudado</Typography>
+                    <Typography variant="h6" fontWeight="bold">{formatStudyDuration(selectedDaySeconds)}</Typography>
+                  </Box>
+                </Grid>
+                <Grid item xs={6} sm={3}>
+                  <Box sx={{ p: 1, borderRadius: 2, bgcolor: isDark ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.02)', border: '1px solid', borderColor: 'divider' }}>
+                    <Typography variant="caption" color="text.secondary">Sessões Realizadas</Typography>
+                    <Typography variant="h6" fontWeight="bold">{selectedDaySessions.length}</Typography>
+                  </Box>
+                </Grid>
+                <Grid item xs={6} sm={3}>
+                  <Box sx={{ p: 1, borderRadius: 2, bgcolor: isDark ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.02)', border: '1px solid', borderColor: 'divider' }}>
+                    <Typography variant="caption" color="text.secondary">Cards Praticados</Typography>
+                    <Typography variant="h6" fontWeight="bold">{selectedDayCards}</Typography>
+                    <Typography variant="caption" color="text.secondary">{selectedDayCorrect} acertos • {selectedDayWrong} erros</Typography>
+                  </Box>
+                </Grid>
+                <Grid item xs={6} sm={3}>
+                  <Box sx={{ p: 1, borderRadius: 2, bgcolor: isDark ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.02)', border: '1px solid', borderColor: 'divider' }}>
+                    <Typography variant="caption" color="text.secondary">Taxa de Acerto</Typography>
+                    <Typography variant="h6" fontWeight="bold" sx={{ color: selectedDayAccuracy >= 70 ? PALETTE_COLORS.success : PALETTE_COLORS.primary }}>
+                      {selectedDayAccuracy.toFixed(1)}%
+                    </Typography>
+                  </Box>
+                </Grid>
+              </Grid>
+
+              <Typography variant="caption" fontWeight="bold" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
+                SESSÕES DO DIA ({selectedDaySessions.length}):
+              </Typography>
+              <Stack spacing={1}>
+                {selectedDaySessions.map((session) => {
+                  const sTime = new Date(session.createdAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+                  const total = session.totalCards || (session.correctCount + session.wrongCount + session.skippedCount);
+                  const acc = session.accuracyPercentage != null ? Math.round(session.accuracyPercentage) : total > 0 ? Math.round((session.correctCount / total) * 100) : 0;
+                  return (
+                    <Paper
+                      key={session.id}
+                      variant="outlined"
+                      sx={{
+                        p: 1.5,
+                        borderRadius: 2,
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        flexWrap: 'wrap',
+                        gap: 1,
+                        bgcolor: isDark ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.01)',
+                      }}
+                    >
+                      <Box>
+                        <Typography variant="body2" fontWeight="bold">
+                          {session.folderName || 'Cards Avulsos'}
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          {session.areaName ? `${session.areaName} • ` : ''}{session.subjectName || 'Geral'} • às {sTime}
+                        </Typography>
+                      </Box>
+                      <Stack direction="row" spacing={1} alignItems="center">
+                        <Chip size="small" label={formatStudyDuration(session.timeSpentSeconds)} variant="outlined" />
+                        <Chip size="small" label={`${total} cards`} />
+                        <Chip
+                          size="small"
+                          label={`${acc}%`}
+                          sx={{
+                            fontWeight: 700,
+                            bgcolor: acc >= 70 ? 'rgba(75, 241, 81, 0.15)' : 'rgba(217, 183, 99, 0.15)',
+                            color: acc >= 70 ? '#4bf151' : PALETTE_COLORS.primary,
+                          }}
+                        />
+                        {onSelectSession && (
+                          <Button
+                            size="small"
+                            variant="text"
+                            onClick={() => onSelectSession(session)}
+                            sx={{ textTransform: 'none', fontWeight: 600 }}
+                          >
+                            Detalhes
+                          </Button>
+                        )}
+                      </Stack>
+                    </Paper>
+                  );
+                })}
+              </Stack>
+            </>
+          )}
+        </Paper>
+      )}
+    </Paper>
+  );
+};
+
 export const UserProfilePage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const userId = id ? Number(id) : null;
@@ -176,6 +918,7 @@ export const UserProfilePage: React.FC = () => {
   // Tabs de Categoria em Sessões de Estudo (Flashcards): 0 = Área, 1 = Matéria, 2 = Deck
   const [studyCategoryTab, setStudyCategoryTab] = useState<number>(0);
   const [studyCategorySortBy, setStudyCategorySortBy] = useState<'studied' | 'accuracy'>('studied');
+  const [overviewStudyVisualTab, setOverviewStudyVisualTab] = useState<number>(0);
 
   // Dados de Histórico de Questões Respondidas
   const [myQuestionAttempts, setMyQuestionAttempts] = useState<QuestionAttemptHistory[]>([]);
@@ -486,19 +1229,28 @@ export const UserProfilePage: React.FC = () => {
     }
   };
 
-  const formatStudyDuration = (seconds?: number): string => {
-    if (!seconds || seconds <= 0) return '0s';
+  const formatStudyDuration = (seconds?: number, includeSeconds = false): string => {
+    if (!seconds || seconds <= 0) return includeSeconds ? '0s' : '0m';
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
     if (mins >= 60) {
       const hours = Math.floor(mins / 60);
       const remMins = mins % 60;
-      return `${hours}h ${remMins}m ${secs}s`;
+      if (includeSeconds) {
+        return `${hours}h ${remMins}m ${secs}s`;
+      }
+      return remMins > 0 ? `${hours}h ${remMins}m` : `${hours}h`;
     }
     if (mins > 0) {
-      return `${mins}m ${secs}s`;
+      if (includeSeconds) {
+        return `${mins}m ${secs}s`;
+      }
+      return `${mins}m`;
     }
-    return `${secs}s`;
+    if (includeSeconds) {
+      return `${secs}s`;
+    }
+    return seconds > 0 ? '< 1m' : '0m';
   };
 
   const handleToggleProfileCardFlip = (cardId: number) => {
@@ -767,6 +1519,40 @@ export const UserProfilePage: React.FC = () => {
     }
     return list.sort((a, b) => b.totalCards - a.totalCards || b.accuracy - a.accuracy);
   }, [studyCategoryTab, studyCategorySortBy, studyAreaPerformance, studySubjectPerformance, studyFolderPerformance]);
+
+  // Médias de Tempo de Estudo Diário e Semanal
+  const studyTimeAverages = useMemo(() => {
+    const totalSeconds = flashcardSessions.reduce((acc, s) => acc + (s.timeSpentSeconds || 0), 0);
+    const dayMap = new Map<string, number>();
+    const weekMap = new Map<string, number>();
+
+    for (const session of flashcardSessions) {
+      if (!session.createdAt) continue;
+      const date = new Date(session.createdAt);
+      const dayKey = date.toLocaleDateString('en-CA');
+      dayMap.set(dayKey, (dayMap.get(dayKey) || 0) + (session.timeSpentSeconds || 0));
+
+      const d = new Date(date);
+      const dayOfWeek = d.getDay();
+      d.setDate(d.getDate() - dayOfWeek);
+      const weekKey = d.toLocaleDateString('en-CA');
+      weekMap.set(weekKey, (weekMap.get(weekKey) || 0) + (session.timeSpentSeconds || 0));
+    }
+
+    const activeDaysCount = dayMap.size;
+    const activeWeeksCount = weekMap.size;
+
+    const avgDailySeconds = activeDaysCount > 0 ? Math.round(totalSeconds / activeDaysCount) : 0;
+    const avgWeeklySeconds = activeWeeksCount > 0 ? Math.round(totalSeconds / activeWeeksCount) : 0;
+
+    return {
+      totalSeconds,
+      activeDaysCount,
+      activeWeeksCount,
+      avgDailySeconds,
+      avgWeeklySeconds,
+    };
+  }, [flashcardSessions]);
 
   if (loading) {
     return <ProfileSkeleton />;
@@ -1461,23 +2247,27 @@ export const UserProfilePage: React.FC = () => {
                       </Stack>
                     </Box>
 
-                    {/* 4 Cards Alinhados perfeitamente */}
+                    {/* 6 Cards com flex-wrap para responsividade e respiração */}
                     <Box
                       sx={{
-                        display: 'grid',
-                        gridTemplateColumns: {
-                          xs: '1fr',
-                          sm: 'repeat(2, 1fr)',
-                          md: 'repeat(4, 1fr)',
-                        },
+                        display: 'flex',
+                        flexWrap: 'wrap',
                         gap: 2,
                         width: '100%',
+                        mb: 3,
                       }}
                     >
                       <Paper
                         variant="outlined"
                         sx={{
-                          p: 2,
+                          flex: {
+                            xs: '1 1 100%',
+                            sm: '1 1 calc(50% - 16px)',
+                            md: '1 1 calc(33.333% - 16px)',
+                            xl: '1 1 calc(16.666% - 16px)',
+                          },
+                          minWidth: { xs: '100%', sm: 180 },
+                          p: 2.5,
                           borderRadius: 2.5,
                           backgroundColor: isDark ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.02)',
                           display: 'flex',
@@ -1499,7 +2289,14 @@ export const UserProfilePage: React.FC = () => {
                       <Paper
                         variant="outlined"
                         sx={{
-                          p: 2,
+                          flex: {
+                            xs: '1 1 100%',
+                            sm: '1 1 calc(50% - 16px)',
+                            md: '1 1 calc(33.333% - 16px)',
+                            xl: '1 1 calc(16.666% - 16px)',
+                          },
+                          minWidth: { xs: '100%', sm: 180 },
+                          p: 2.5,
                           borderRadius: 2.5,
                           backgroundColor: isDark ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.02)',
                           display: 'flex',
@@ -1521,7 +2318,72 @@ export const UserProfilePage: React.FC = () => {
                       <Paper
                         variant="outlined"
                         sx={{
-                          p: 2,
+                          flex: {
+                            xs: '1 1 100%',
+                            sm: '1 1 calc(50% - 16px)',
+                            md: '1 1 calc(33.333% - 16px)',
+                            xl: '1 1 calc(16.666% - 16px)',
+                          },
+                          minWidth: { xs: '100%', sm: 180 },
+                          p: 2.5,
+                          borderRadius: 2.5,
+                          backgroundColor: isDark ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.02)',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          justifyContent: 'center',
+                        }}
+                      >
+                        <Typography variant="caption" color="text.secondary" fontWeight={600}>
+                          Média Diária
+                        </Typography>
+                        <Typography variant="h4" fontWeight={800} sx={{ mt: 0.5 }}>
+                          {formatStudyDuration(studyTimeAverages.avgDailySeconds)}
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          por dia ativo
+                        </Typography>
+                      </Paper>
+
+                      <Paper
+                        variant="outlined"
+                        sx={{
+                          flex: {
+                            xs: '1 1 100%',
+                            sm: '1 1 calc(50% - 16px)',
+                            md: '1 1 calc(33.333% - 16px)',
+                            xl: '1 1 calc(16.666% - 16px)',
+                          },
+                          minWidth: { xs: '100%', sm: 180 },
+                          p: 2.5,
+                          borderRadius: 2.5,
+                          backgroundColor: isDark ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.02)',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          justifyContent: 'center',
+                        }}
+                      >
+                        <Typography variant="caption" color="text.secondary" fontWeight={600}>
+                          Média Semanal
+                        </Typography>
+                        <Typography variant="h4" fontWeight={800} sx={{ mt: 0.5 }}>
+                          {formatStudyDuration(studyTimeAverages.avgWeeklySeconds)}
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          por semana ativa
+                        </Typography>
+                      </Paper>
+
+                      <Paper
+                        variant="outlined"
+                        sx={{
+                          flex: {
+                            xs: '1 1 100%',
+                            sm: '1 1 calc(50% - 16px)',
+                            md: '1 1 calc(33.333% - 16px)',
+                            xl: '1 1 calc(16.666% - 16px)',
+                          },
+                          minWidth: { xs: '100%', sm: 180 },
+                          p: 2.5,
                           borderRadius: 2.5,
                           backgroundColor: isDark ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.02)',
                           display: 'flex',
@@ -1544,7 +2406,14 @@ export const UserProfilePage: React.FC = () => {
                       <Paper
                         variant="outlined"
                         sx={{
-                          p: 2,
+                          flex: {
+                            xs: '1 1 100%',
+                            sm: '1 1 calc(50% - 16px)',
+                            md: '1 1 calc(33.333% - 16px)',
+                            xl: '1 1 calc(16.666% - 16px)',
+                          },
+                          minWidth: { xs: '100%', sm: 180 },
+                          p: 2.5,
                           borderRadius: 2.5,
                           backgroundColor: isDark ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.02)',
                           display: 'flex',
@@ -1580,6 +2449,38 @@ export const UserProfilePage: React.FC = () => {
                           />
                         </Box>
                       </Paper>
+                    </Box>
+
+                    {/* Gráfico de Linhas e Calendário Integrados em Visão Geral */}
+                    <Box sx={{ mt: 2 }}>
+                      <Tabs
+                        value={overviewStudyVisualTab}
+                        onChange={(_, val) => setOverviewStudyVisualTab(val)}
+                        sx={{
+                          mb: 2,
+                          borderBottom: 1,
+                          borderColor: 'divider',
+                          '& .MuiTab-root': { fontWeight: 'bold', textTransform: 'none', fontSize: '0.9rem' },
+                        }}
+                      >
+                        <Tab icon={<ShowChartIcon fontSize="small" />} iconPosition="start" label="Evolução (Gráfico de Linhas)" />
+                        <Tab icon={<CalendarMonthIcon fontSize="small" />} iconPosition="start" label="Calendário de Estudos" />
+                      </Tabs>
+
+                      {overviewStudyVisualTab === 0 ? (
+                        <StudySessionLineChart
+                          sessions={flashcardSessions}
+                          isDark={isDark}
+                          formatStudyDuration={formatStudyDuration}
+                        />
+                      ) : (
+                        <StudySessionCalendar
+                          sessions={flashcardSessions}
+                          isDark={isDark}
+                          formatStudyDuration={formatStudyDuration}
+                          onSelectSession={(s) => setSelectedSessionDetail(s)}
+                        />
+                      )}
                     </Box>
                   </Paper>
                 );
@@ -2241,100 +3142,227 @@ export const UserProfilePage: React.FC = () => {
                 const avgAccuracy = totalCards > 0 ? Math.round((totalCorrect / totalCards) * 100) : 0;
 
                 return (
-                  <Grid container spacing={2} sx={{ mb: 3 }}>
-                    <Grid item xs={12} sm={6} md={3}>
-                      <Paper
-                        variant="outlined"
-                        sx={{
-                          p: 2,
-                          borderRadius: 2.5,
-                          backgroundColor: isDark ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.02)',
-                        }}
-                      >
-                        <Typography variant="caption" color="text.secondary" fontWeight={600}>
-                          Sessões Realizadas
-                        </Typography>
-                        <Typography variant="h5" fontWeight={800} sx={{ mt: 0.5, color: PALETTE_COLORS.primary }}>
-                          {totalSessions}
-                        </Typography>
-                        <Typography variant="caption" color="text.secondary">
-                          execuções finalizadas
-                        </Typography>
-                      </Paper>
-                    </Grid>
+                  <Box
+                    sx={{
+                      display: 'flex',
+                      flexWrap: 'wrap',
+                      gap: 2,
+                      width: '100%',
+                      mb: 3,
+                    }}
+                  >
+                    <Paper
+                      variant="outlined"
+                      sx={{
+                        flex: {
+                          xs: '1 1 100%',
+                          sm: '1 1 calc(50% - 16px)',
+                          md: '1 1 calc(33.333% - 16px)',
+                          xl: '1 1 calc(16.666% - 16px)',
+                        },
+                        minWidth: { xs: '100%', sm: 180 },
+                        p: 2.5,
+                        borderRadius: 2.5,
+                        backgroundColor: isDark ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.02)',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        justifyContent: 'center',
+                      }}
+                    >
+                      <Typography variant="caption" color="text.secondary" fontWeight={600}>
+                        Sessões Realizadas
+                      </Typography>
+                      <Typography variant="h5" fontWeight={800} sx={{ mt: 0.5, color: PALETTE_COLORS.primary }}>
+                        {totalSessions}
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        execuções finalizadas
+                      </Typography>
+                    </Paper>
 
-                    <Grid item xs={12} sm={6} md={3}>
-                      <Paper
-                        variant="outlined"
-                        sx={{
-                          p: 2,
-                          borderRadius: 2.5,
-                          backgroundColor: isDark ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.02)',
-                        }}
-                      >
-                        <Typography variant="caption" color="text.secondary" fontWeight={600}>
-                          Tempo Total Respondido
-                        </Typography>
-                        <Typography variant="h5" fontWeight={800} sx={{ mt: 0.5 }}>
-                          {formatStudyDuration(totalSeconds)}
-                        </Typography>
-                        <Typography variant="caption" color="text.secondary">
-                          tempo em estudo ativo
-                        </Typography>
-                      </Paper>
-                    </Grid>
+                    <Paper
+                      variant="outlined"
+                      sx={{
+                        flex: {
+                          xs: '1 1 100%',
+                          sm: '1 1 calc(50% - 16px)',
+                          md: '1 1 calc(33.333% - 16px)',
+                          xl: '1 1 calc(16.666% - 16px)',
+                        },
+                        minWidth: { xs: '100%', sm: 180 },
+                        p: 2.5,
+                        borderRadius: 2.5,
+                        backgroundColor: isDark ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.02)',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        justifyContent: 'center',
+                      }}
+                    >
+                      <Typography variant="caption" color="text.secondary" fontWeight={600}>
+                        Tempo Total Respondido
+                      </Typography>
+                      <Typography variant="h5" fontWeight={800} sx={{ mt: 0.5 }}>
+                        {formatStudyDuration(totalSeconds)}
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        tempo em estudo ativo
+                      </Typography>
+                    </Paper>
 
-                    <Grid item xs={12} sm={6} md={3}>
-                      <Paper
-                        variant="outlined"
-                        sx={{
-                          p: 2,
-                          borderRadius: 2.5,
-                          backgroundColor: isDark ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.02)',
-                        }}
-                      >
-                        <Typography variant="caption" color="text.secondary" fontWeight={600}>
-                          Cards Praticados
-                        </Typography>
-                        <Typography variant="h5" fontWeight={800} sx={{ mt: 0.5 }}>
-                          {totalCards}
-                        </Typography>
-                        <Typography variant="caption" color="text.secondary">
-                          {totalCorrect} acertos • {totalWrong} erros
-                        </Typography>
-                      </Paper>
-                    </Grid>
+                    <Paper
+                      variant="outlined"
+                      sx={{
+                        flex: {
+                          xs: '1 1 100%',
+                          sm: '1 1 calc(50% - 16px)',
+                          md: '1 1 calc(33.333% - 16px)',
+                          xl: '1 1 calc(16.666% - 16px)',
+                        },
+                        minWidth: { xs: '100%', sm: 180 },
+                        p: 2.5,
+                        borderRadius: 2.5,
+                        backgroundColor: isDark ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.02)',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        justifyContent: 'center',
+                      }}
+                    >
+                      <Typography variant="caption" color="text.secondary" fontWeight={600}>
+                        Média Diária
+                      </Typography>
+                      <Typography variant="h5" fontWeight={800} sx={{ mt: 0.5 }}>
+                        {formatStudyDuration(studyTimeAverages.avgDailySeconds)}
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        por dia ativo
+                      </Typography>
+                    </Paper>
 
-                    <Grid item xs={12} sm={6} md={3}>
-                      <Paper
-                        variant="outlined"
+                    <Paper
+                      variant="outlined"
+                      sx={{
+                        flex: {
+                          xs: '1 1 100%',
+                          sm: '1 1 calc(50% - 16px)',
+                          md: '1 1 calc(33.333% - 16px)',
+                          xl: '1 1 calc(16.666% - 16px)',
+                        },
+                        minWidth: { xs: '100%', sm: 180 },
+                        p: 2.5,
+                        borderRadius: 2.5,
+                        backgroundColor: isDark ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.02)',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        justifyContent: 'center',
+                      }}
+                    >
+                      <Typography variant="caption" color="text.secondary" fontWeight={600}>
+                        Média Semanal
+                      </Typography>
+                      <Typography variant="h5" fontWeight={800} sx={{ mt: 0.5 }}>
+                        {formatStudyDuration(studyTimeAverages.avgWeeklySeconds)}
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        por semana ativa
+                      </Typography>
+                    </Paper>
+
+                    <Paper
+                      variant="outlined"
+                      sx={{
+                        flex: {
+                          xs: '1 1 100%',
+                          sm: '1 1 calc(50% - 16px)',
+                          md: '1 1 calc(33.333% - 16px)',
+                          xl: '1 1 calc(16.666% - 16px)',
+                        },
+                        minWidth: { xs: '100%', sm: 180 },
+                        p: 2.5,
+                        borderRadius: 2.5,
+                        backgroundColor: isDark ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.02)',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        justifyContent: 'center',
+                      }}
+                    >
+                      <Typography variant="caption" color="text.secondary" fontWeight={600}>
+                        Cards Praticados
+                      </Typography>
+                      <Typography variant="h5" fontWeight={800} sx={{ mt: 0.5 }}>
+                        {totalCards}
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        {totalCorrect} acertos • {totalWrong} erros
+                      </Typography>
+                    </Paper>
+
+                    <Paper
+                      variant="outlined"
+                      sx={{
+                        flex: {
+                          xs: '1 1 100%',
+                          sm: '1 1 calc(50% - 16px)',
+                          md: '1 1 calc(33.333% - 16px)',
+                          xl: '1 1 calc(16.666% - 16px)',
+                        },
+                        minWidth: { xs: '100%', sm: 180 },
+                        p: 2.5,
+                        borderRadius: 2.5,
+                        backgroundColor: isDark ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.02)',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        justifyContent: 'center',
+                      }}
+                    >
+                      <Typography variant="caption" color="text.secondary" fontWeight={600}>
+                        Taxa Média de Acerto
+                      </Typography>
+                      <Typography
+                        variant="h5"
+                        fontWeight={800}
                         sx={{
-                          p: 2,
-                          borderRadius: 2.5,
-                          backgroundColor: isDark ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.02)',
+                          mt: 0.5,
+                          color: avgAccuracy >= 70 ? PALETTE_COLORS.success : PALETTE_COLORS.primary,
                         }}
                       >
-                        <Typography variant="caption" color="text.secondary" fontWeight={600}>
-                          Taxa Média de Acerto
-                        </Typography>
-                        <Typography
-                          variant="h5"
-                          fontWeight={800}
+                        {avgAccuracy}%
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        aproveitamento global
+                      </Typography>
+                      <Box sx={{ width: '100%', mt: 0.5 }}>
+                        <LinearProgress
+                          variant="determinate"
+                          value={Math.min(100, avgAccuracy)}
                           sx={{
-                            mt: 0.5,
-                            color: avgAccuracy >= 70 ? PALETTE_COLORS.success : PALETTE_COLORS.primary,
+                            height: 6,
+                            borderRadius: 3,
+                            bgcolor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)',
+                            '& .MuiLinearProgress-bar': {
+                              bgcolor: avgAccuracy >= 70 ? PALETTE_COLORS.success : PALETTE_COLORS.primary,
+                            },
                           }}
-                        >
-                          {avgAccuracy}%
-                        </Typography>
-                        <Typography variant="caption" color="text.secondary">
-                          aproveitamento global
-                        </Typography>
-                      </Paper>
-                    </Grid>
-                  </Grid>
+                        />
+                      </Box>
+                    </Paper>
+                  </Box>
                 );
               })()}
+
+              {/* Gráfico de Linhas: Evolução do Estudo */}
+              <StudySessionLineChart
+                sessions={flashcardSessions}
+                isDark={isDark}
+                formatStudyDuration={formatStudyDuration}
+              />
+
+              {/* Calendário de Estudos com Métricas Diárias */}
+              <StudySessionCalendar
+                sessions={flashcardSessions}
+                isDark={isDark}
+                formatStudyDuration={formatStudyDuration}
+                onSelectSession={(s) => setSelectedSessionDetail(s)}
+              />
 
               {/* Painel Interativo de Avaliação de Desempenho em Flashcards */}
               <Paper elevation={4} sx={{ p: { xs: 2.5, md: 4 }, borderRadius: 3, mb: 4 }}>
