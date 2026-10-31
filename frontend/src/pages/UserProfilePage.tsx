@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { useParams, useNavigate, useSearchParams, Link } from 'react-router-dom';
 import {
   Alert,
@@ -101,6 +101,7 @@ import {
 import {
   Area,
   CategoryPerformance,
+  DailyActivity,
   Flashcard,
   FlashcardSession,
   Folder,
@@ -171,6 +172,10 @@ export const UserProfilePage: React.FC = () => {
   // Tabs de Categoria em Estatísticas: 0 = Área, 1 = Matéria, 2 = Banca
   const [categoryTab, setCategoryTab] = useState<number>(0);
   const [categorySortBy, setCategorySortBy] = useState<'resolved' | 'accuracy'>('resolved');
+
+  // Tabs de Categoria em Sessões de Estudo (Flashcards): 0 = Área, 1 = Matéria, 2 = Deck
+  const [studyCategoryTab, setStudyCategoryTab] = useState<number>(0);
+  const [studyCategorySortBy, setStudyCategorySortBy] = useState<'studied' | 'accuracy'>('studied');
 
   // Dados de Histórico de Questões Respondidas
   const [myQuestionAttempts, setMyQuestionAttempts] = useState<QuestionAttemptHistory[]>([]);
@@ -350,7 +355,9 @@ export const UserProfilePage: React.FC = () => {
   // Carregamento sob demanda das abas selecionadas
   useEffect(() => {
     if (!userId) return;
-    if (activeNavTab === 'questoes_respondidas') {
+    if (activeNavTab === 'visao_geral') {
+      loadMyFlashcardSessions();
+    } else if (activeNavTab === 'questoes_respondidas') {
       loadMyQuestionAttempts();
     } else if (activeNavTab === 'meus_simulados') {
       loadMyTestAttempts();
@@ -600,6 +607,167 @@ export const UserProfilePage: React.FC = () => {
     }
   };
 
+  // Desempenho e Gráficos de Avaliação para Sessões de Estudo (Flashcards)
+  const studyAreaPerformance = useMemo(() => {
+    const map = new Map<string, { id?: number; name: string; totalCards: number; correctCount: number; wrongCount: number; skippedCount: number }>();
+
+    if (profile?.flashcardStats?.performanceByArea && profile.flashcardStats.performanceByArea.length > 0) {
+      for (const p of profile.flashcardStats.performanceByArea) {
+        map.set(p.name, {
+          id: p.id,
+          name: p.name,
+          totalCards: p.totalQuestions,
+          correctCount: p.correctAnswers,
+          wrongCount: Math.max(0, p.totalQuestions - p.correctAnswers),
+          skippedCount: 0,
+        });
+      }
+    }
+
+    for (const session of flashcardSessions) {
+      if (session.areaName) {
+        const entry = map.get(session.areaName) || {
+          id: session.areaId,
+          name: session.areaName,
+          totalCards: 0,
+          correctCount: 0,
+          wrongCount: 0,
+          skippedCount: 0,
+        };
+        if (!profile?.flashcardStats?.performanceByArea?.length) {
+          entry.totalCards += session.totalCards || (session.correctCount + session.wrongCount + session.skippedCount);
+          entry.correctCount += session.correctCount;
+          entry.wrongCount += session.wrongCount;
+          entry.skippedCount += session.skippedCount;
+        }
+        map.set(session.areaName, entry);
+      }
+      if (session.items) {
+        for (const item of session.items) {
+          if (item.areaName && !session.areaName && !profile?.flashcardStats?.performanceByArea?.length) {
+            const entry = map.get(item.areaName) || {
+              name: item.areaName,
+              totalCards: 0,
+              correctCount: 0,
+              wrongCount: 0,
+              skippedCount: 0,
+            };
+            entry.totalCards++;
+            if (item.status === 'CORRECT') entry.correctCount++;
+            else if (item.status === 'WRONG') entry.wrongCount++;
+            else entry.skippedCount++;
+            map.set(item.areaName, entry);
+          }
+        }
+      }
+    }
+
+    return Array.from(map.values()).map((e) => ({
+      ...e,
+      accuracy: e.totalCards > 0 ? (e.correctCount / e.totalCards) * 100 : 0,
+    }));
+  }, [profile?.flashcardStats?.performanceByArea, flashcardSessions]);
+
+  const studySubjectPerformance = useMemo(() => {
+    const map = new Map<string, { id?: number; name: string; totalCards: number; correctCount: number; wrongCount: number; skippedCount: number }>();
+
+    if (profile?.flashcardStats?.performanceBySubject && profile.flashcardStats.performanceBySubject.length > 0) {
+      for (const p of profile.flashcardStats.performanceBySubject) {
+        map.set(p.name, {
+          id: p.id,
+          name: p.name,
+          totalCards: p.totalQuestions,
+          correctCount: p.correctAnswers,
+          wrongCount: Math.max(0, p.totalQuestions - p.correctAnswers),
+          skippedCount: 0,
+        });
+      }
+    }
+
+    for (const session of flashcardSessions) {
+      if (session.subjectName) {
+        const entry = map.get(session.subjectName) || {
+          id: session.subjectId,
+          name: session.subjectName,
+          totalCards: 0,
+          correctCount: 0,
+          wrongCount: 0,
+          skippedCount: 0,
+        };
+        if (!profile?.flashcardStats?.performanceBySubject?.length) {
+          entry.totalCards += session.totalCards || (session.correctCount + session.wrongCount + session.skippedCount);
+          entry.correctCount += session.correctCount;
+          entry.wrongCount += session.wrongCount;
+          entry.skippedCount += session.skippedCount;
+        }
+        map.set(session.subjectName, entry);
+      }
+      if (session.items) {
+        for (const item of session.items) {
+          if (item.subjectName && !session.subjectName && !profile?.flashcardStats?.performanceBySubject?.length) {
+            const entry = map.get(item.subjectName) || {
+              name: item.subjectName,
+              totalCards: 0,
+              correctCount: 0,
+              wrongCount: 0,
+              skippedCount: 0,
+            };
+            entry.totalCards++;
+            if (item.status === 'CORRECT') entry.correctCount++;
+            else if (item.status === 'WRONG') entry.wrongCount++;
+            else entry.skippedCount++;
+            map.set(item.subjectName, entry);
+          }
+        }
+      }
+    }
+
+    return Array.from(map.values()).map((e) => ({
+      ...e,
+      accuracy: e.totalCards > 0 ? (e.correctCount / e.totalCards) * 100 : 0,
+    }));
+  }, [profile?.flashcardStats?.performanceBySubject, flashcardSessions]);
+
+  const studyFolderPerformance = useMemo(() => {
+    const map = new Map<string, { id?: number; name: string; totalCards: number; correctCount: number; wrongCount: number; skippedCount: number }>();
+
+    for (const session of flashcardSessions) {
+      const folderKey = session.folderName || 'Cards Avulsos';
+      const entry = map.get(folderKey) || {
+        id: session.folderId,
+        name: folderKey,
+        totalCards: 0,
+        correctCount: 0,
+        wrongCount: 0,
+        skippedCount: 0,
+      };
+      entry.totalCards += session.totalCards || (session.correctCount + session.wrongCount + session.skippedCount);
+      entry.correctCount += session.correctCount;
+      entry.wrongCount += session.wrongCount;
+      entry.skippedCount += session.skippedCount;
+      map.set(folderKey, entry);
+    }
+
+    return Array.from(map.values()).map((e) => ({
+      ...e,
+      accuracy: e.totalCards > 0 ? (e.correctCount / e.totalCards) * 100 : 0,
+    }));
+  }, [flashcardSessions]);
+
+  const currentStudyCategoryList = useMemo(() => {
+    const list =
+      studyCategoryTab === 0
+        ? [...studyAreaPerformance]
+        : studyCategoryTab === 1
+        ? [...studySubjectPerformance]
+        : [...studyFolderPerformance];
+
+    if (studyCategorySortBy === 'accuracy') {
+      return list.sort((a, b) => b.accuracy - a.accuracy || b.totalCards - a.totalCards);
+    }
+    return list.sort((a, b) => b.totalCards - a.totalCards || b.accuracy - a.accuracy);
+  }, [studyCategoryTab, studyCategorySortBy, studyAreaPerformance, studySubjectPerformance, studyFolderPerformance]);
+
   if (loading) {
     return <ProfileSkeleton />;
   }
@@ -614,19 +782,29 @@ export const UserProfilePage: React.FC = () => {
 
   if (!profile) return null;
 
-  // Visualizador do Heatmap de 35 dias
+  // Visualizador do Heatmap de 35 dias (Frequência Ativa: Questões + Flashcards)
   const activities = profile.dailyActivities || (profile as any).dailyActivity || [];
-  const activityMap = new Map(activities.map((a: any) => [a.date, a.count]));
+  const activityMap = new Map<string, DailyActivity>(activities.map((a: any) => [a.date, a]));
 
   const today = new Date();
-  const days: { dateStr: string; count: number }[] = [];
+  const days: {
+    dateStr: string;
+    count: number;
+    questionsCount: number;
+    flashcardsCount: number;
+    flashcardSessionsCount: number;
+  }[] = [];
   for (let i = 34; i >= 0; i--) {
     const d = new Date(today);
     d.setDate(today.getDate() - i);
     const dateStr = d.toISOString().split('T')[0];
+    const act = activityMap.get(dateStr);
     days.push({
       dateStr,
-      count: activityMap.get(dateStr) || 0,
+      count: act?.count || 0,
+      questionsCount: act?.questionsCount || 0,
+      flashcardsCount: act?.flashcardsCount || 0,
+      flashcardSessionsCount: act?.flashcardSessionsCount || 0,
     });
   }
 
@@ -1226,6 +1404,187 @@ export const UserProfilePage: React.FC = () => {
                 </Card>
               </Box>
 
+              {/* Painel de Métricas de Flashcards & Sessões de Estudo */}
+              {(() => {
+                const fcStats = profile.flashcardStats;
+                const totalSessions = fcStats?.totalSessions ?? flashcardSessions.length;
+                const totalSeconds = fcStats?.totalTimeSpentSeconds ?? flashcardSessions.reduce((acc, s) => acc + (s.timeSpentSeconds || 0), 0);
+                const totalCards = fcStats?.totalCardsStudied ?? flashcardSessions.reduce((acc, s) => acc + (s.totalCards || 0), 0);
+                const totalCorrect = fcStats?.totalCorrect ?? flashcardSessions.reduce((acc, s) => acc + (s.correctCount || 0), 0);
+                const totalWrong = fcStats?.totalWrong ?? flashcardSessions.reduce((acc, s) => acc + (s.wrongCount || 0), 0);
+                const totalSkipped = fcStats?.totalSkipped ?? flashcardSessions.reduce((acc, s) => acc + (s.skippedCount || 0), 0);
+                const accuracy = fcStats?.generalAccuracyPercentage != null
+                  ? fcStats.generalAccuracyPercentage
+                  : totalCards > 0 ? Math.round((totalCorrect / totalCards) * 100) : 0;
+
+                return (
+                  <Paper elevation={4} sx={{ p: { xs: 2.5, md: 3.5 }, borderRadius: 3 }}>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2.5, flexWrap: 'wrap', gap: 2 }}>
+                      <Box>
+                        <Stack direction="row" spacing={1} alignItems="center">
+                          <StyleOutlinedIcon color="primary" />
+                          <Typography variant="h6" fontWeight="bold">
+                            Sessões de Estudo & Flashcards
+                          </Typography>
+                        </Stack>
+                        <Typography variant="body2" color="text.secondary">
+                          Métricas consolidadas de estudo ativo, tempo dedicado e taxa de aproveitamento em flashcards.
+                        </Typography>
+                      </Box>
+
+                      <Stack direction="row" spacing={1.5} alignItems="center">
+                        <Button
+                          size="small"
+                          variant="outlined"
+                          startIcon={<HistoryIcon />}
+                          onClick={() => setActiveNavTab('sessoes_estudo')}
+                          sx={{ textTransform: 'none', borderRadius: 2, fontWeight: 700 }}
+                        >
+                          Ver Histórico Completo
+                        </Button>
+                        <Button
+                          size="small"
+                          variant="contained"
+                          startIcon={<PlayArrowIcon />}
+                          onClick={() => navigate('/flashcards')}
+                          sx={{
+                            textTransform: 'none',
+                            borderRadius: 2,
+                            fontWeight: 700,
+                            backgroundColor: PALETTE_COLORS.primary,
+                            color: '#1a1e24',
+                            '&:hover': { backgroundColor: '#c4a251' },
+                          }}
+                        >
+                          Praticar Flashcards
+                        </Button>
+                      </Stack>
+                    </Box>
+
+                    {/* 4 Cards Alinhados perfeitamente */}
+                    <Box
+                      sx={{
+                        display: 'grid',
+                        gridTemplateColumns: {
+                          xs: '1fr',
+                          sm: 'repeat(2, 1fr)',
+                          md: 'repeat(4, 1fr)',
+                        },
+                        gap: 2,
+                        width: '100%',
+                      }}
+                    >
+                      <Paper
+                        variant="outlined"
+                        sx={{
+                          p: 2,
+                          borderRadius: 2.5,
+                          backgroundColor: isDark ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.02)',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          justifyContent: 'center',
+                        }}
+                      >
+                        <Typography variant="caption" color="text.secondary" fontWeight={600}>
+                          Sessões Realizadas
+                        </Typography>
+                        <Typography variant="h4" fontWeight={800} sx={{ mt: 0.5, color: PALETTE_COLORS.primary }}>
+                          {totalSessions}
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          execuções finalizadas
+                        </Typography>
+                      </Paper>
+
+                      <Paper
+                        variant="outlined"
+                        sx={{
+                          p: 2,
+                          borderRadius: 2.5,
+                          backgroundColor: isDark ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.02)',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          justifyContent: 'center',
+                        }}
+                      >
+                        <Typography variant="caption" color="text.secondary" fontWeight={600}>
+                          Tempo Total Respondido
+                        </Typography>
+                        <Typography variant="h4" fontWeight={800} sx={{ mt: 0.5 }}>
+                          {formatStudyDuration(totalSeconds)}
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          em estudo ativo
+                        </Typography>
+                      </Paper>
+
+                      <Paper
+                        variant="outlined"
+                        sx={{
+                          p: 2,
+                          borderRadius: 2.5,
+                          backgroundColor: isDark ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.02)',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          justifyContent: 'center',
+                        }}
+                      >
+                        <Typography variant="caption" color="text.secondary" fontWeight={600}>
+                          Cards Praticados
+                        </Typography>
+                        <Typography variant="h4" fontWeight={800} sx={{ mt: 0.5 }}>
+                          {totalCards}
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          {totalCorrect} acertos • {totalWrong} erros
+                          {totalSkipped > 0 ? ` • ${totalSkipped} pulados` : ''}
+                        </Typography>
+                      </Paper>
+
+                      <Paper
+                        variant="outlined"
+                        sx={{
+                          p: 2,
+                          borderRadius: 2.5,
+                          backgroundColor: isDark ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.02)',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          justifyContent: 'center',
+                        }}
+                      >
+                        <Typography variant="caption" color="text.secondary" fontWeight={600}>
+                          Taxa Média de Acerto
+                        </Typography>
+                        <Typography
+                          variant="h4"
+                          fontWeight={800}
+                          sx={{
+                            mt: 0.5,
+                            color: accuracy >= 70 ? PALETTE_COLORS.success : PALETTE_COLORS.primary,
+                          }}
+                        >
+                          {accuracy.toFixed(1)}%
+                        </Typography>
+                        <Box sx={{ width: '100%', mt: 0.5 }}>
+                          <LinearProgress
+                            variant="determinate"
+                            value={Math.min(100, accuracy)}
+                            sx={{
+                              height: 6,
+                              borderRadius: 3,
+                              bgcolor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)',
+                              '& .MuiLinearProgress-bar': {
+                                bgcolor: accuracy >= 70 ? PALETTE_COLORS.success : PALETTE_COLORS.primary,
+                              },
+                            }}
+                          />
+                        </Box>
+                      </Paper>
+                    </Box>
+                  </Paper>
+                );
+              })()}
+
               {/* Painel Interativo de Análise por Categorias */}
               <Paper elevation={4} sx={{ p: { xs: 2.5, md: 4 }, borderRadius: 3 }}>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2, mb: 3 }}>
@@ -1347,32 +1706,42 @@ export const UserProfilePage: React.FC = () => {
                   </Typography>
                 </Stack>
                 <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-                  Exibindo a frequência de resolução dos últimos 35 dias.
+                  Exibindo a frequência de estudos dos últimos 35 dias (questões respondidas e sessões de flashcards).
                 </Typography>
 
                 <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, justifyContent: 'flex-start' }}>
-                  {days.map((d) => (
-                    <Tooltip
-                      key={d.dateStr}
-                      title={`${d.dateStr}: ${d.count} questão(ões) resolvida(s)`}
-                      arrow
-                    >
-                      <Box
-                        sx={{
-                          width: 20,
-                          height: 20,
-                          borderRadius: 0.5,
-                          backgroundColor: getHeatmapColor(d.count),
-                          border: `1px solid ${theme.palette.divider}`,
-                          transition: 'transform 0.1s',
-                          '&:hover': {
-                            transform: 'scale(1.2)',
-                            borderColor: '#5aa6e2',
-                          },
-                        }}
-                      />
-                    </Tooltip>
-                  ))}
+                  {days.map((d) => {
+                    let tooltipTitle = `${d.dateStr}: Nenhuma atividade realizada`;
+                    if (d.count > 0) {
+                      const details: string[] = [];
+                      if (d.questionsCount > 0) details.push(`${d.questionsCount} questão(ões)`);
+                      if (d.flashcardsCount > 0) details.push(`${d.flashcardsCount} flashcard(s)`);
+                      else if (d.flashcardSessionsCount > 0) details.push(`${d.flashcardSessionsCount} sessão(ões) de flashcard`);
+                      tooltipTitle = `${d.dateStr}: ${d.count} atividade(s) realizada(s)` + (details.length > 0 ? ` (${details.join(', ')})` : '');
+                    }
+                    return (
+                      <Tooltip
+                        key={d.dateStr}
+                        title={tooltipTitle}
+                        arrow
+                      >
+                        <Box
+                          sx={{
+                            width: 20,
+                            height: 20,
+                            borderRadius: 0.5,
+                            backgroundColor: getHeatmapColor(d.count),
+                            border: `1px solid ${theme.palette.divider}`,
+                            transition: 'transform 0.1s',
+                            '&:hover': {
+                              transform: 'scale(1.2)',
+                              borderColor: '#5aa6e2',
+                            },
+                          }}
+                        />
+                      </Tooltip>
+                    );
+                  })}
                 </Box>
               </Paper>
             </Stack>
@@ -1966,6 +2335,195 @@ export const UserProfilePage: React.FC = () => {
                   </Grid>
                 );
               })()}
+
+              {/* Painel Interativo de Avaliação de Desempenho em Flashcards */}
+              <Paper elevation={4} sx={{ p: { xs: 2.5, md: 4 }, borderRadius: 3, mb: 4 }}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2, mb: 3 }}>
+                  <Box>
+                    <Stack direction="row" spacing={1} alignItems="center">
+                      <BarChartIcon color="secondary" />
+                      <Typography variant="h6" fontWeight="bold">
+                        Avaliação Gráfica de Desempenho
+                      </Typography>
+                    </Stack>
+                    <Typography variant="body2" color="text.secondary">
+                      Acompanhe sua taxa de retenção e acertos agrupados por área, matéria ou deck de flashcards.
+                    </Typography>
+                  </Box>
+
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    startIcon={<SortIcon />}
+                    onClick={() => setStudyCategorySortBy((prev) => (prev === 'studied' ? 'accuracy' : 'studied'))}
+                    sx={{ textTransform: 'none', borderRadius: 2, fontWeight: 600 }}
+                  >
+                    Ordenar: {studyCategorySortBy === 'studied' ? 'Mais Praticados' : 'Maior Taxa de Acerto'}
+                  </Button>
+                </Box>
+
+                {/* Barra de Distribuição de Retenção Global */}
+                {(() => {
+                  const totalCards = flashcardSessions.reduce((acc, s) => acc + (s.totalCards || 0), 0);
+                  const totalCorrect = flashcardSessions.reduce((acc, s) => acc + (s.correctCount || 0), 0);
+                  const totalWrong = flashcardSessions.reduce((acc, s) => acc + (s.wrongCount || 0), 0);
+                  const totalSkipped = flashcardSessions.reduce((acc, s) => acc + (s.skippedCount || 0), 0);
+                  const correctPct = totalCards > 0 ? (totalCorrect / totalCards) * 100 : 0;
+                  const wrongPct = totalCards > 0 ? (totalWrong / totalCards) * 100 : 0;
+                  const skippedPct = totalCards > 0 ? (totalSkipped / totalCards) * 100 : 0;
+
+                  return (
+                    <Box sx={{ mb: 4, p: 2, borderRadius: 2, bgcolor: isDark ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.02)', border: '1px solid', borderColor: 'divider' }}>
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5, flexWrap: 'wrap', gap: 1 }}>
+                        <Typography variant="subtitle2" fontWeight={700}>
+                          Distribuição Geral de Respostas
+                        </Typography>
+                        <Stack direction="row" spacing={2} alignItems="center" flexWrap="wrap">
+                          <Stack direction="row" spacing={0.5} alignItems="center">
+                            <Box sx={{ width: 12, height: 12, borderRadius: 0.5, bgcolor: PALETTE_COLORS.success }} />
+                            <Typography variant="caption" color="text.secondary">
+                              Acertos: <b>{totalCorrect}</b> ({correctPct.toFixed(1)}%)
+                            </Typography>
+                          </Stack>
+                          <Stack direction="row" spacing={0.5} alignItems="center">
+                            <Box sx={{ width: 12, height: 12, borderRadius: 0.5, bgcolor: '#f44336' }} />
+                            <Typography variant="caption" color="text.secondary">
+                              Erros: <b>{totalWrong}</b> ({wrongPct.toFixed(1)}%)
+                            </Typography>
+                          </Stack>
+                          {totalSkipped > 0 && (
+                            <Stack direction="row" spacing={0.5} alignItems="center">
+                              <Box sx={{ width: 12, height: 12, borderRadius: 0.5, bgcolor: 'text.disabled' }} />
+                              <Typography variant="caption" color="text.secondary">
+                                Pulados: <b>{totalSkipped}</b> ({skippedPct.toFixed(1)}%)
+                              </Typography>
+                            </Stack>
+                          )}
+                        </Stack>
+                      </Box>
+
+                      {/* Segmented bar */}
+                      <Tooltip
+                        title={`Total: ${totalCards} cards | Acertos: ${totalCorrect} (${correctPct.toFixed(1)}%) | Erros: ${totalWrong} (${wrongPct.toFixed(1)}%) ${totalSkipped > 0 ? `| Pulados: ${totalSkipped} (${skippedPct.toFixed(1)}%)` : ''}`}
+                        arrow
+                      >
+                        <Box
+                          sx={{
+                            height: 12,
+                            borderRadius: 6,
+                            overflow: 'hidden',
+                            display: 'flex',
+                            width: '100%',
+                            bgcolor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)',
+                          }}
+                        >
+                          {totalCards === 0 ? (
+                            <Box sx={{ width: '100%', height: '100%', bgcolor: 'action.disabledBackground' }} />
+                          ) : (
+                            <>
+                              <Box sx={{ width: `${correctPct}%`, height: '100%', bgcolor: PALETTE_COLORS.success, transition: 'width 0.4s' }} />
+                              <Box sx={{ width: `${wrongPct}%`, height: '100%', bgcolor: '#f44336', transition: 'width 0.4s' }} />
+                              <Box sx={{ width: `${skippedPct}%`, height: '100%', bgcolor: 'rgba(160, 160, 160, 0.6)', transition: 'width 0.4s' }} />
+                            </>
+                          )}
+                        </Box>
+                      </Tooltip>
+                    </Box>
+                  );
+                })()}
+
+                <Tabs
+                  value={studyCategoryTab}
+                  onChange={(_, val) => setStudyCategoryTab(val)}
+                  variant="scrollable"
+                  scrollButtons="auto"
+                  allowScrollButtonsMobile
+                  sx={{
+                    mb: 3,
+                    borderBottom: 1,
+                    borderColor: 'divider',
+                    '& .MuiTab-root': { fontWeight: 'bold', textTransform: 'none', fontSize: '0.95rem' },
+                  }}
+                >
+                  <Tab icon={<CategoryIcon fontSize="small" />} iconPosition="start" label={`Áreas (${studyAreaPerformance.length})`} />
+                  <Tab icon={<ClassIcon fontSize="small" />} iconPosition="start" label={`Matérias (${studySubjectPerformance.length})`} />
+                  <Tab icon={<FolderSpecialOutlinedIcon fontSize="small" />} iconPosition="start" label={`Decks (${studyFolderPerformance.length})`} />
+                </Tabs>
+
+                {currentStudyCategoryList.length === 0 ? (
+                  <Alert severity="info" sx={{ borderRadius: 2 }}>
+                    Nenhuma sessão de estudo concluída nesta categoria até o momento.
+                  </Alert>
+                ) : (
+                  <Stack spacing={2}>
+                    {currentStudyCategoryList.map((cat) => {
+                      const accColor = getAccuracyColor(cat.accuracy);
+                      return (
+                        <Box
+                          key={cat.id || cat.name}
+                          sx={{
+                            p: 2,
+                            borderRadius: 2,
+                            border: '1px solid',
+                            borderColor: 'divider',
+                            backgroundColor: isDark ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.01)',
+                            transition: 'all 0.2s',
+                            '&:hover': {
+                              borderColor: PALETTE_COLORS.secondary,
+                              backgroundColor: isDark ? 'rgba(90, 166, 226, 0.05)' : 'rgba(90, 166, 226, 0.03)',
+                            },
+                          }}
+                        >
+                          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1, flexWrap: 'wrap', gap: 1 }}>
+                            <Typography variant="subtitle1" fontWeight="bold">
+                              {cat.name}
+                            </Typography>
+                            <Stack direction="row" spacing={1} alignItems="center">
+                              <Chip
+                                size="small"
+                                label={`${cat.totalCards} cards`}
+                                variant="outlined"
+                                sx={{ fontWeight: 600 }}
+                              />
+                              <Chip
+                                size="small"
+                                label={`${cat.correctCount} acertos`}
+                                sx={{ fontWeight: 600, bgcolor: 'rgba(75, 241, 81, 0.15)', color: '#4bf151' }}
+                              />
+                              {cat.wrongCount > 0 && (
+                                <Chip
+                                  size="small"
+                                  label={`${cat.wrongCount} erros`}
+                                  sx={{ fontWeight: 600, bgcolor: 'rgba(244, 67, 54, 0.15)', color: '#f44336' }}
+                                />
+                              )}
+                              <Typography variant="h6" fontWeight="900" sx={{ color: accColor, minWidth: 65, textAlign: 'right' }}>
+                                {cat.accuracy.toFixed(1)}%
+                              </Typography>
+                            </Stack>
+                          </Box>
+
+                          <Tooltip title={`Aproveitamento: ${cat.accuracy.toFixed(1)}% (${cat.correctCount}/${cat.totalCards})`} arrow>
+                            <LinearProgress
+                              variant="determinate"
+                              value={Math.min(100, cat.accuracy)}
+                              sx={{
+                                height: 8,
+                                borderRadius: 4,
+                                backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)',
+                                '& .MuiLinearProgress-bar': {
+                                  backgroundColor: accColor,
+                                  borderRadius: 4,
+                                },
+                              }}
+                            />
+                          </Tooltip>
+                        </Box>
+                      );
+                    })}
+                  </Stack>
+                )}
+              </Paper>
 
               {/* Barra de Filtro e Busca */}
               <TextField
