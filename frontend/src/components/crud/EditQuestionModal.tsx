@@ -236,20 +236,62 @@ export const EditQuestionModal: React.FC<EditQuestionModalProps> = ({
     });
   };
 
-  const handlePaste = (e: React.ClipboardEvent) => {
-    const items = e.clipboardData?.items;
-    if (!items) return;
+  const extractAndAddImages = (data: DataTransfer | null): boolean => {
+    if (!data) return false;
     const imageFiles: File[] = [];
-    for (let i = 0; i < items.length; i++) {
-      if (items[i].type.indexOf('image') !== -1) {
-        const file = items[i].getAsFile();
-        if (file) imageFiles.push(file);
+
+    if (data.files && data.files.length > 0) {
+      for (let i = 0; i < data.files.length; i++) {
+        const file = data.files[i];
+        if (file.type.startsWith('image/')) {
+          imageFiles.push(file);
+        }
       }
     }
+
+    if (imageFiles.length === 0 && data.items && data.items.length > 0) {
+      for (let i = 0; i < data.items.length; i++) {
+        const item = data.items[i];
+        if (item.type.startsWith('image/')) {
+          const file = item.getAsFile();
+          if (file) {
+            imageFiles.push(file);
+          }
+        }
+      }
+    }
+
     if (imageFiles.length > 0) {
       handleFiles(imageFiles);
+      return true;
+    }
+    return false;
+  };
+
+  const handlePaste = (e: React.ClipboardEvent) => {
+    const hadImages = extractAndAddImages(e.clipboardData);
+    if (hadImages) {
+      e.preventDefault();
+      e.stopPropagation();
     }
   };
+
+  useEffect(() => {
+    if (!open) return;
+
+    const handleWindowPaste = (e: ClipboardEvent) => {
+      const hadImages = extractAndAddImages(e.clipboardData);
+      if (hadImages) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+    };
+
+    window.addEventListener('paste', handleWindowPaste);
+    return () => {
+      window.removeEventListener('paste', handleWindowPaste);
+    };
+  }, [open]);
 
   const handleRemoveImage = (index: number) => {
     setImages((prev) => prev.filter((_, idx) => idx !== index));
@@ -300,6 +342,8 @@ export const EditQuestionModal: React.FC<EditQuestionModalProps> = ({
             {/* Drop & Paste Zone */}
             <Paper
               elevation={0}
+              tabIndex={0}
+              onPaste={handlePaste}
               onDragOver={(e) => {
                 e.preventDefault();
                 setIsDragging(true);

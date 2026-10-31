@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import {
   Dialog,
   DialogTitle,
@@ -41,6 +41,7 @@ import EditIcon from '@mui/icons-material/Edit';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 import ImageIcon from '@mui/icons-material/Image';
+import CloudUploadOutlinedIcon from '@mui/icons-material/CloudUploadOutlined';
 import { ZoomableImage } from '../common/ZoomableImage';
 import { Area, Origin, TextualReference, AvailableProvaOption } from '../../types';
 import {
@@ -54,6 +55,7 @@ import { PALETTE_COLORS } from '../../theme/theme';
 import { useAppTheme } from '../../theme/ThemeContext';
 import { CreateOriginModal } from './CreateOriginModal';
 import { CreateAreaModal } from './CreateAreaModal';
+import { sortQuestionsByIdentifier } from '../../utils/questionUtils';
 
 interface CreateTestWizardModalProps {
   open: boolean;
@@ -108,6 +110,9 @@ export const CreateTestWizardModal: React.FC<CreateTestWizardModalProps> = ({
   // Step 1: Questions
   const [questions, setQuestions] = useState<QuestionForm[]>([]);
   const [parsingExam, setParsingExam] = useState(false);
+  const [activeQuestionIndex, setActiveQuestionIndex] = useState<number | null>(null);
+  const [draggingQuestionIndex, setDraggingQuestionIndex] = useState<number | null>(null);
+  const fileInputRefs = useRef<{ [key: number]: HTMLInputElement | null }>({});
 
   // Step 2: Answer key
   const [answerKeyPdfFile, setAnswerKeyPdfFile] = useState<File | null>(null);
@@ -257,6 +262,7 @@ export const CreateTestWizardModal: React.FC<CreateTestWizardModalProps> = ({
       id: `q_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
       identifier: `${nextNum}`,
       enunciado: '',
+      images: [],
       alternatives: [
         { identifier: 'A', text: '', isCorrect: false },
         { identifier: 'B', text: '', isCorrect: false },
@@ -265,7 +271,8 @@ export const CreateTestWizardModal: React.FC<CreateTestWizardModalProps> = ({
         { identifier: 'E', text: '', isCorrect: false },
       ],
     };
-    setQuestions([...questions, newQ]);
+    setQuestions((prev) => [...prev, newQ]);
+    setActiveQuestionIndex(questions.length);
   };
 
   // Remove question
@@ -273,6 +280,11 @@ export const CreateTestWizardModal: React.FC<CreateTestWizardModalProps> = ({
     const updated = [...questions];
     updated.splice(index, 1);
     setQuestions(updated);
+    if (activeQuestionIndex === index) {
+      setActiveQuestionIndex(null);
+    } else if (activeQuestionIndex !== null && activeQuestionIndex > index) {
+      setActiveQuestionIndex(activeQuestionIndex - 1);
+    }
   };
 
   // Update question field
@@ -290,6 +302,98 @@ export const CreateTestWizardModal: React.FC<CreateTestWizardModalProps> = ({
     updated[qIndex] = { ...updated[qIndex], images: currentImgs };
     setQuestions(updated);
   };
+
+  // Add images to a question
+  const handleAddQuestionImages = (qIndex: number, files: FileList | File[]) => {
+    const fileList = Array.from(files).filter((f) => f.type.startsWith('image/'));
+    if (fileList.length === 0) return;
+
+    fileList.forEach((file) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        if (e.target?.result) {
+          const dataUrl = e.target.result as string;
+          setQuestions((prev) => {
+            const copy = [...prev];
+            if (!copy[qIndex]) return prev;
+            const currentImages = copy[qIndex].images || [];
+            copy[qIndex] = {
+              ...copy[qIndex],
+              images: [...currentImages, dataUrl],
+            };
+            return copy;
+          });
+        }
+      };
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const extractAndAddQuestionImages = (qIndex: number, data: DataTransfer | null): boolean => {
+    if (!data) return false;
+    const imageFiles: File[] = [];
+
+    if (data.files && data.files.length > 0) {
+      for (let i = 0; i < data.files.length; i++) {
+        const file = data.files[i];
+        if (file.type.startsWith('image/')) {
+          imageFiles.push(file);
+        }
+      }
+    }
+
+    if (imageFiles.length === 0 && data.items && data.items.length > 0) {
+      for (let i = 0; i < data.items.length; i++) {
+        const item = data.items[i];
+        if (item.type.startsWith('image/')) {
+          const file = item.getAsFile();
+          if (file) {
+            imageFiles.push(file);
+          }
+        }
+      }
+    }
+
+    if (imageFiles.length > 0) {
+      handleAddQuestionImages(qIndex, imageFiles);
+      return true;
+    }
+    return false;
+  };
+
+  const handleQuestionPaste = (qIndex: number, e: React.ClipboardEvent) => {
+    const hadImages = extractAndAddQuestionImages(qIndex, e.clipboardData);
+    if (hadImages) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+  };
+
+  useEffect(() => {
+    if (!open || activeStep !== 1) return;
+
+    const handleWindowPaste = (e: ClipboardEvent) => {
+      const targetIndex =
+        activeQuestionIndex !== null && activeQuestionIndex >= 0 && activeQuestionIndex < questions.length
+          ? activeQuestionIndex
+          : questions.length === 1
+          ? 0
+          : null;
+
+      if (targetIndex === null) return;
+
+      const hadImages = extractAndAddQuestionImages(targetIndex, e.clipboardData);
+      if (hadImages) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+    };
+
+    window.addEventListener('paste', handleWindowPaste);
+    return () => {
+      window.removeEventListener('paste', handleWindowPaste);
+    };
+  }, [open, activeStep, activeQuestionIndex, questions.length]);
 
   // Update alternative text
   const handleUpdateAltText = (qIndex: number, altIndex: number, text: string) => {
@@ -444,6 +548,7 @@ export const CreateTestWizardModal: React.FC<CreateTestWizardModalProps> = ({
     setErrorMessage(null);
 
     try {
+      const sortedQuestions = sortQuestionsByIdentifier(questions);
       await createTestWithQuestions({
         name: name.trim(),
         year: Number(year),
@@ -461,7 +566,7 @@ export const CreateTestWizardModal: React.FC<CreateTestWizardModalProps> = ({
           source: ref.source?.trim() || ref.reference?.trim() || undefined,
           mediaUrl: ref.mediaUrl?.trim() || undefined,
         })),
-        questions: questions.map((q) => ({
+        questions: sortedQuestions.map((q) => ({
           identifier: q.identifier.trim(),
           enunciado: q.enunciado.trim(),
           images: q.images || [],
@@ -924,6 +1029,14 @@ export const CreateTestWizardModal: React.FC<CreateTestWizardModalProps> = ({
                 <Accordion
                   key={q.id}
                   disableGutters
+                  onChange={(_, isExpanded) => {
+                    if (isExpanded) {
+                      setActiveQuestionIndex(qIndex);
+                    } else if (activeQuestionIndex === qIndex) {
+                      setActiveQuestionIndex(null);
+                    }
+                  }}
+                  onFocus={() => setActiveQuestionIndex(qIndex)}
                   sx={{
                     border: isDuplicate ? '1px solid #f44336' : '1px solid',
                     borderColor: isDuplicate ? 'error.main' : 'divider',
@@ -1086,7 +1199,7 @@ export const CreateTestWizardModal: React.FC<CreateTestWizardModalProps> = ({
                       </IconButton>
                     </Box>
                   </AccordionSummary>
-                  <AccordionDetails>
+                  <AccordionDetails onPaste={(e) => handleQuestionPaste(qIndex, e)}>
                     <Stack spacing={2}>
                       <TextField
                         label="Número / Identificador da Questão"
@@ -1102,55 +1215,143 @@ export const CreateTestWizardModal: React.FC<CreateTestWizardModalProps> = ({
                         label="Enunciado da Questão"
                         value={q.enunciado}
                         onChange={(e) => handleUpdateQuestion(qIndex, 'enunciado', e.target.value)}
+                        onPaste={(e) => handleQuestionPaste(qIndex, e)}
                         multiline
                         rows={3}
                         fullWidth
                         size="small"
+                        placeholder="Digite o enunciado da questão (ou cole texto/imagens com Ctrl+V)..."
                       />
 
-                      {/* Question Images */}
-                      {q.images && q.images.length > 0 && (
-                        <Box sx={{ p: 1.5, border: '1px dashed', borderColor: 'divider', borderRadius: 2, bgcolor: 'action.hover' }}>
-                          <Typography variant="caption" sx={{ fontWeight: 700, color: 'text.secondary', display: 'block', mb: 1 }}>
-                            Imagens / Diagramas extraídos ({q.images.length}):
-                          </Typography>
-                          <Stack direction="row" spacing={1.5} flexWrap="wrap">
-                            {q.images.map((imgUrl, imgIdx) => (
-                              <Box
-                                key={imgIdx}
-                                sx={{
-                                  position: 'relative',
-                                  display: 'inline-block',
-                                }}
-                              >
-                                <ZoomableImage
-                                  src={imgUrl}
-                                  alt={`Diagrama ${imgIdx + 1} da Questão ${q.identifier}`}
-                                  maxHeight={140}
-                                  maxWidth={260}
-                                />
-                                <IconButton
-                                  size="small"
-                                  onClick={() => handleRemoveQuestionImage(qIndex, imgIdx)}
-                                  sx={{
-                                    position: 'absolute',
-                                    top: 6,
-                                    right: 6,
-                                    bgcolor: 'rgba(0,0,0,0.65)',
-                                    color: '#fff',
-                                    p: 0.4,
-                                    zIndex: 2,
-                                    '&:hover': { bgcolor: 'rgba(200,0,0,0.9)' },
-                                  }}
-                                  title="Remover imagem"
-                                >
-                                  <DeleteOutlineIcon sx={{ fontSize: '1rem' }} />
-                                </IconButton>
-                              </Box>
-                            ))}
+                      {/* Seção de Inserção e Pré-visualização de Imagens */}
+                      <Box sx={{ mt: 0.5, mb: 1 }}>
+                        <input
+                          type="file"
+                          ref={(el) => {
+                            fileInputRefs.current[qIndex] = el;
+                          }}
+                          accept="image/*"
+                          multiple
+                          style={{ display: 'none' }}
+                          onChange={(e) => {
+                            if (e.target.files) {
+                              handleAddQuestionImages(qIndex, e.target.files);
+                              e.target.value = '';
+                            }
+                          }}
+                        />
+
+                        {/* Drop & Paste Zone */}
+                        <Paper
+                          elevation={0}
+                          tabIndex={0}
+                          onPaste={(e) => handleQuestionPaste(qIndex, e)}
+                          onDragOver={(e) => {
+                            e.preventDefault();
+                            setDraggingQuestionIndex(qIndex);
+                          }}
+                          onDragLeave={() => setDraggingQuestionIndex(null)}
+                          onDrop={(e) => {
+                            e.preventDefault();
+                            setDraggingQuestionIndex(null);
+                            if (e.dataTransfer.files) {
+                              handleAddQuestionImages(qIndex, e.dataTransfer.files);
+                            }
+                          }}
+                          onClick={() => fileInputRefs.current[qIndex]?.click()}
+                          sx={{
+                            p: 1.5,
+                            textAlign: 'center',
+                            cursor: 'pointer',
+                            borderRadius: 2,
+                            border: '2px dashed',
+                            borderColor: draggingQuestionIndex === qIndex ? PALETTE_COLORS.primary : 'divider',
+                            backgroundColor: draggingQuestionIndex === qIndex
+                              ? 'rgba(217, 183, 99, 0.08)'
+                              : 'rgba(0, 0, 0, 0.02)',
+                            transition: 'all 0.2s ease',
+                            '&:hover': {
+                              borderColor: PALETTE_COLORS.primary,
+                              backgroundColor: 'rgba(217, 183, 99, 0.05)',
+                            },
+                          }}
+                        >
+                          <Stack direction="row" spacing={1.5} alignItems="center" justifyContent="center">
+                            <CloudUploadOutlinedIcon sx={{ color: PALETTE_COLORS.primary, fontSize: 24 }} />
+                            <Box sx={{ textAlign: 'left' }}>
+                              <Typography variant="body2" fontWeight={700} sx={{ fontSize: '0.85rem' }}>
+                                Clique para anexar imagens, arraste arquivos aqui ou cole com <Box component="span" sx={{ color: PALETTE_COLORS.primary }}>Ctrl+V</Box>
+                              </Typography>
+                              <Typography variant="caption" color="text.secondary">
+                                Suporta imagens em PNG, JPG, WEBP e colagens diretas da área de transferência
+                              </Typography>
+                            </Box>
                           </Stack>
-                        </Box>
-                      )}
+                        </Paper>
+
+                        {/* Gallery de imagens anexadas */}
+                        {q.images && q.images.length > 0 && (
+                          <Box sx={{ mt: 1.5, p: 1.5, border: '1px solid', borderColor: 'divider', borderRadius: 2, bgcolor: 'action.hover' }}>
+                            <Typography variant="caption" sx={{ fontWeight: 700, color: 'text.secondary', display: 'block', mb: 1 }}>
+                              Imagens / Diagramas anexados ({q.images.length}):
+                            </Typography>
+                            <Stack direction="row" spacing={1.5} flexWrap="wrap">
+                              {q.images.map((imgUrl, imgIdx) => (
+                                <Box
+                                  key={imgIdx}
+                                  sx={{
+                                    position: 'relative',
+                                    display: 'inline-block',
+                                    borderRadius: 1.5,
+                                    overflow: 'hidden',
+                                    border: '1px solid',
+                                    borderColor: 'divider',
+                                    bgcolor: 'background.paper',
+                                  }}
+                                >
+                                  <ZoomableImage
+                                    src={imgUrl}
+                                    alt={`Diagrama ${imgIdx + 1} da Questão ${q.identifier}`}
+                                    maxHeight={140}
+                                    maxWidth={260}
+                                  />
+                                  <Chip
+                                    size="small"
+                                    label={`Figura ${imgIdx + 1}`}
+                                    sx={{
+                                      position: 'absolute',
+                                      bottom: 6,
+                                      left: 6,
+                                      height: 20,
+                                      fontSize: '0.68rem',
+                                      fontWeight: 700,
+                                      backgroundColor: 'rgba(0, 0, 0, 0.7)',
+                                      color: '#ffffff',
+                                    }}
+                                  />
+                                  <IconButton
+                                    size="small"
+                                    onClick={() => handleRemoveQuestionImage(qIndex, imgIdx)}
+                                    sx={{
+                                      position: 'absolute',
+                                      top: 6,
+                                      right: 6,
+                                      bgcolor: 'rgba(0,0,0,0.65)',
+                                      color: '#fff',
+                                      p: 0.4,
+                                      zIndex: 2,
+                                      '&:hover': { bgcolor: 'error.main' },
+                                    }}
+                                    title="Remover imagem"
+                                  >
+                                    <DeleteOutlineIcon sx={{ fontSize: '1rem' }} />
+                                  </IconButton>
+                                </Box>
+                              ))}
+                            </Stack>
+                          </Box>
+                        )}
+                      </Box>
 
                       {/* Textual Reference Selector */}
                       {textualReferences.length > 0 && (
@@ -1557,6 +1758,7 @@ export const CreateTestWizardModal: React.FC<CreateTestWizardModalProps> = ({
                     return;
                   }
                   setErrorMessage(null);
+                  setQuestions((prev) => sortQuestionsByIdentifier(prev));
                   setActiveStep(2);
                 } else if (activeStep === 2) {
                   setActiveStep(3);
