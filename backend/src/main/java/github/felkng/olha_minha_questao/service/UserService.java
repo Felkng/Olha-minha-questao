@@ -25,6 +25,7 @@ public class UserService {
 
     private final UserRepository userRepository;
     private final QuestionAttemptRepository questionAttemptRepository;
+    private final github.felkng.olha_minha_questao.domain.repository.FlashcardSessionRepository flashcardSessionRepository;
     private final UserMapper userMapper;
     private final AuthService authService;
 
@@ -170,8 +171,10 @@ public class UserService {
             long uCorrect = uAttempts.stream().filter(qa -> Boolean.TRUE.equals(qa.getIsCorrect())).count();
             userRankingData.add(new long[]{u.getId(), uTotal, uCorrect});
 
-            if (uTotal > 0) {
-                double uAcc = (double) uCorrect / uTotal * 100.0;
+            boolean hasFlashcards = !flashcardSessionRepository.findByUserIdOrderByCreatedAtDesc(u.getId()).isEmpty();
+
+            if (uTotal > 0 || hasFlashcards) {
+                double uAcc = uTotal > 0 ? (double) uCorrect / uTotal * 100.0 : 0.0;
                 globalAccSum += uAcc;
                 globalResolvedSum += uTotal;
                 activeUsersCount++;
@@ -215,16 +218,130 @@ public class UserService {
                 .globalAverageResolved(globalAvgResolved)
                 .build();
 
-        List<Object[]> rawDaily = questionAttemptRepository.findDailyAttemptCountsByUserId(id);
-        List<DailyActivityDTO> dailyActivity = new ArrayList<>();
-        for (Object[] row : rawDaily) {
-            if (row != null && row.length >= 2 && row[0] != null) {
-                dailyActivity.add(DailyActivityDTO.builder()
-                        .date(row[0].toString())
-                        .count(((Number) row[1]).longValue())
-                        .build());
+        // Métricas de Sessões de Flashcard
+        List<github.felkng.olha_minha_questao.domain.entity.FlashcardSession> userSessions = flashcardSessionRepository.findByUserIdOrderByCreatedAtDesc(id);
+        long totalSessions = userSessions.size();
+        long totalCardsStudied = 0;
+        long totalCardsCorrect = 0;
+        long totalCardsWrong = 0;
+        long totalCardsSkipped = 0;
+        long totalFlashcardTimeSpent = 0;
+
+        java.util.Map<Long, String> fcAreaNames = new java.util.HashMap<>();
+        java.util.Map<Long, long[]> fcAreaStats = new java.util.HashMap<>();
+
+        java.util.Map<Long, String> fcSubjectNames = new java.util.HashMap<>();
+        java.util.Map<Long, long[]> fcSubjectStats = new java.util.HashMap<>();
+
+        for (github.felkng.olha_minha_questao.domain.entity.FlashcardSession s : userSessions) {
+            int cards = s.getTotalCards() != null ? s.getTotalCards() : 0;
+            int corr = s.getCorrectCount() != null ? s.getCorrectCount() : 0;
+            int wrg = s.getWrongCount() != null ? s.getWrongCount() : 0;
+            int skp = s.getSkippedCount() != null ? s.getSkippedCount() : 0;
+            int time = s.getTimeSpentSeconds() != null ? s.getTimeSpentSeconds() : 0;
+
+            totalCardsStudied += cards;
+            totalCardsCorrect += corr;
+            totalCardsWrong += wrg;
+            totalCardsSkipped += skp;
+            totalFlashcardTimeSpent += time;
+
+            if (s.getArea() != null) {
+                Long aId = s.getArea().getId();
+                fcAreaNames.put(aId, s.getArea().getName());
+                long[] stats = fcAreaStats.computeIfAbsent(aId, k -> new long[2]);
+                stats[0] += cards;
+                stats[1] += corr;
+            }
+
+            if (s.getSubject() != null) {
+                Long subId = s.getSubject().getId();
+                fcSubjectNames.put(subId, s.getSubject().getName());
+                long[] stats = fcSubjectStats.computeIfAbsent(subId, k -> new long[2]);
+                stats[0] += cards;
+                stats[1] += corr;
             }
         }
+
+        double fcGeneralAcc = totalCardsStudied > 0 ? (double) totalCardsCorrect / totalCardsStudied * 100.0 : 0.0;
+
+        List<github.felkng.olha_minha_questao.dto.user.CategoryPerformanceDTO> fcPerfByArea = fcAreaStats.entrySet().stream()
+                .map(e -> {
+                    long tot = e.getValue()[0];
+                    long corr = e.getValue()[1];
+                    double acc = tot > 0 ? (double) corr / tot * 100.0 : 0.0;
+                    return github.felkng.olha_minha_questao.dto.user.CategoryPerformanceDTO.builder()
+                            .id(e.getKey())
+                            .name(fcAreaNames.get(e.getKey()))
+                            .totalQuestions(tot)
+                            .correctAnswers(corr)
+                            .accuracyPercentage(Math.round(acc * 100.0) / 100.0)
+                            .build();
+                })
+                .sorted((a, b) -> Long.compare(b.getTotalQuestions(), a.getTotalQuestions()))
+                .toList();
+
+        List<github.felkng.olha_minha_questao.dto.user.CategoryPerformanceDTO> fcPerfBySubject = fcSubjectStats.entrySet().stream()
+                .map(e -> {
+                    long tot = e.getValue()[0];
+                    long corr = e.getValue()[1];
+                    double acc = tot > 0 ? (double) corr / tot * 100.0 : 0.0;
+                    return github.felkng.olha_minha_questao.dto.user.CategoryPerformanceDTO.builder()
+                            .id(e.getKey())
+                            .name(fcSubjectNames.get(e.getKey()))
+                            .totalQuestions(tot)
+                            .correctAnswers(corr)
+                            .accuracyPercentage(Math.round(acc * 100.0) / 100.0)
+                            .build();
+                })
+                .sorted((a, b) -> Long.compare(b.getTotalQuestions(), a.getTotalQuestions()))
+                .toList();
+
+        github.felkng.olha_minha_questao.dto.user.UserFlashcardStatsDTO flashcardStats = github.felkng.olha_minha_questao.dto.user.UserFlashcardStatsDTO.builder()
+                .totalSessions(totalSessions)
+                .totalCardsStudied(totalCardsStudied)
+                .totalCorrect(totalCardsCorrect)
+                .totalWrong(totalCardsWrong)
+                .totalSkipped(totalCardsSkipped)
+                .totalTimeSpentSeconds(totalFlashcardTimeSpent)
+                .generalAccuracyPercentage(Math.round(fcGeneralAcc * 100.0) / 100.0)
+                .performanceByArea(fcPerfByArea)
+                .performanceBySubject(fcPerfBySubject)
+                .build();
+
+        // Carimbo de Frequência Diária (Questões + Flashcards)
+        List<Object[]> rawDailyQuestions = questionAttemptRepository.findDailyAttemptCountsByUserId(id);
+        List<Object[]> rawDailyFlashcards = flashcardSessionRepository.findDailySessionCountsByUserId(id);
+
+        java.util.Map<String, DailyActivityDTO> activityMap = new java.util.HashMap<>();
+
+        for (Object[] row : rawDailyQuestions) {
+            if (row != null && row.length >= 2 && row[0] != null) {
+                String dateStr = row[0].toString();
+                long qCount = ((Number) row[1]).longValue();
+                DailyActivityDTO dto = activityMap.computeIfAbsent(dateStr, d -> DailyActivityDTO.builder().date(d).build());
+                dto.setQuestionsCount(qCount);
+            }
+        }
+
+        for (Object[] row : rawDailyFlashcards) {
+            if (row != null && row.length >= 3 && row[0] != null) {
+                String dateStr = row[0].toString();
+                long sCount = ((Number) row[1]).longValue();
+                long cardsCount = ((Number) row[2]).longValue();
+                DailyActivityDTO dto = activityMap.computeIfAbsent(dateStr, d -> DailyActivityDTO.builder().date(d).build());
+                dto.setFlashcardSessionsCount(sCount);
+                dto.setFlashcardsCount(cardsCount);
+            }
+        }
+
+        List<DailyActivityDTO> dailyActivity = activityMap.values().stream()
+                .peek(dto -> {
+                    long totalActivity = dto.getQuestionsCount() + (dto.getFlashcardsCount() > 0 ? dto.getFlashcardsCount() : dto.getFlashcardSessionsCount());
+                    dto.setCount(totalActivity);
+                })
+                .sorted(java.util.Comparator.comparing(DailyActivityDTO::getDate))
+                .toList();
 
         return UserProfileDTO.builder()
                 .id(user.getId())
@@ -243,6 +360,7 @@ public class UserService {
                 .performanceBySubject(performanceBySubject)
                 .performanceByOrigin(performanceByOrigin)
                 .comparison(comparison)
+                .flashcardStats(flashcardStats)
                 .build();
     }
 
