@@ -64,6 +64,21 @@ export interface AuthResponse {
 export interface DailyActivity {
   date: string;
   count: number;
+  questionsCount?: number;
+  flashcardSessionsCount?: number;
+  flashcardsCount?: number;
+}
+
+export interface UserFlashcardStats {
+  totalSessions: number;
+  totalCardsStudied: number;
+  totalCorrect: number;
+  totalWrong: number;
+  totalSkipped: number;
+  totalTimeSpentSeconds: number;
+  generalAccuracyPercentage: number;
+  performanceByArea?: CategoryPerformance[];
+  performanceBySubject?: CategoryPerformance[];
 }
 
 export interface CategoryPerformance {
@@ -102,6 +117,7 @@ export interface UserProfile {
   performanceBySubject?: CategoryPerformance[];
   performanceByOrigin?: CategoryPerformance[];
   comparison?: UserComparison;
+  flashcardStats?: UserFlashcardStats;
 }
 
 export interface TextualReference {

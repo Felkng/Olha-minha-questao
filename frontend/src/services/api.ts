@@ -106,6 +106,7 @@ export const getUserProfile = async (userId: number): Promise<UserProfile> => {
     performanceBySubject: d.performanceBySubject || [],
     performanceByOrigin: d.performanceByOrigin || [],
     comparison: d.comparison,
+    flashcardStats: d.flashcardStats,
   };
 };
 

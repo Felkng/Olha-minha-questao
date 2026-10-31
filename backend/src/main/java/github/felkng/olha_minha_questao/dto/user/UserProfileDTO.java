@@ -42,6 +42,9 @@ public class UserProfileDTO {
 
     private UserComparisonDTO comparison;
 
+    @Builder.Default
+    private UserFlashcardStatsDTO flashcardStats = new UserFlashcardStatsDTO();
+
     public long getTotalResolved() {
         return totalQuestionsResolved;
     }

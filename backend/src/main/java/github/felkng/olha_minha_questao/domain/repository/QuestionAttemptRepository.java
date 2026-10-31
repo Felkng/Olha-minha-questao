@@ -24,4 +24,7 @@ public interface QuestionAttemptRepository extends JpaRepository<QuestionAttempt
 
     @Query("SELECT COUNT(DISTINCT qa.user.id) FROM QuestionAttempt qa WHERE qa.user IS NOT NULL AND qa.createdAt >= :since")
     long countDistinctActiveUsersSince(@Param("since") Instant since);
+
+    @Query("SELECT DISTINCT qa.user.id FROM QuestionAttempt qa WHERE qa.user IS NOT NULL AND qa.createdAt >= :since")
+    List<Long> findDistinctUserIdsSince(@Param("since") Instant since);
 }

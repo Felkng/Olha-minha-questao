@@ -48,6 +48,7 @@ public class StatisticsService {
     private final OriginRepository originRepository;
     private final AreaRepository areaRepository;
     private final FlashcardRepository flashcardRepository;
+    private final github.felkng.olha_minha_questao.domain.repository.FlashcardSessionRepository flashcardSessionRepository;
 
     @Transactional
     public QuestionAttemptResponseDTO registerQuestionAttempt(Long questionId, QuestionAttemptRequestDTO dto) {
@@ -448,7 +449,9 @@ public class StatisticsService {
         long totalTests = testRepository.count();
         long totalFlashcards = flashcardRepository.count();
         java.time.Instant fiveDaysAgo = java.time.Instant.now().minus(5, java.time.temporal.ChronoUnit.DAYS);
-        long activeUsers = questionAttemptRepository.countDistinctActiveUsersSince(fiveDaysAgo);
+        java.util.Set<Long> activeUserIds = new java.util.HashSet<>(questionAttemptRepository.findDistinctUserIdsSince(fiveDaysAgo));
+        activeUserIds.addAll(flashcardSessionRepository.findDistinctUserIdsSince(fiveDaysAgo));
+        long activeUsers = activeUserIds.size();
         long totalOrigins = originRepository.count();
         long totalAreas = areaRepository.count();
         long totalAttempts = questionAttemptRepository.count();
