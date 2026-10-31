@@ -33,6 +33,7 @@ import {
 import { PALETTE_COLORS } from '../../theme/theme';
 import { EditQuestionModal } from './EditQuestionModal';
 import { CreateQuestionModal } from './CreateQuestionModal';
+import { sortQuestionsByIdentifier } from '../../utils/questionUtils';
 
 interface TestQuestionsManagerModalProps {
   open: boolean;
@@ -72,7 +73,7 @@ export const TestQuestionsManagerModal: React.FC<TestQuestionsManagerModalProps>
     setErrorMessage(null);
     try {
       const res = await getTestEvaluation(test.id);
-      setQuestions(res.questions || []);
+      setQuestions(sortQuestionsByIdentifier(res.questions || []));
     } catch (err: any) {
       console.error(err);
       setErrorMessage('Erro ao carregar questões da prova.');

@@ -25,6 +25,7 @@ import { TextualReferenceDrawer } from '../components/questions/TextualReference
 import { ShareResultsModal } from '../components/simulations/ShareResultsModal';
 import { FormattedText } from '../components/common/FormattedText';
 import { ZoomableImage } from '../components/common/ZoomableImage';
+import { sortQuestionsByIdentifier } from '../utils/questionUtils';
 
 export const TestAttemptReviewPage: React.FC = () => {
   const { testId, attemptId } = useParams<{ testId: string; attemptId: string }>();
@@ -56,7 +57,10 @@ export const TestAttemptReviewPage: React.FC = () => {
         getTestEvaluation(tId),
       ]);
       setAttempt(attemptData);
-      setEvaluation(evalData);
+      setEvaluation({
+        ...evalData,
+        questions: sortQuestionsByIdentifier(evalData.questions || []),
+      });
     } catch (err: any) {
       console.error('Erro ao carregar detalhes da tentativa:', err);
       setError('Não foi possível carregar os dados desta tentativa.');

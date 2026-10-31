@@ -89,7 +89,9 @@ public class TestService {
                 .orElseThrow(() -> new ResourceNotFoundException("Prova não encontrada com o id: " + id));
 
         List<Question> questions = questionRepository.findAllQuestionsByTestId(id);
+        var comparator = new github.felkng.olha_minha_questao.util.QuestionIdentifierComparator();
         List<QuestionResponseDTO> questionDTOs = questions.stream()
+                .sorted((q1, q2) -> comparator.compare(q1.getIdentifier(), q2.getIdentifier()))
                 .map(questionMapper::toDTO)
                 .toList();
 
@@ -221,6 +223,11 @@ public class TestService {
     @Transactional
     public TestResponseDTO createWithQuestions(github.felkng.olha_minha_questao.dto.test.TestWithQuestionsRequestDTO dto, Long userId) {
         if (dto.getQuestions() != null && !dto.getQuestions().isEmpty()) {
+            var comparator = new github.felkng.olha_minha_questao.util.QuestionIdentifierComparator();
+            var sortedQuestions = new java.util.ArrayList<>(dto.getQuestions());
+            sortedQuestions.sort((q1, q2) -> comparator.compare(q1.getIdentifier(), q2.getIdentifier()));
+            dto.setQuestions(sortedQuestions);
+
             java.util.Set<String> seen = new java.util.HashSet<>();
             for (var q : dto.getQuestions()) {
                 String iden = q.getIdentifier() != null ? q.getIdentifier().trim().toLowerCase() : "";

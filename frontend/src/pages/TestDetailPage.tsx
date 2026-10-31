@@ -50,6 +50,7 @@ import { TestQuestionsManagerModal } from '../components/crud/TestQuestionsManag
 import { PALETTE_COLORS } from '../theme/theme';
 import { useAppTheme } from '../theme/ThemeContext';
 import { useAuth } from '../context/AuthContext';
+import { sortQuestionsByIdentifier } from '../utils/questionUtils';
 
 interface TestDetailPageProps {
   onBookmarkQuestion?: (question: Question) => void;
@@ -107,7 +108,7 @@ export const TestDetailPage: React.FC<TestDetailPageProps> = ({
         getTestAttempts(tId, userId).catch(() => []),
       ]);
       setTest(testData);
-      setQuestions(evalData.questions || []);
+      setQuestions(sortQuestionsByIdentifier(evalData.questions || []));
       setAttempts(attemptsData || []);
     } catch (err) {
       console.error('Erro ao carregar dados da prova:', err);
@@ -471,6 +472,8 @@ export const TestDetailPage: React.FC<TestDetailPageProps> = ({
           <QuestionCard
             question={questions[activeQuestionIndex]}
             onBookmarkClick={onBookmarkQuestion}
+            onUpdated={() => loadTest(Number(id))}
+            onDelete={() => loadTest(Number(id))}
           />
 
           {/* Lousa de Raciocínio Interativa da Questão */}
@@ -544,6 +547,8 @@ export const TestDetailPage: React.FC<TestDetailPageProps> = ({
               key={q.id}
               question={q}
               onBookmarkClick={onBookmarkQuestion}
+              onUpdated={() => loadTest(Number(id))}
+              onDelete={() => loadTest(Number(id))}
             />
           ))}
         </Box>

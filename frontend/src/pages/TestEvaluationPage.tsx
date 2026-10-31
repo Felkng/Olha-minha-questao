@@ -44,6 +44,7 @@ import { TestQuestionsNavigator } from '../components/questions/TestQuestionsNav
 import { QuestionWhiteboard } from '../components/whiteboard/QuestionWhiteboard';
 import { ShareResultsModal } from '../components/simulations/ShareResultsModal';
 import { useAuth } from '../context/AuthContext';
+import { sortQuestionsByIdentifier } from '../utils/questionUtils';
 
 export const TestEvaluationPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -89,7 +90,11 @@ export const TestEvaluationPage: React.FC = () => {
     setLoading(true);
     try {
       const data = await getTestEvaluation(testId);
-      setEvaluation(data);
+      const sortedData = {
+        ...data,
+        questions: sortQuestionsByIdentifier(data.questions || []),
+      };
+      setEvaluation(sortedData);
 
       // Check if there is an active session in progress for this test
       const stored = localStorage.getItem('omq_active_test_session');
