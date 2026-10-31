@@ -1,5 +1,4 @@
 from fastapi import FastAPI, UploadFile, File, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
 from parser import parse_exam_pdf, parse_answer_key_pdf
 import logging
 
@@ -7,14 +6,6 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("pdf-worker")
 
 app = FastAPI(title="Olha Minha Questão - PDF Worker", version="1.0.0")
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
 
 @app.get("/health")
 def health():
