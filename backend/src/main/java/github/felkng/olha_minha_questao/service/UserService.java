@@ -234,10 +234,11 @@ public class UserService {
         java.util.Map<Long, long[]> fcSubjectStats = new java.util.HashMap<>();
 
         for (github.felkng.olha_minha_questao.domain.entity.FlashcardSession s : userSessions) {
-            int cards = s.getTotalCards() != null ? s.getTotalCards() : 0;
             int corr = s.getCorrectCount() != null ? s.getCorrectCount() : 0;
             int wrg = s.getWrongCount() != null ? s.getWrongCount() : 0;
             int skp = s.getSkippedCount() != null ? s.getSkippedCount() : 0;
+            int answeredCards = corr + wrg + skp;
+            int cards = Boolean.TRUE.equals(s.getCompleted()) ? (s.getTotalCards() != null ? s.getTotalCards() : answeredCards) : answeredCards;
             int time = s.getTimeSpentSeconds() != null ? s.getTimeSpentSeconds() : 0;
 
             totalCardsStudied += cards;

@@ -31,7 +31,10 @@ public class FlashcardSessionResponseDTO {
     private Integer skippedCount;
     private Integer timeSpentSeconds;
     private Double accuracyPercentage;
+    private Boolean completed;
+    private List<Long> cardIds;
     private Instant createdAt;
+    private Instant updatedAt;
     @Builder.Default
     private List<FlashcardSessionItemDTO> items = new ArrayList<>();
 }

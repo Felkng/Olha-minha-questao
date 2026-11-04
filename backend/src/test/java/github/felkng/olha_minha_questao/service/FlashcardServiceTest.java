@@ -29,6 +29,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
@@ -38,6 +39,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -232,5 +234,147 @@ class FlashcardServiceTest {
         assertNotNull(list);
         assertEquals(1, list.size());
         assertEquals(90, list.get(0).getTimeSpentSeconds());
+    }
+
+    @Test
+    @DisplayName("Deve registrar sessão de estudo incompleta")
+    void shouldSaveIncompleteFlashcardSession() {
+        FlashcardSessionRequestDTO sessionReq = FlashcardSessionRequestDTO.builder()
+                .totalCards(10)
+                .timeSpentSeconds(45)
+                .completed(false)
+                .cardIds(List.of(10L, 20L, 30L))
+                .items(List.of(
+                        FlashcardSessionItemDTO.builder().flashcardId(10L).status("CORRECT").build()
+                ))
+                .build();
+
+        when(userRepository.findById(1L)).thenReturn(Optional.of(user1));
+        when(flashcardRepository.findById(10L)).thenReturn(Optional.of(publicCard));
+        when(flashcardSessionRepository.save(any(FlashcardSession.class))).thenAnswer(inv -> {
+            FlashcardSession s = inv.getArgument(0);
+            s.setId(88L);
+            return s;
+        });
+        when(flashcardSessionItemRepository.save(any(FlashcardSessionItem.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(flashcardMapper.toSessionDTO(any(FlashcardSession.class))).thenAnswer(inv -> {
+            FlashcardSession s = inv.getArgument(0);
+            return FlashcardSessionResponseDTO.builder()
+                    .id(88L)
+                    .totalCards(s.getTotalCards())
+                    .correctCount(s.getCorrectCount())
+                    .wrongCount(s.getWrongCount())
+                    .skippedCount(s.getSkippedCount())
+                    .timeSpentSeconds(s.getTimeSpentSeconds())
+                    .completed(s.getCompleted())
+                    .cardIds(List.of(10L, 20L, 30L))
+                    .accuracyPercentage(100.0)
+                    .build();
+        });
+
+        FlashcardSessionResponseDTO sessionRes = flashcardService.saveSession(sessionReq, 1L);
+        assertNotNull(sessionRes);
+        assertEquals(10, sessionRes.getTotalCards());
+        assertEquals(1, sessionRes.getCorrectCount());
+        assertFalse(sessionRes.getCompleted());
+        assertEquals(45, sessionRes.getTimeSpentSeconds());
+    }
+
+    @Test
+    @DisplayName("Deve atualizar sessão existente e marcar como concluída")
+    void shouldUpdateSession() {
+        FlashcardSession existingSession = FlashcardSession.builder()
+                .id(88L)
+                .user(user1)
+                .totalCards(10)
+                .correctCount(1)
+                .wrongCount(0)
+                .skippedCount(0)
+                .timeSpentSeconds(45)
+                .completed(false)
+                .items(new ArrayList<>())
+                .build();
+
+        FlashcardSessionRequestDTO updateReq = FlashcardSessionRequestDTO.builder()
+                .timeSpentSeconds(120)
+                .completed(true)
+                .items(List.of(
+                        FlashcardSessionItemDTO.builder().flashcardId(10L).status("CORRECT").build(),
+                        FlashcardSessionItemDTO.builder().flashcardId(20L).status("WRONG").build()
+                ))
+                .build();
+
+        when(flashcardSessionRepository.findById(88L)).thenReturn(Optional.of(existingSession));
+        when(userRepository.findById(1L)).thenReturn(Optional.of(user1));
+        when(flashcardRepository.findById(10L)).thenReturn(Optional.of(publicCard));
+        when(flashcardRepository.findById(20L)).thenReturn(Optional.of(privateCard));
+        when(flashcardSessionRepository.save(any(FlashcardSession.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(flashcardMapper.toSessionDTO(any(FlashcardSession.class))).thenAnswer(inv -> {
+            FlashcardSession s = inv.getArgument(0);
+            return FlashcardSessionResponseDTO.builder()
+                    .id(88L)
+                    .totalCards(s.getTotalCards())
+                    .correctCount(s.getCorrectCount())
+                    .wrongCount(s.getWrongCount())
+                    .skippedCount(s.getSkippedCount())
+                    .timeSpentSeconds(s.getTimeSpentSeconds())
+                    .completed(s.getCompleted())
+                    .accuracyPercentage(50.0)
+                    .build();
+        });
+
+        FlashcardSessionResponseDTO updated = flashcardService.updateSession(88L, updateReq, 1L);
+        assertNotNull(updated);
+        assertTrue(updated.getCompleted());
+        assertEquals(1, updated.getCorrectCount());
+        assertEquals(1, updated.getWrongCount());
+        assertEquals(120, updated.getTimeSpentSeconds());
+    }
+
+    @Test
+    @DisplayName("Deve buscar sessão por ID")
+    void shouldGetSessionById() {
+        FlashcardSession session = FlashcardSession.builder()
+                .id(100L)
+                .user(user1)
+                .totalCards(5)
+                .correctCount(4)
+                .wrongCount(1)
+                .skippedCount(0)
+                .timeSpentSeconds(90)
+                .completed(true)
+                .build();
+
+        when(flashcardSessionRepository.findById(100L)).thenReturn(Optional.of(session));
+        when(userRepository.findById(1L)).thenReturn(Optional.of(user1));
+        when(flashcardMapper.toSessionDTO(session)).thenReturn(FlashcardSessionResponseDTO.builder()
+                .id(100L)
+                .totalCards(5)
+                .correctCount(4)
+                .wrongCount(1)
+                .timeSpentSeconds(90)
+                .completed(true)
+                .accuracyPercentage(80.0)
+                .build());
+
+        FlashcardSessionResponseDTO found = flashcardService.getSessionById(100L, 1L);
+        assertNotNull(found);
+        assertEquals(100L, found.getId());
+        assertTrue(found.getCompleted());
+    }
+
+    @Test
+    @DisplayName("Deve excluir sessão de estudo")
+    void shouldDeleteSession() {
+        FlashcardSession session = FlashcardSession.builder()
+                .id(100L)
+                .user(user1)
+                .build();
+
+        when(flashcardSessionRepository.findById(100L)).thenReturn(Optional.of(session));
+        when(userRepository.findById(1L)).thenReturn(Optional.of(user1));
+
+        flashcardService.deleteSession(100L, 1L);
+        verify(flashcardSessionRepository, times(1)).delete(session);
     }
 }

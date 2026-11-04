@@ -54,6 +54,7 @@ public class FlashcardService {
 
     @Transactional(readOnly = true)
     public Page<FlashcardResponseDTO> findAll(
+            List<Long> ids,
             Long areaId,
             Long subjectId,
             Long folderId,
@@ -64,6 +65,10 @@ public class FlashcardService {
 
         Specification<Flashcard> spec = (root, query, cb) -> {
             List<Predicate> predicates = new ArrayList<>();
+
+            if (ids != null && !ids.isEmpty()) {
+                predicates.add(root.get("id").in(ids));
+            }
 
             // Regra de Privacidade
             if (currentUserId == null) {
@@ -280,6 +285,13 @@ public class FlashcardService {
             subject = subjectRepository.findById(dto.getSubjectId()).orElse(null);
         }
 
+        int totalCards = dto.getTotalCards() != null ? dto.getTotalCards()
+                : (dto.getItems() != null ? dto.getItems().size() : 0);
+        boolean completed = dto.getCompleted() != null ? dto.getCompleted() : true;
+        String cardIdsStr = dto.getCardIds() != null && !dto.getCardIds().isEmpty()
+                ? String.join(",", dto.getCardIds().stream().map(String::valueOf).toList())
+                : null;
+
         int correct = 0;
         int wrong = 0;
         int skipped = 0;
@@ -292,37 +304,41 @@ public class FlashcardService {
                 .folder(folder)
                 .area(area)
                 .subject(subject)
-                .totalCards(dto.getItems().size())
+                .totalCards(totalCards)
                 .correctCount(0)
                 .wrongCount(0)
                 .skippedCount(0)
                 .timeSpentSeconds(dto.getTimeSpentSeconds() != null ? dto.getTimeSpentSeconds() : 0)
+                .completed(completed)
+                .cardIds(cardIdsStr)
                 .build();
 
         FlashcardSession savedSession = flashcardSessionRepository.save(session);
 
-        for (FlashcardSessionItemDTO itemDTO : dto.getItems()) {
-            Flashcard card = flashcardRepository.findById(itemDTO.getFlashcardId()).orElse(null);
-            if (card == null) continue;
-            participatingCards.add(card);
+        if (dto.getItems() != null) {
+            for (FlashcardSessionItemDTO itemDTO : dto.getItems()) {
+                Flashcard card = flashcardRepository.findById(itemDTO.getFlashcardId()).orElse(null);
+                if (card == null) continue;
+                participatingCards.add(card);
 
-            String status = itemDTO.getStatus() != null ? itemDTO.getStatus().toUpperCase() : "SKIPPED";
-            if ("CORRECT".equals(status)) {
-                correct++;
-            } else if ("WRONG".equals(status)) {
-                wrong++;
-            } else {
-                skipped++;
-                status = "SKIPPED";
+                String status = itemDTO.getStatus() != null ? itemDTO.getStatus().toUpperCase() : "SKIPPED";
+                if ("CORRECT".equals(status)) {
+                    correct++;
+                } else if ("WRONG".equals(status)) {
+                    wrong++;
+                } else {
+                    skipped++;
+                    status = "SKIPPED";
+                }
+
+                FlashcardSessionItem item = FlashcardSessionItem.builder()
+                        .session(savedSession)
+                        .flashcard(card)
+                        .status(status)
+                        .build();
+
+                sessionItems.add(flashcardSessionItemRepository.save(item));
             }
-
-            FlashcardSessionItem item = FlashcardSessionItem.builder()
-                    .session(savedSession)
-                    .flashcard(card)
-                    .status(status)
-                    .build();
-
-            sessionItems.add(flashcardSessionItemRepository.save(item));
         }
 
         // Se area ou subject não foram explicitamente informados, derivar das cartas praticadas se forem homogêneas
@@ -350,6 +366,123 @@ public class FlashcardService {
         FlashcardSessionResponseDTO response = flashcardMapper.toSessionDTO(savedSession);
         response.setItems(sessionItems.stream().map(flashcardMapper::toItemDTO).toList());
         return response;
+    }
+
+    @Transactional
+    public FlashcardSessionResponseDTO updateSession(Long sessionId, FlashcardSessionRequestDTO dto, Long userId) {
+        FlashcardSession session = flashcardSessionRepository.findById(sessionId)
+                .orElseThrow(() -> new ResourceNotFoundException("Sessão não encontrada com o id: " + sessionId));
+
+        if (userId != null && session.getUser() != null) {
+            User user = userRepository.findById(userId).orElse(null);
+            if (user != null && user.getRole() != UserRole.ADMIN && !session.getUser().getId().equals(userId)) {
+                throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Você não tem permissão para alterar esta sessão.");
+            }
+        }
+
+        if (dto.getTimeSpentSeconds() != null) {
+            session.setTimeSpentSeconds(dto.getTimeSpentSeconds());
+        }
+        if (dto.getCompleted() != null) {
+            session.setCompleted(dto.getCompleted());
+        }
+        if (dto.getTotalCards() != null && dto.getTotalCards() > 0) {
+            session.setTotalCards(dto.getTotalCards());
+        }
+        if (dto.getCardIds() != null && !dto.getCardIds().isEmpty()) {
+            session.setCardIds(String.join(",", dto.getCardIds().stream().map(String::valueOf).toList()));
+        }
+
+        if (dto.getItems() != null) {
+            // Remove itens anteriores para persistir a lista atualizada
+            flashcardSessionItemRepository.deleteAll(session.getItems());
+            session.getItems().clear();
+
+            int correct = 0;
+            int wrong = 0;
+            int skipped = 0;
+            List<FlashcardSessionItem> sessionItems = new ArrayList<>();
+            List<Flashcard> participatingCards = new ArrayList<>();
+
+            for (FlashcardSessionItemDTO itemDTO : dto.getItems()) {
+                Flashcard card = flashcardRepository.findById(itemDTO.getFlashcardId()).orElse(null);
+                if (card == null) continue;
+                participatingCards.add(card);
+
+                String status = itemDTO.getStatus() != null ? itemDTO.getStatus().toUpperCase() : "SKIPPED";
+                if ("CORRECT".equals(status)) {
+                    correct++;
+                } else if ("WRONG".equals(status)) {
+                    wrong++;
+                } else {
+                    skipped++;
+                    status = "SKIPPED";
+                }
+
+                FlashcardSessionItem item = FlashcardSessionItem.builder()
+                        .session(session)
+                        .flashcard(card)
+                        .status(status)
+                        .build();
+
+                sessionItems.add(flashcardSessionItemRepository.save(item));
+            }
+
+            if (session.getArea() == null && !participatingCards.isEmpty()) {
+                Area firstArea = participatingCards.get(0).getArea();
+                if (firstArea != null && participatingCards.stream().allMatch(c -> c.getArea() != null && c.getArea().getId().equals(firstArea.getId()))) {
+                    session.setArea(firstArea);
+                }
+            }
+            if (session.getSubject() == null && !participatingCards.isEmpty()) {
+                Subject firstSubject = participatingCards.get(0).getSubject();
+                if (firstSubject != null && participatingCards.stream().allMatch(c -> c.getSubject() != null && c.getSubject().getId().equals(firstSubject.getId()))) {
+                    session.setSubject(firstSubject);
+                }
+            }
+
+            session.setCorrectCount(correct);
+            session.setWrongCount(wrong);
+            session.setSkippedCount(skipped);
+            session.setItems(sessionItems);
+        }
+
+        FlashcardSession updated = flashcardSessionRepository.save(session);
+        FlashcardSessionResponseDTO response = flashcardMapper.toSessionDTO(updated);
+        response.setItems(updated.getItems().stream().map(flashcardMapper::toItemDTO).toList());
+        return response;
+    }
+
+    @Transactional(readOnly = true)
+    public FlashcardSessionResponseDTO getSessionById(Long sessionId, Long userId) {
+        FlashcardSession session = flashcardSessionRepository.findById(sessionId)
+                .orElseThrow(() -> new ResourceNotFoundException("Sessão não encontrada com o id: " + sessionId));
+
+        if (userId != null && session.getUser() != null) {
+            User user = userRepository.findById(userId).orElse(null);
+            if (user != null && user.getRole() != UserRole.ADMIN && !session.getUser().getId().equals(userId)) {
+                throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Você não tem permissão para visualizar esta sessão.");
+            }
+        }
+
+        FlashcardSessionResponseDTO dto = flashcardMapper.toSessionDTO(session);
+        dto.setItems(session.getItems().stream().map(flashcardMapper::toItemDTO).toList());
+        return dto;
+    }
+
+    @Transactional
+    public void deleteSession(Long sessionId, Long userId) {
+        FlashcardSession session = flashcardSessionRepository.findById(sessionId)
+                .orElseThrow(() -> new ResourceNotFoundException("Sessão não encontrada com o id: " + sessionId));
+
+        if (userId != null && session.getUser() != null) {
+            User user = userRepository.findById(userId).orElse(null);
+            if (user != null && user.getRole() != UserRole.ADMIN && !session.getUser().getId().equals(userId)) {
+                throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Você não tem permissão para excluir esta sessão.");
+            }
+        }
+
+        flashcardSessionRepository.delete(session);
     }
 
     @Transactional(readOnly = true)

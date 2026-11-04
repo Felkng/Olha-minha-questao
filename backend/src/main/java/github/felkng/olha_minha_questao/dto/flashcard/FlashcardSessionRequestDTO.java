@@ -1,7 +1,6 @@
 package github.felkng.olha_minha_questao.dto.flashcard;
 
 import jakarta.validation.Valid;
-import jakarta.validation.constraints.NotEmpty;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -21,10 +20,12 @@ public class FlashcardSessionRequestDTO {
     private Long areaId;
     private Long subjectId;
 
+    private Integer totalCards;
     private Integer timeSpentSeconds;
+    private Boolean completed;
+    private List<Long> cardIds;
 
     @Valid
-    @NotEmpty(message = "A sessão deve conter ao menos um item praticado")
     @Builder.Default
     private List<FlashcardSessionItemDTO> items = new ArrayList<>();
 }

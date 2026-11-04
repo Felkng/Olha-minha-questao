@@ -37,6 +37,7 @@ public class FlashcardController {
 
     @GetMapping
     public ResponseEntity<Page<FlashcardResponseDTO>> findAll(
+            @RequestParam(required = false) List<Long> ids,
             @RequestParam(required = false) Long areaId,
             @RequestParam(required = false) Long subjectId,
             @RequestParam(required = false) Long folderId,
@@ -52,7 +53,7 @@ public class FlashcardController {
                     Sort.by(Sort.Direction.DESC, "updatedAt").and(Sort.by(Sort.Direction.DESC, "id"))
             );
         }
-        return ResponseEntity.ok(flashcardService.findAll(areaId, subjectId, folderId, search, createdByUserId, currentUserId, effectivePageable));
+        return ResponseEntity.ok(flashcardService.findAll(ids, areaId, subjectId, folderId, search, createdByUserId, currentUserId, effectivePageable));
     }
 
     @GetMapping("/{id}")
@@ -98,6 +99,29 @@ public class FlashcardController {
             @Valid @RequestBody FlashcardSessionRequestDTO dto,
             @RequestHeader(value = "X-User-Id", required = false) Long userId) {
         return ResponseEntity.ok(flashcardService.saveSession(dto, userId));
+    }
+
+    @GetMapping("/sessions/{id}")
+    public ResponseEntity<FlashcardSessionResponseDTO> getSessionById(
+            @PathVariable Long id,
+            @RequestHeader(value = "X-User-Id", required = false) Long userId) {
+        return ResponseEntity.ok(flashcardService.getSessionById(id, userId));
+    }
+
+    @PutMapping("/sessions/{id}")
+    public ResponseEntity<FlashcardSessionResponseDTO> updateSession(
+            @PathVariable Long id,
+            @Valid @RequestBody FlashcardSessionRequestDTO dto,
+            @RequestHeader(value = "X-User-Id", required = false) Long userId) {
+        return ResponseEntity.ok(flashcardService.updateSession(id, dto, userId));
+    }
+
+    @DeleteMapping("/sessions/{id}")
+    public ResponseEntity<Void> deleteSession(
+            @PathVariable Long id,
+            @RequestHeader(value = "X-User-Id", required = false) Long userId) {
+        flashcardService.deleteSession(id, userId);
+        return ResponseEntity.noContent().build();
     }
 
     @GetMapping("/sessions/my")
