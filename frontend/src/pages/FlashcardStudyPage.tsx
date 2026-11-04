@@ -11,6 +11,13 @@ import {
   Grid,
   Skeleton,
   Tooltip,
+  IconButton,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogContentText,
+  DialogActions,
+  Alert,
 } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import FlipCameraAndroidIcon from '@mui/icons-material/FlipCameraAndroid';
@@ -24,9 +31,20 @@ import KeyboardIcon from '@mui/icons-material/Keyboard';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import ShuffleIcon from '@mui/icons-material/Shuffle';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
+import PauseIcon from '@mui/icons-material/Pause';
+import PlayArrowIcon from '@mui/icons-material/PlayArrow';
+import PauseCircleOutlineIcon from '@mui/icons-material/PauseCircleOutline';
+import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import { useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import { Flashcard, FlashcardItemStatus, FlashcardSessionItem } from '../types';
-import { getFlashcards, getFlashcardsInFolder, submitFlashcardSession } from '../services/api';
+import {
+  getFlashcards,
+  getFlashcardsInFolder,
+  getFlashcardSession,
+  submitFlashcardSession,
+  updateFlashcardSession,
+  deleteFlashcardSession,
+} from '../services/api';
 import { PALETTE_COLORS } from '../theme/theme';
 import { useAppTheme } from '../theme/ThemeContext';
 import { useAuth } from '../context/AuthContext';
@@ -63,6 +81,7 @@ export const FlashcardStudyPage: React.FC = () => {
   const areaIdParam = searchParams.get('areaId');
   const subjectIdParam = searchParams.get('subjectId');
   const searchParam = searchParams.get('search');
+  const sessionIdParam = searchParams.get('sessionId');
   const shuffleParam = searchParams.get('shuffle') === 'true' || searchParams.get('random') === 'true';
   const folderId = folderIdParam ? Number(folderIdParam) : undefined;
 
@@ -90,10 +109,19 @@ export const FlashcardStudyPage: React.FC = () => {
   const [isRandomMode, setIsRandomMode] = useState<boolean>(shuffleParam);
   const [loading, setLoading] = useState(true);
 
-  // Timer state
+  // Active Session tracking
+  const [activeSessionId, setActiveSessionId] = useState<number | null>(
+    sessionIdParam ? Number(sessionIdParam) : null
+  );
+
+  // Timer & Pause State
   const [elapsedSeconds, setElapsedSeconds] = useState<number>(0);
+  const [isPaused, setIsPaused] = useState<boolean>(false);
   const startTimeRef = React.useRef<number>(Date.now());
   const timerIntervalRef = React.useRef<any>(null);
+
+  // Exit dialog
+  const [exitDialogOpen, setExitDialogOpen] = useState<boolean>(false);
 
   // Session State
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -104,42 +132,115 @@ export const FlashcardStudyPage: React.FC = () => {
   const [isFinished, setIsFinished] = useState(false);
   const [submittingSession, setSubmittingSession] = useState(false);
 
+  const togglePause = useCallback(() => {
+    setIsPaused((prev) => {
+      const next = !prev;
+      if (next) {
+        // Pausando
+        const cur = Math.max(0, Math.floor((Date.now() - startTimeRef.current) / 1000));
+        setElapsedSeconds(cur);
+        if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
+      } else {
+        // Retomando
+        startTimeRef.current = Date.now() - elapsedSeconds * 1000;
+      }
+      return next;
+    });
+  }, [elapsedSeconds]);
+
   useEffect(() => {
-    if (!loading && !isFinished && cards.length > 0) {
+    if (!loading && !isFinished && !isPaused && cards.length > 0) {
       startTimeRef.current = Date.now() - elapsedSeconds * 1000;
       timerIntervalRef.current = setInterval(() => {
         setElapsedSeconds(Math.floor((Date.now() - startTimeRef.current) / 1000));
       }, 1000);
+    } else {
+      if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
     }
 
     return () => {
       if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
     };
-  }, [loading, isFinished, cards.length]);
+  }, [loading, isFinished, isPaused, cards.length]);
 
-  // Load cards for study
+  // Load cards for study (or resume session)
   const loadCards = async () => {
     setLoading(true);
     try {
-      let fetchedCards: Flashcard[] = [];
-      if (folderId) {
-        fetchedCards = await getFlashcardsInFolder(folderId, {
-          areaId: areaIdParam ? Number(areaIdParam) : undefined,
-          subjectId: subjectIdParam ? Number(subjectIdParam) : undefined,
-          search: searchParam || undefined,
+      if (sessionIdParam) {
+        const session = await getFlashcardSession(Number(sessionIdParam));
+        setActiveSessionId(session.id);
+        const savedSeconds = session.timeSpentSeconds || 0;
+        setElapsedSeconds(savedSeconds);
+        startTimeRef.current = Date.now() - savedSeconds * 1000;
+
+        let fetchedCards: Flashcard[] = [];
+        if (session.cardIds && session.cardIds.length > 0) {
+          const res = await getFlashcards({
+            ids: session.cardIds,
+            size: 1000,
+          });
+          const cardMap = new Map(res.content.map((c) => [c.id, c]));
+          fetchedCards = session.cardIds
+            .map((id) => cardMap.get(id))
+            .filter(Boolean) as Flashcard[];
+        } else if (session.folderId) {
+          fetchedCards = await getFlashcardsInFolder(session.folderId);
+        } else {
+          const res = await getFlashcards({
+            areaId: session.areaId ?? '',
+            subjectId: session.subjectId ?? '',
+            size: 1000,
+          });
+          fetchedCards = res.content;
+        }
+
+        setOriginalCards(fetchedCards);
+        setCards(fetchedCards);
+
+        // Restaurar respostas prévias
+        const cardMap = new Map(fetchedCards.map((c) => [c.id, c]));
+        const restoredResults = (session.items || []).map((item) => {
+          const cardObj = cardMap.get(item.flashcardId) || ({
+            id: item.flashcardId,
+            front: item.flashcardFront || '',
+            back: item.flashcardBack || '',
+            areaName: item.areaName,
+            subjectName: item.subjectName,
+          } as Flashcard);
+          return {
+            card: cardObj,
+            status: item.status,
+          };
         });
+
+        setSessionResults(restoredResults);
+        const nextIndex = restoredResults.length;
+        setCurrentIndex(nextIndex);
+        if (nextIndex >= fetchedCards.length && fetchedCards.length > 0) {
+          setIsFinished(true);
+        }
       } else {
-        const res = await getFlashcards({
-          areaId: areaIdParam ? Number(areaIdParam) : '',
-          subjectId: subjectIdParam ? Number(subjectIdParam) : '',
-          search: searchParam || undefined,
-          size: 1000,
-          sort: 'updatedAt,desc',
-        });
-        fetchedCards = res.content;
+        let fetchedCards: Flashcard[] = [];
+        if (folderId) {
+          fetchedCards = await getFlashcardsInFolder(folderId, {
+            areaId: areaIdParam ? Number(areaIdParam) : undefined,
+            subjectId: subjectIdParam ? Number(subjectIdParam) : undefined,
+            search: searchParam || undefined,
+          });
+        } else {
+          const res = await getFlashcards({
+            areaId: areaIdParam ? Number(areaIdParam) : '',
+            subjectId: subjectIdParam ? Number(subjectIdParam) : '',
+            search: searchParam || undefined,
+            size: 1000,
+            sort: 'updatedAt,desc',
+          });
+          fetchedCards = res.content;
+        }
+        setOriginalCards(fetchedCards);
+        setCards(isRandomMode ? shuffleArray(fetchedCards) : fetchedCards);
       }
-      setOriginalCards(fetchedCards);
-      setCards(isRandomMode ? shuffleArray(fetchedCards) : fetchedCards);
     } catch (err) {
       console.error('Erro ao carregar flashcards para estudo:', err);
     } finally {
@@ -149,7 +250,7 @@ export const FlashcardStudyPage: React.FC = () => {
 
   useEffect(() => {
     loadCards();
-  }, [folderIdParam, areaIdParam, subjectIdParam, searchParam]);
+  }, [folderIdParam, areaIdParam, subjectIdParam, searchParam, sessionIdParam]);
 
   const toggleRandomMode = () => {
     const nextRandom = !isRandomMode;
@@ -177,25 +278,68 @@ export const FlashcardStudyPage: React.FC = () => {
   const currentCard = cards[currentIndex];
 
   const handleNextCard = (status: FlashcardItemStatus) => {
-    if (!currentCard) return;
+    if (!currentCard || isPaused) return;
 
     const newResults = [...sessionResults, { card: currentCard, status }];
     setSessionResults(newResults);
     setIsFlipped(false);
 
-    if (currentIndex + 1 < cards.length) {
+    const isLast = currentIndex + 1 >= cards.length;
+    const currentSeconds = Math.max(1, Math.floor((Date.now() - startTimeRef.current) / 1000));
+    setElapsedSeconds(currentSeconds);
+
+    if (user?.id) {
+      const itemsPayload: FlashcardSessionItem[] = newResults.map((r) => ({
+        flashcardId: r.card.id,
+        status: r.status,
+      }));
+
+      if (!activeSessionId) {
+        submitFlashcardSession({
+          folderId,
+          areaId: areaIdParam ? Number(areaIdParam) : undefined,
+          subjectId: subjectIdParam ? Number(subjectIdParam) : undefined,
+          totalCards: cards.length,
+          completed: isLast,
+          cardIds: cards.map((c) => c.id),
+          timeSpentSeconds: currentSeconds,
+          items: itemsPayload,
+        })
+          .then((saved) => {
+            setActiveSessionId(saved.id);
+            const newParams = new URLSearchParams(searchParams);
+            newParams.set('sessionId', String(saved.id));
+            setSearchParams(newParams, { replace: true });
+          })
+          .catch((err) => console.error('Erro ao salvar sessão inicial:', err));
+      } else {
+        updateFlashcardSession(activeSessionId, {
+          folderId,
+          areaId: areaIdParam ? Number(areaIdParam) : undefined,
+          subjectId: subjectIdParam ? Number(subjectIdParam) : undefined,
+          totalCards: cards.length,
+          completed: isLast,
+          cardIds: cards.map((c) => c.id),
+          timeSpentSeconds: currentSeconds,
+          items: itemsPayload,
+        }).catch((err) => console.error('Erro ao atualizar sessão:', err));
+      }
+    }
+
+    if (!isLast) {
       setCurrentIndex((prev) => prev + 1);
     } else {
-      finishSession(newResults);
+      finishSession(newResults, currentSeconds);
     }
   };
 
   const finishSession = async (
-    finalResults: { card: Flashcard; status: FlashcardItemStatus }[]
+    finalResults: { card: Flashcard; status: FlashcardItemStatus }[],
+    finalSecondsInput?: number
   ) => {
     setIsFinished(true);
     if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
-    const finalSeconds = Math.max(1, Math.floor((Date.now() - startTimeRef.current) / 1000));
+    const finalSeconds = finalSecondsInput ?? Math.max(1, Math.floor((Date.now() - startTimeRef.current) / 1000));
     setElapsedSeconds(finalSeconds);
 
     if (user?.id) {
@@ -205,32 +349,105 @@ export const FlashcardStudyPage: React.FC = () => {
           flashcardId: r.card.id,
           status: r.status,
         }));
-        await submitFlashcardSession({
-          folderId,
-          areaId: areaIdParam ? Number(areaIdParam) : undefined,
-          subjectId: subjectIdParam ? Number(subjectIdParam) : undefined,
-          timeSpentSeconds: finalSeconds,
-          items,
-        });
+        if (activeSessionId) {
+          await updateFlashcardSession(activeSessionId, {
+            folderId,
+            areaId: areaIdParam ? Number(areaIdParam) : undefined,
+            subjectId: subjectIdParam ? Number(subjectIdParam) : undefined,
+            totalCards: cards.length,
+            completed: true,
+            cardIds: cards.map((c) => c.id),
+            timeSpentSeconds: finalSeconds,
+            items,
+          });
+        } else {
+          const saved = await submitFlashcardSession({
+            folderId,
+            areaId: areaIdParam ? Number(areaIdParam) : undefined,
+            subjectId: subjectIdParam ? Number(subjectIdParam) : undefined,
+            totalCards: cards.length,
+            completed: true,
+            cardIds: cards.map((c) => c.id),
+            timeSpentSeconds: finalSeconds,
+            items,
+          });
+          setActiveSessionId(saved.id);
+        }
       } catch (err) {
-        console.error('Erro ao salvar sessão de estudo:', err);
+        console.error('Erro ao salvar sessão de estudo concluída:', err);
       } finally {
         setSubmittingSession(false);
       }
     }
   };
 
-  // Keyboard navigation (apenas tecla Espaço para virar/revelar)
+  const handleExitRequest = () => {
+    if (isFinished || sessionResults.length === 0) {
+      handleBack();
+      return;
+    }
+    // Pausa o cronômetro enquanto decide sair
+    setIsPaused(true);
+    setExitDialogOpen(true);
+  };
+
+  const handleConfirmSaveAndExit = async () => {
+    const currentSeconds = Math.max(1, Math.floor((Date.now() - startTimeRef.current) / 1000));
+    if (activeSessionId && user?.id) {
+      try {
+        const itemsPayload: FlashcardSessionItem[] = sessionResults.map((r) => ({
+          flashcardId: r.card.id,
+          status: r.status,
+        }));
+        await updateFlashcardSession(activeSessionId, {
+          folderId,
+          areaId: areaIdParam ? Number(areaIdParam) : undefined,
+          subjectId: subjectIdParam ? Number(subjectIdParam) : undefined,
+          totalCards: cards.length,
+          completed: false,
+          cardIds: cards.map((c) => c.id),
+          timeSpentSeconds: currentSeconds,
+          items: itemsPayload,
+        });
+      } catch (err) {
+        console.error('Erro ao salvar estado ao sair:', err);
+      }
+    }
+    setExitDialogOpen(false);
+    handleBack();
+  };
+
+  const handleDiscardSession = async () => {
+    if (activeSessionId) {
+      try {
+        await deleteFlashcardSession(activeSessionId);
+      } catch (err) {
+        console.error('Erro ao descartar sessão:', err);
+      }
+    }
+    setExitDialogOpen(false);
+    handleBack();
+  };
+
+  // Keyboard navigation (Espaço para virar, P para pausar)
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
       if (isFinished || !currentCard) return;
+
+      if (e.key === 'p' || e.key === 'P') {
+        e.preventDefault();
+        togglePause();
+        return;
+      }
+
+      if (isPaused) return;
 
       if (e.code === 'Space') {
         e.preventDefault();
         setIsFlipped((prev) => !prev);
       }
     },
-    [isFinished, currentCard]
+    [isFinished, currentCard, isPaused, togglePause]
   );
 
   useEffect(() => {
@@ -594,7 +811,7 @@ export const FlashcardStudyPage: React.FC = () => {
         <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
           <Button
             startIcon={<ArrowBackIcon />}
-            onClick={handleBack}
+            onClick={handleExitRequest}
             sx={{ color: 'text.secondary', fontWeight: 600 }}
           >
             Sair do Estudo
@@ -633,6 +850,32 @@ export const FlashcardStudyPage: React.FC = () => {
               color: PALETTE_COLORS.primary,
             }}
           />
+
+          <Tooltip title={isPaused ? 'Continuar Estudo (P)' : 'Pausar Estudo (P)'}>
+            <IconButton
+              size="small"
+              onClick={togglePause}
+              sx={{
+                color: isPaused ? PALETTE_COLORS.success : 'text.secondary',
+                border: '1px solid',
+                borderColor: isPaused ? PALETTE_COLORS.success : 'divider',
+                backgroundColor: isPaused
+                  ? isDark
+                    ? 'rgba(75, 241, 81, 0.15)'
+                    : 'rgba(75, 241, 81, 0.1)'
+                  : 'transparent',
+                '&:hover': {
+                  backgroundColor: isPaused
+                    ? isDark
+                      ? 'rgba(75, 241, 81, 0.25)'
+                      : 'rgba(75, 241, 81, 0.2)'
+                    : 'action.hover',
+                },
+              }}
+            >
+              {isPaused ? <PlayArrowIcon fontSize="small" /> : <PauseIcon fontSize="small" />}
+            </IconButton>
+          </Tooltip>
           <Chip
             size="small"
             icon={<CheckCircleIcon style={{ color: PALETTE_COLORS.success }} />}
@@ -673,7 +916,63 @@ export const FlashcardStudyPage: React.FC = () => {
         />
       </Box>
 
-      {/* 3D Flip Card Container */}
+      {/* Pause Screen Overlay or Active Card */}
+      {isPaused ? (
+        <Paper
+          elevation={4}
+          sx={{
+            p: { xs: 4, sm: 6 },
+            my: 3,
+            borderRadius: 4,
+            textAlign: 'center',
+            border: '2px dashed',
+            borderColor: PALETTE_COLORS.primary,
+            backgroundColor: isDark ? 'rgba(217, 183, 99, 0.05)' : 'rgba(217, 183, 99, 0.03)',
+            minHeight: { xs: 360, sm: 400 },
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'center',
+            alignItems: 'center',
+          }}
+        >
+          <Stack spacing={2.5} alignItems="center" sx={{ maxWidth: 480 }}>
+            <PauseCircleOutlineIcon sx={{ fontSize: 64, color: PALETTE_COLORS.primary }} />
+            <Box>
+              <Typography variant="h5" fontWeight="bold" gutterBottom>
+                Estudo Pausado
+              </Typography>
+              <Typography variant="body1" color="text.secondary">
+                O cronômetro está parado em <strong>{formatSeconds(elapsedSeconds)}</strong>. Respire fundo e retome quando estiver pronto para continuar.
+              </Typography>
+            </Box>
+
+            <Button
+              variant="contained"
+              size="large"
+              startIcon={<PlayArrowIcon />}
+              onClick={togglePause}
+              sx={{
+                px: 5,
+                py: 1.5,
+                fontWeight: 800,
+                fontSize: '1.05rem',
+                borderRadius: 3,
+                backgroundColor: PALETTE_COLORS.primary,
+                color: '#1a1e24',
+                boxShadow: 'none',
+                '&:hover': {
+                  backgroundColor: '#c4a251',
+                  boxShadow: 'none',
+                },
+              }}
+            >
+              Continuar Estudo (P)
+            </Button>
+          </Stack>
+        </Paper>
+      ) : (
+        <>
+          {/* 3D Flip Card Container */}
       <Box
         sx={{
           perspective: '1200px',
@@ -1092,12 +1391,81 @@ export const FlashcardStudyPage: React.FC = () => {
         </Stack>
       )}
 
-      {/* Quick helper */}
-      <Box sx={{ mt: 3, textAlign: 'center' }}>
-        <Typography variant="caption" sx={{ color: 'text.secondary', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5 }}>
-          <KeyboardIcon fontSize="small" /> Atalho: Espaço para {!isFlipped ? 'revelar' : 'ocultar'} a resposta
-        </Typography>
-      </Box>
+          {/* Quick helper */}
+          <Box sx={{ mt: 3, textAlign: 'center' }}>
+            <Typography variant="caption" sx={{ color: 'text.secondary', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5 }}>
+              <KeyboardIcon fontSize="small" /> Atalhos: <kbd style={{ padding: '2px 6px', background: isDark ? '#333' : '#eee', borderRadius: '4px' }}>Espaço</kbd> para {!isFlipped ? 'revelar' : 'ocultar'} • <kbd style={{ padding: '2px 6px', background: isDark ? '#333' : '#eee', borderRadius: '4px' }}>P</kbd> para pausar/despausar
+            </Typography>
+          </Box>
+        </>
+      )}
+
+      {/* Exit Confirmation Dialog */}
+      <Dialog
+        open={exitDialogOpen}
+        onClose={() => {
+          setExitDialogOpen(false);
+          setIsPaused(false);
+        }}
+        maxWidth="sm"
+        fullWidth
+        PaperProps={{
+          sx: { borderRadius: 3, p: 1 },
+        }}
+      >
+        <DialogTitle sx={{ fontWeight: 800 }}>
+          Sair da Sessão de Estudo?
+        </DialogTitle>
+        <DialogContent>
+          <DialogContentText sx={{ color: 'text.secondary', mb: 2 }}>
+            Você praticou <strong>{sessionResults.length}</strong> de <strong>{cards.length}</strong> flashcards.
+            Seu progresso foi registrado para suas métricas e você poderá retomar o estudo a qualquer momento pela aba <strong>Sessões de Estudo</strong> no seu Perfil.
+          </DialogContentText>
+          <Alert severity="info" sx={{ borderRadius: 2 }}>
+            O tempo de estudo e os acertos/erros até aqui estão seguros. Nada será perdido!
+          </Alert>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2, justifyContent: 'space-between', flexWrap: 'wrap', gap: 1 }}>
+          {activeSessionId && (
+            <Button
+              color="error"
+              startIcon={<DeleteOutlineIcon />}
+              onClick={handleDiscardSession}
+              sx={{ textTransform: 'none', fontWeight: 600 }}
+            >
+              Descartar Sessão
+            </Button>
+          )}
+          <Stack direction="row" spacing={1} sx={{ ml: 'auto' }}>
+            <Button
+              variant="outlined"
+              onClick={() => {
+                setExitDialogOpen(false);
+                setIsPaused(false);
+              }}
+              sx={{ textTransform: 'none', fontWeight: 600, borderRadius: 2 }}
+            >
+              Continuar Estudando
+            </Button>
+            <Button
+              variant="contained"
+              onClick={handleConfirmSaveAndExit}
+              sx={{
+                textTransform: 'none',
+                fontWeight: 700,
+                borderRadius: 2,
+                backgroundColor: PALETTE_COLORS.primary,
+                color: '#1a1e24',
+                '&:hover': {
+                  backgroundColor: '#c4a251',
+                },
+              }}
+            >
+              Salvar e Sair
+            </Button>
+          </Stack>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 };

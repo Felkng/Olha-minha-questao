@@ -246,7 +246,10 @@ export interface FlashcardSessionRequest {
   folderId?: number;
   areaId?: number;
   subjectId?: number;
+  totalCards?: number;
   timeSpentSeconds?: number;
+  completed?: boolean;
+  cardIds?: number[];
   items: FlashcardSessionItem[];
 }
 
@@ -265,7 +268,10 @@ export interface FlashcardSession {
   skippedCount: number;
   timeSpentSeconds?: number;
   accuracyPercentage: number;
+  completed?: boolean;
+  cardIds?: number[];
   createdAt: string;
+  updatedAt?: string;
   items: FlashcardSessionItem[];
 }
 

@@ -48,6 +48,7 @@ import PersonIcon from '@mui/icons-material/Person';
 import PersonOutlineIcon from '@mui/icons-material/PersonOutline';
 import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import CategoryIcon from '@mui/icons-material/Category';
@@ -103,6 +104,7 @@ import {
   getFlashcards,
   deleteFlashcard,
   getUserFlashcardSessions,
+  deleteFlashcardSession,
 } from '../services/api';
 import {
   Area,
@@ -962,6 +964,7 @@ export const UserProfilePage: React.FC = () => {
   const [flashcardSessions, setFlashcardSessions] = useState<FlashcardSession[]>([]);
   const [loadingFlashcardSessions, setLoadingFlashcardSessions] = useState(false);
   const [selectedSessionDetail, setSelectedSessionDetail] = useState<FlashcardSession | null>(null);
+  const [sessionToDiscard, setSessionToDiscard] = useState<FlashcardSession | null>(null);
   const [flashcardSearch, setFlashcardSearch] = useState('');
   const [flashcardSessionSearch, setFlashcardSessionSearch] = useState('');
   const [flashcardSubTab, setFlashcardSubTab] = useState<'DECKS' | 'CARDS' | 'SESSIONS'>('DECKS');
@@ -3132,11 +3135,97 @@ export const UserProfilePage: React.FC = () => {
                 </Button>
               </Box>
 
+              {/* Banner de Sessão em Andamento */}
+              {(() => {
+                const incompleteSessions = flashcardSessions.filter((s) => s.completed === false);
+                if (incompleteSessions.length === 0) return null;
+                const latestIncomplete = incompleteSessions[0];
+                const answeredCount = (latestIncomplete.correctCount || 0) + (latestIncomplete.wrongCount || 0) + (latestIncomplete.skippedCount || 0);
+
+                return (
+                  <Paper
+                    elevation={3}
+                    sx={{
+                      p: 2.5,
+                      mb: 3,
+                      borderRadius: 2.5,
+                      border: '1.5px solid',
+                      borderColor: PALETTE_COLORS.primary,
+                      background: isDark
+                        ? 'linear-gradient(90deg, rgba(217, 183, 99, 0.15) 0%, rgba(26, 30, 36, 0.95) 100%)'
+                        : 'linear-gradient(90deg, rgba(217, 183, 99, 0.2) 0%, rgba(255, 255, 255, 0.95) 100%)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      flexWrap: 'wrap',
+                      gap: 2,
+                    }}
+                  >
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                      <Box
+                        sx={{
+                          p: 1.2,
+                          borderRadius: '50%',
+                          bgcolor: 'rgba(217, 183, 99, 0.2)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                        }}
+                      >
+                        <AccessTimeIcon sx={{ color: PALETTE_COLORS.primary, fontSize: 28 }} />
+                      </Box>
+                      <Box>
+                        <Typography variant="subtitle1" fontWeight={800}>
+                          {incompleteSessions.length === 1
+                            ? 'Você possui 1 estudo em andamento!'
+                            : `Você possui ${incompleteSessions.length} estudos em andamento!`}
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary">
+                          {latestIncomplete.folderName
+                            ? `Deck: ${latestIncomplete.folderName}`
+                            : latestIncomplete.subjectName
+                            ? `Matéria: ${latestIncomplete.subjectName}`
+                            : 'Cards Avulsos'}{' '}
+                          • {answeredCount} de {latestIncomplete.totalCards} cards praticados ({formatStudyDuration(latestIncomplete.timeSpentSeconds)})
+                        </Typography>
+                      </Box>
+                    </Box>
+
+                    <Button
+                      variant="contained"
+                      startIcon={<PlayArrowIcon />}
+                      onClick={() => navigate(`/flashcards/estudo?sessionId=${latestIncomplete.id}`)}
+                      sx={{
+                        fontWeight: 800,
+                        backgroundColor: PALETTE_COLORS.primary,
+                        color: '#1a1e24',
+                        borderRadius: 2,
+                        px: 3,
+                        py: 1,
+                        textTransform: 'none',
+                        '&:hover': {
+                          backgroundColor: '#c4a251',
+                        },
+                      }}
+                    >
+                      Retomar Estudo
+                    </Button>
+                  </Paper>
+                );
+              })()}
+
               {/* Cards de Resumo Métrico */}
               {(() => {
                 const totalSessions = flashcardSessions.length;
                 const totalSeconds = flashcardSessions.reduce((acc, s) => acc + (s.timeSpentSeconds || 0), 0);
-                const totalCards = flashcardSessions.reduce((acc, s) => acc + (s.totalCards || 0), 0);
+                const totalCards = flashcardSessions.reduce(
+                  (acc, s) =>
+                    acc +
+                    (s.completed !== false
+                      ? s.totalCards || 0
+                      : (s.correctCount || 0) + (s.wrongCount || 0) + (s.skippedCount || 0)),
+                  0
+                );
                 const totalCorrect = flashcardSessions.reduce((acc, s) => acc + (s.correctCount || 0), 0);
                 const totalWrong = flashcardSessions.reduce((acc, s) => acc + (s.wrongCount || 0), 0);
                 const avgAccuracy = totalCards > 0 ? Math.round((totalCorrect / totalCards) * 100) : 0;
@@ -3614,10 +3703,12 @@ export const UserProfilePage: React.FC = () => {
                   return (
                     <Stack spacing={2}>
                       {filtered.map((session) => {
-                        const total = session.totalCards || (session.correctCount + session.wrongCount + session.skippedCount);
+                        const isCompleted = session.completed !== false;
+                        const answeredCount = (session.correctCount || 0) + (session.wrongCount || 0) + (session.skippedCount || 0);
+                        const total = isCompleted ? (session.totalCards || answeredCount) : (session.totalCards || answeredCount);
                         const accuracy = session.accuracyPercentage != null
                           ? Math.round(session.accuracyPercentage)
-                          : total > 0 ? Math.round((session.correctCount / total) * 100) : 0;
+                          : answeredCount > 0 ? Math.round(((session.correctCount || 0) / answeredCount) * 100) : 0;
                         const durationStr = formatStudyDuration(session.timeSpentSeconds);
                         const dateFormatted = new Date(session.createdAt).toLocaleDateString('pt-BR', {
                           day: '2-digit',
@@ -3640,6 +3731,10 @@ export const UserProfilePage: React.FC = () => {
                               flexWrap: 'wrap',
                               gap: 2,
                               transition: 'all 0.2s',
+                              borderColor: !isCompleted ? PALETTE_COLORS.primary : undefined,
+                              backgroundColor: !isCompleted
+                                ? (isDark ? 'rgba(217, 183, 99, 0.04)' : 'rgba(217, 183, 99, 0.03)')
+                                : undefined,
                               '&:hover': {
                                 boxShadow: 2,
                                 borderColor: PALETTE_COLORS.primary,
@@ -3648,6 +3743,31 @@ export const UserProfilePage: React.FC = () => {
                           >
                             <Box sx={{ minWidth: 240 }}>
                               <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" sx={{ mb: 1, gap: 0.5 }}>
+                                {!isCompleted ? (
+                                  <Chip
+                                    size="small"
+                                    icon={<AccessTimeIcon fontSize="small" />}
+                                    label="Em andamento"
+                                    sx={{
+                                      fontWeight: 800,
+                                      backgroundColor: isDark ? 'rgba(217, 183, 99, 0.2)' : 'rgba(217, 183, 99, 0.25)',
+                                      color: PALETTE_COLORS.primary,
+                                      border: '1px solid',
+                                      borderColor: PALETTE_COLORS.primary,
+                                    }}
+                                  />
+                                ) : (
+                                  <Chip
+                                    size="small"
+                                    icon={<CheckCircleIcon fontSize="small" />}
+                                    label="Concluída"
+                                    sx={{
+                                      fontWeight: 700,
+                                      backgroundColor: 'rgba(75, 241, 81, 0.12)',
+                                      color: PALETTE_COLORS.success,
+                                    }}
+                                  />
+                                )}
                                 {session.folderName ? (
                                   <Chip
                                     size="small"
@@ -3698,14 +3818,19 @@ export const UserProfilePage: React.FC = () => {
                                 sx={{ color: 'text.secondary', display: 'flex', alignItems: 'center', gap: 0.8 }}
                               >
                                 <AccessTimeIcon fontSize="small" sx={{ fontSize: 16, color: PALETTE_COLORS.primary }} />
-                                Tempo Respondido: <strong>{durationStr}</strong>
+                                Tempo {!isCompleted ? 'Até o Momento' : 'Respondido'}: <strong>{durationStr}</strong>
                               </Typography>
+                              {!isCompleted && (
+                                <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600, display: 'block', mt: 0.5 }}>
+                                  Progresso: <strong>{answeredCount} de {total} cards respondidos ({total > 0 ? Math.round((answeredCount / total) * 100) : 0}%)</strong>
+                                </Typography>
+                              )}
                             </Box>
 
                             <Stack direction="row" spacing={1.5} alignItems="center" flexWrap="wrap">
                               <Chip
                                 size="small"
-                                label={`${session.totalCards} cards`}
+                                label={`${isCompleted ? total : `${answeredCount}/${total}`} cards`}
                                 sx={{ fontWeight: 600 }}
                               />
                               <Chip
@@ -3760,30 +3885,64 @@ export const UserProfilePage: React.FC = () => {
                                 Ver Detalhes
                               </Button>
 
-                              <Button
-                                size="small"
-                                variant="contained"
-                                startIcon={<PlayArrowIcon fontSize="small" />}
-                                onClick={() => {
-                                  const params = new URLSearchParams();
-                                  if (session.folderId) params.set('folderId', session.folderId.toString());
-                                  if (session.areaId) params.set('areaId', session.areaId.toString());
-                                  if (session.subjectId) params.set('subjectId', session.subjectId.toString());
-                                  navigate(`/flashcards/study?${params.toString()}`);
-                                }}
-                                sx={{
-                                  borderRadius: 2,
-                                  fontWeight: 700,
-                                  textTransform: 'none',
-                                  backgroundColor: PALETTE_COLORS.primary,
-                                  color: '#1a1e24',
-                                  '&:hover': {
-                                    backgroundColor: '#c4a251',
-                                  },
-                                }}
-                              >
-                                Estudar Novamente
-                              </Button>
+                              {!isCompleted ? (
+                                <>
+                                  <Button
+                                    size="small"
+                                    variant="contained"
+                                    startIcon={<PlayArrowIcon fontSize="small" />}
+                                    onClick={() => navigate(`/flashcards/estudo?sessionId=${session.id}`)}
+                                    sx={{
+                                      borderRadius: 2,
+                                      fontWeight: 800,
+                                      textTransform: 'none',
+                                      backgroundColor: PALETTE_COLORS.primary,
+                                      color: '#1a1e24',
+                                      '&:hover': {
+                                        backgroundColor: '#c4a251',
+                                      },
+                                    }}
+                                  >
+                                    Retomar Estudo
+                                  </Button>
+
+                                  <Tooltip title="Descartar estudo incompleto">
+                                    <IconButton
+                                      size="small"
+                                      color="error"
+                                      onClick={() => setSessionToDiscard(session)}
+                                      sx={{ border: '1px solid', borderColor: 'divider' }}
+                                    >
+                                      <DeleteOutlineIcon fontSize="small" />
+                                    </IconButton>
+                                  </Tooltip>
+                                </>
+                              ) : (
+                                <Button
+                                  size="small"
+                                  variant="contained"
+                                  startIcon={<PlayArrowIcon fontSize="small" />}
+                                  onClick={() => {
+                                    const params = new URLSearchParams();
+                                    if (session.folderId) params.set('folderId', session.folderId.toString());
+                                    if (session.areaId) params.set('areaId', session.areaId.toString());
+                                    if (session.subjectId) params.set('subjectId', session.subjectId.toString());
+                                    navigate(`/flashcards/estudo?${params.toString()}`);
+                                  }}
+                                  sx={{
+                                    borderRadius: 2,
+                                    fontWeight: 700,
+                                    textTransform: 'none',
+                                    backgroundColor: PALETTE_COLORS.primary,
+                                    color: '#1a1e24',
+                                    '&:hover': {
+                                      backgroundColor: '#c4a251',
+                                    },
+                                  }}
+                                >
+                                  Estudar Novamente
+                                </Button>
+                              )}
                             </Stack>
                           </Paper>
                         );
@@ -5721,6 +5880,49 @@ export const UserProfilePage: React.FC = () => {
         <DialogActions sx={{ p: 2 }}>
           <Button onClick={() => setSelectedSessionDetail(null)} sx={{ fontWeight: 700 }}>
             Fechar
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Dialog para Descartar Sessão Incompleta */}
+      <Dialog
+        open={Boolean(sessionToDiscard)}
+        onClose={() => setSessionToDiscard(null)}
+        maxWidth="xs"
+        fullWidth
+        PaperProps={{ sx: { borderRadius: 3, p: 1 } }}
+      >
+        <DialogTitle sx={{ fontWeight: 800 }}>Descartar Estudo Incompleto?</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            Deseja realmente excluir esta sessão de estudo em andamento? O progresso salvo dela será removido.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button
+            variant="outlined"
+            onClick={() => setSessionToDiscard(null)}
+            sx={{ textTransform: 'none', borderRadius: 2 }}
+          >
+            Cancelar
+          </Button>
+          <Button
+            variant="contained"
+            color="error"
+            onClick={async () => {
+              if (sessionToDiscard) {
+                try {
+                  await deleteFlashcardSession(sessionToDiscard.id);
+                  setFlashcardSessions((prev) => prev.filter((s) => s.id !== sessionToDiscard.id));
+                } catch (err) {
+                  console.error('Erro ao descartar sessão:', err);
+                }
+              }
+              setSessionToDiscard(null);
+            }}
+            sx={{ textTransform: 'none', fontWeight: 700, borderRadius: 2 }}
+          >
+            Descartar
           </Button>
         </DialogActions>
       </Dialog>

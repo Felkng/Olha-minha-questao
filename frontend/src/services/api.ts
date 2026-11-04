@@ -680,6 +680,7 @@ export const saveQuestionBoard = async (
 // ==========================================
 
 export const getFlashcards = async (params?: {
+  ids?: number[];
   areaId?: number | '';
   subjectId?: number | '';
   folderId?: number | '';
@@ -698,6 +699,7 @@ export const getFlashcards = async (params?: {
       sort: params?.sort || 'updatedAt,desc',
     };
 
+    if (params?.ids && params.ids.length > 0) queryParams.ids = params.ids.join(',');
     if (params?.areaId) queryParams.areaId = params.areaId;
     if (params?.subjectId) queryParams.subjectId = params.subjectId;
     if (params?.folderId) queryParams.folderId = params.folderId;
@@ -787,6 +789,23 @@ export const submitFlashcardSession = async (
 ): Promise<FlashcardSession> => {
   const response = await apiClient.post<FlashcardSession>('/flashcards/sessions', sessionData);
   return response.data;
+};
+
+export const getFlashcardSession = async (id: number): Promise<FlashcardSession> => {
+  const response = await apiClient.get<FlashcardSession>(`/flashcards/sessions/${id}`);
+  return response.data;
+};
+
+export const updateFlashcardSession = async (
+  id: number,
+  sessionData: FlashcardSessionRequest
+): Promise<FlashcardSession> => {
+  const response = await apiClient.put<FlashcardSession>(`/flashcards/sessions/${id}`, sessionData);
+  return response.data;
+};
+
+export const deleteFlashcardSession = async (id: number): Promise<void> => {
+  await apiClient.delete(`/flashcards/sessions/${id}`);
 };
 
 export const getUserFlashcardSessions = async (userId?: number): Promise<FlashcardSession[]> => {
