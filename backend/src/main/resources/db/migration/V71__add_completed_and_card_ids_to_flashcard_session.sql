@@ -1,0 +1,5 @@
+ALTER TABLE flashcard_session ADD COLUMN IF NOT EXISTS completed BOOLEAN NOT NULL DEFAULT TRUE;
+ALTER TABLE flashcard_session ADD COLUMN IF NOT EXISTS card_ids TEXT;
+ALTER TABLE flashcard_session ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP;
+
+CREATE INDEX IF NOT EXISTS idx_flashcard_session_completed ON flashcard_session(completed);

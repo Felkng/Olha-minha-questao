@@ -17,6 +17,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.UpdateTimestamp;
 
 import java.time.Instant;
 import java.util.ArrayList;
@@ -71,9 +72,20 @@ public class FlashcardSession {
     @Builder.Default
     private Integer timeSpentSeconds = 0;
 
+    @Column(name = "completed", nullable = false)
+    @Builder.Default
+    private Boolean completed = true;
+
+    @Column(name = "card_ids", columnDefinition = "TEXT")
+    private String cardIds;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
+
+    @UpdateTimestamp
+    @Column(name = "updated_at", nullable = false)
+    private Instant updatedAt;
 
     @OneToMany(mappedBy = "session", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
