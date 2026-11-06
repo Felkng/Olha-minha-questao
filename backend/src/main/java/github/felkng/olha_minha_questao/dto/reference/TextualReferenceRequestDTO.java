@@ -25,19 +25,14 @@ public class TextualReferenceRequestDTO {
 
     private String content;
 
-    @Size(max = 255, message = "O autor deve ter no máximo 255 caracteres")
     private String author;
 
-    @Size(max = 1000, message = "A referência deve ter no máximo 1000 caracteres")
     private String reference;
 
-    @Size(max = 1000, message = "A legenda deve ter no máximo 1000 caracteres")
     private String caption;
 
-    @Size(max = 500, message = "A fonte deve ter no máximo 500 caracteres")
     private String source;
 
-    @Size(max = 1000, message = "A URL de mídia deve ter no máximo 1000 caracteres")
     private String mediaUrl;
 
     private Long testId;
