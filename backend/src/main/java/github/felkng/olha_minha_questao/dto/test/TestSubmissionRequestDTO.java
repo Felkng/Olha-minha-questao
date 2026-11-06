@@ -15,6 +15,7 @@ public class TestSubmissionRequestDTO {
     private Long userId;
     private Integer timeSpentSeconds;
     private String sessionId;
+    private Long testSessionId;
     private List<QuestionAnswerDTO> answers;
 
     @Data

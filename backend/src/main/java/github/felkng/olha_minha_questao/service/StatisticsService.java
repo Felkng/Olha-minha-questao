@@ -49,6 +49,7 @@ public class StatisticsService {
     private final AreaRepository areaRepository;
     private final FlashcardRepository flashcardRepository;
     private final github.felkng.olha_minha_questao.domain.repository.FlashcardSessionRepository flashcardSessionRepository;
+    private final github.felkng.olha_minha_questao.domain.repository.TestSessionRepository testSessionRepository;
 
     @Transactional
     public QuestionAttemptResponseDTO registerQuestionAttempt(Long questionId, QuestionAttemptRequestDTO dto) {
@@ -163,7 +164,7 @@ public class StatisticsService {
 
         User user = (userId != null) ? userRepository.findById(userId).orElse(null) : null;
 
-        List<Question> testQuestions = questionRepository.findByTestId(testId);
+        List<Question> testQuestions = questionRepository.findAllQuestionsByTestId(testId);
 
         // Mapeia respostas enviadas pelo usuário
         java.util.Map<Long, Long> answersMap = new java.util.HashMap<>();
@@ -256,7 +257,40 @@ public class StatisticsService {
                 .timeSpentSeconds(dto.getTimeSpentSeconds())
                 .sessionId(dto.getSessionId())
                 .build();
-        testAttemptRepository.save(testAttempt);
+        TestAttempt savedAttempt = testAttemptRepository.save(testAttempt);
+
+        java.util.Set<Long> updatedSessionIds = new java.util.HashSet<>();
+        if (dto.getTestSessionId() != null) {
+            testSessionRepository.findById(dto.getTestSessionId()).ifPresent(session -> {
+                if (session.getTest() != null && session.getTest().getId().equals(testId)) {
+                    session.setCompleted(true);
+                    if (dto.getTimeSpentSeconds() != null) {
+                        session.setTimeSpentSeconds(dto.getTimeSpentSeconds());
+                    }
+                    session.setTestAttempt(savedAttempt);
+                    session.setUpdatedAt(java.time.Instant.now());
+                    testSessionRepository.save(session);
+                    updatedSessionIds.add(session.getId());
+                }
+            });
+        }
+
+        Long effectiveUserId = user != null ? user.getId() : userId;
+        if (effectiveUserId != null) {
+            List<github.felkng.olha_minha_questao.domain.entity.TestSession> incompleteSessions =
+                    testSessionRepository.findByUserIdAndTestIdAndCompletedFalse(effectiveUserId, testId);
+            for (github.felkng.olha_minha_questao.domain.entity.TestSession session : incompleteSessions) {
+                if (!updatedSessionIds.contains(session.getId())) {
+                    session.setCompleted(true);
+                    if (dto.getTimeSpentSeconds() != null) {
+                        session.setTimeSpentSeconds(dto.getTimeSpentSeconds());
+                    }
+                    session.setTestAttempt(savedAttempt);
+                    session.setUpdatedAt(java.time.Instant.now());
+                    testSessionRepository.save(session);
+                }
+            }
+        }
 
         TestStatistic statistic = testStatisticRepository.findById(testId)
                 .orElseGet(() -> {
@@ -364,7 +398,7 @@ public class StatisticsService {
                 .orElseThrow(() -> new ResourceNotFoundException("Tentativa de simulado não encontrada com o id: " + attemptId));
 
         Test test = attempt.getTest();
-        List<Question> questions = questionRepository.findByTestIdOrderByIdAsc(test.getId());
+        List<Question> questions = questionRepository.findAllQuestionsByTestId(test.getId());
 
         List<QuestionAttempt> questionAttempts = attempt.getSessionId() != null && !attempt.getSessionId().isBlank()
                 ? questionAttemptRepository.findBySessionId(attempt.getSessionId())

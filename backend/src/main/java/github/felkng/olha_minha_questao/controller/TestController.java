@@ -26,6 +26,7 @@ import java.util.List;
 public class TestController {
 
     private final TestService testService;
+    private final github.felkng.olha_minha_questao.service.TestSessionService testSessionService;
     private final github.felkng.olha_minha_questao.service.StatisticsService statisticsService;
     private final github.felkng.olha_minha_questao.service.ExamParserService examParserService;
 
@@ -85,6 +86,62 @@ public class TestController {
     public ResponseEntity<List<github.felkng.olha_minha_questao.dto.test.TestAttemptSummaryDTO>> getUserTestAttempts(
             @PathVariable Long userId) {
         return ResponseEntity.ok(statisticsService.getUserTestAttempts(userId));
+    }
+
+    @GetMapping("/sessions/my")
+    public ResponseEntity<List<github.felkng.olha_minha_questao.dto.test.TestSessionResponseDTO>> getMyTestSessions(
+            @RequestHeader(value = "X-User-Id") Long userId) {
+        return ResponseEntity.ok(testSessionService.getUserSessions(userId));
+    }
+
+    @GetMapping("/sessions/user/{targetUserId}")
+    public ResponseEntity<List<github.felkng.olha_minha_questao.dto.test.TestSessionResponseDTO>> getUserTestSessions(
+            @PathVariable Long targetUserId) {
+        return ResponseEntity.ok(testSessionService.getUserSessions(targetUserId));
+    }
+
+    @GetMapping("/sessions/{sessionId}")
+    public ResponseEntity<github.felkng.olha_minha_questao.dto.test.TestSessionResponseDTO> getTestSessionById(
+            @PathVariable Long sessionId,
+            @RequestHeader(value = "X-User-Id", required = false) Long userId) {
+        return ResponseEntity.ok(testSessionService.getSessionById(sessionId, userId));
+    }
+
+    @PutMapping("/sessions/{sessionId}")
+    public ResponseEntity<github.felkng.olha_minha_questao.dto.test.TestSessionResponseDTO> updateTestSession(
+            @PathVariable Long sessionId,
+            @RequestBody github.felkng.olha_minha_questao.dto.test.TestSessionRequestDTO dto,
+            @RequestHeader(value = "X-User-Id") Long userId) {
+        return ResponseEntity.ok(testSessionService.updateSession(sessionId, dto, userId));
+    }
+
+    @DeleteMapping("/sessions/{sessionId}")
+    public ResponseEntity<Void> deleteTestSession(
+            @PathVariable Long sessionId,
+            @RequestHeader(value = "X-User-Id") Long userId) {
+        testSessionService.deleteSession(sessionId, userId);
+        return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/{id}/sessions")
+    public ResponseEntity<github.felkng.olha_minha_questao.dto.test.TestSessionResponseDTO> createOrUpdateTestSession(
+            @PathVariable Long id,
+            @RequestBody(required = false) github.felkng.olha_minha_questao.dto.test.TestSessionRequestDTO dto,
+            @RequestHeader(value = "X-User-Id") Long userId) {
+        var result = testSessionService.createOrUpdateSession(id, dto != null ? dto : new github.felkng.olha_minha_questao.dto.test.TestSessionRequestDTO(), userId);
+        if (result.isCreated()) {
+            return ResponseEntity.status(HttpStatus.CREATED).body(result.getResponse());
+        }
+        return ResponseEntity.ok(result.getResponse());
+    }
+
+    @GetMapping("/{id}/sessions/active")
+    public ResponseEntity<github.felkng.olha_minha_questao.dto.test.TestSessionResponseDTO> getActiveTestSession(
+            @PathVariable Long id,
+            @RequestHeader(value = "X-User-Id", required = false) Long userId) {
+        return testSessionService.getActiveSession(id, userId)
+                .map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.noContent().build());
     }
 
     @GetMapping("/{id}")
