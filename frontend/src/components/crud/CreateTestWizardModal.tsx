@@ -56,6 +56,7 @@ import { useAppTheme } from '../../theme/ThemeContext';
 import { CreateOriginModal } from './CreateOriginModal';
 import { CreateAreaModal } from './CreateAreaModal';
 import { sortQuestionsByIdentifier } from '../../utils/questionUtils';
+import { stripRichTextMarkup } from '../common/FormattedText';
 
 interface CreateTestWizardModalProps {
   open: boolean;
@@ -72,6 +73,8 @@ interface QuestionAltForm {
 interface QuestionForm {
   id: string; // temp unique client id
   identifier: string;
+  originalIdentifier?: string;
+  section?: string;
   enunciado: string;
   images?: string[];
   textualReferenceIndex?: number | null;
@@ -196,6 +199,84 @@ export const CreateTestWizardModal: React.FC<CreateTestWizardModalProps> = ({
 
   const duplicates = getDuplicateIdentifiers();
 
+  const [filterOnlyDuplicates, setFilterOnlyDuplicates] = useState(false);
+
+  // Sections that actually contain duplicated/conflicting questions
+  const conflictingSections = React.useMemo(() => {
+    const s = new Set<string>();
+    questions.forEach((q) => {
+      const norm = (q.identifier || '').trim().toLowerCase();
+      if (duplicates.includes(norm) && q.section && q.section.trim()) {
+        s.add(q.section.trim());
+      }
+    });
+    return Array.from(s);
+  }, [questions, duplicates]);
+
+  // Resolution 1: Keep only 1 conflicting section
+  const handleKeepOnlySection = (sectionToKeep: string) => {
+    const updated = questions.filter((q) => {
+      const norm = (q.identifier || '').trim().toLowerCase();
+      if (duplicates.includes(norm)) {
+        return q.section === sectionToKeep;
+      }
+      return true;
+    });
+    setQuestions(updated);
+  };
+
+  // Resolution 2: Reindex duplicate occurrences sequentially at the end
+  const handleReindexDuplicatesSequentially = () => {
+    const highestNum = questions.reduce((max, q) => {
+      const n = parseInt(q.identifier, 10);
+      return !isNaN(n) ? Math.max(max, n) : max;
+    }, 0);
+    let nextId = highestNum + 1;
+    const seen = new Set<string>();
+    const updated = questions.map((q) => {
+      const norm = (q.identifier || '').trim().toLowerCase();
+      if (seen.has(norm)) {
+        const oldId = q.identifier;
+        const newId = `${nextId++}`;
+        return {
+          ...q,
+          originalIdentifier: q.originalIdentifier || oldId,
+          identifier: newId,
+        };
+      }
+      seen.add(norm);
+      return q;
+    });
+    setQuestions(updated);
+  };
+
+  // Resolution 3: Differentiate duplicates with section suffix
+  const handleDifferentiateWithSectionSuffix = () => {
+    const seen = new Set<string>();
+    const updated = questions.map((q) => {
+      const norm = (q.identifier || '').trim().toLowerCase();
+      if (duplicates.includes(norm)) {
+        let suffix = '';
+        if (q.section) {
+          if (q.section.toLowerCase().includes('ingl')) suffix = '-ING';
+          else if (q.section.toLowerCase().includes('espanh')) suffix = '-ESP';
+          else if (q.section.toLowerCase().includes('franc')) suffix = '-FRA';
+          else suffix = `-${q.section.substring(0, 3).toUpperCase()}`;
+        } else {
+          suffix = seen.has(norm) ? '-2' : '-1';
+        }
+        seen.add(norm);
+        return {
+          ...q,
+          originalIdentifier: q.originalIdentifier || q.identifier,
+          identifier: `${q.identifier}${suffix}`,
+        };
+      }
+      return q;
+    });
+    setQuestions(updated);
+  };
+
   // Handlers for Step 0 -> Step 1
   const handleProceedFromStep0 = async () => {
     if (!name.trim() || !year) {
@@ -220,9 +301,11 @@ export const CreateTestWizardModal: React.FC<CreateTestWizardModalProps> = ({
         const formattedQuestions: QuestionForm[] = parsedQuestions.map((pq, idx) => ({
           id: `q_${Date.now()}_${idx}`,
           identifier: pq.identifier || `${idx + 1}`,
+          originalIdentifier: pq.identifier || `${idx + 1}`,
+          section: pq.section,
           enunciado: pq.enunciado || '',
           images: pq.images || [],
-          textualReferenceIndex: null,
+          textualReferenceIndex: pq.textualReferenceIndex !== undefined && pq.textualReferenceIndex !== null ? pq.textualReferenceIndex : null,
           alternatives: (pq.alternatives && pq.alternatives.length > 0)
             ? pq.alternatives.map((alt) => ({
                 identifier: alt.identifier,
@@ -481,10 +564,44 @@ export const CreateTestWizardModal: React.FC<CreateTestWizardModalProps> = ({
         }
       });
 
+      const sectionAnswers = res.sectionAnswers || {};
+
       let matches = 0;
       const updated = questions.map((q) => {
         const qIden = (q.identifier || '').trim().toLowerCase();
-        const correctLetter = ansMap[qIden];
+        const origIden = (q.originalIdentifier || q.identifier || '').trim().toLowerCase();
+
+        let correctLetter: string | undefined = undefined;
+
+        // 1. Tenta encontrar a resposta pela seção da questão (ex: LÍNGUA ESTRANGEIRA - INGLÊS / ESPANHOL)
+        if (q.section && Object.keys(sectionAnswers).length > 0) {
+          const qSecLower = q.section.toLowerCase();
+          for (const [secKey, sList] of Object.entries(sectionAnswers)) {
+            const secKeyLower = secKey.toLowerCase();
+            if (
+              secKeyLower === qSecLower ||
+              (qSecLower.includes('ingl') && secKeyLower.includes('ingl')) ||
+              (qSecLower.includes('espanh') && secKeyLower.includes('espanh')) ||
+              (qSecLower.includes('franc') && secKeyLower.includes('franc'))
+            ) {
+              const found = sList.find(
+                (item) =>
+                  (item.identifier || '').trim().toLowerCase() === origIden ||
+                  (item.identifier || '').trim().toLowerCase() === qIden
+              );
+              if (found) {
+                correctLetter = found.correctAlternative.toUpperCase();
+                break;
+              }
+            }
+          }
+        }
+
+        // 2. Fallback para ansMap geral por originalIdentifier ou identifier
+        if (!correctLetter) {
+          correctLetter = ansMap[origIden] || ansMap[qIden];
+        }
+
         if (correctLetter) {
           matches++;
           const isAnnulled = correctLetter === 'X' || correctLetter === 'ANULADA';
@@ -556,16 +673,24 @@ export const CreateTestWizardModal: React.FC<CreateTestWizardModalProps> = ({
         areaId: areaId ? Number(areaId) : null,
         description: description.trim() || undefined,
         isPublic,
-        textualReferences: textualReferences.map((ref) => ({
-          title: ref.title?.trim() || undefined,
-          subtitle: ref.subtitle?.trim() || undefined,
-          content: ref.content?.trim() || undefined,
-          author: ref.author?.trim() || undefined,
-          reference: ref.reference?.trim() || ref.source?.trim() || undefined,
-          caption: ref.caption?.trim() || undefined,
-          source: ref.source?.trim() || ref.reference?.trim() || undefined,
-          mediaUrl: ref.mediaUrl?.trim() || undefined,
-        })),
+        textualReferences: textualReferences.map((ref) => {
+          const cleanRef = (ref.reference || ref.source || '')
+            .replace(/!\[.*?\]\([^)]+\)/g, '')
+            .trim() || undefined;
+          const cleanSource = (ref.source || ref.reference || '')
+            .replace(/!\[.*?\]\([^)]+\)/g, '')
+            .trim() || undefined;
+          return {
+            title: ref.title?.trim() || undefined,
+            subtitle: ref.subtitle?.trim() || undefined,
+            content: ref.content?.trim() || undefined,
+            author: ref.author?.trim() || undefined,
+            reference: cleanRef,
+            caption: ref.caption?.trim() || undefined,
+            source: cleanSource,
+            mediaUrl: ref.mediaUrl?.trim() || undefined,
+          };
+        }),
         questions: sortedQuestions.map((q) => ({
           identifier: q.identifier.trim(),
           enunciado: q.enunciado.trim(),
@@ -814,9 +939,135 @@ export const CreateTestWizardModal: React.FC<CreateTestWizardModalProps> = ({
         {activeStep === 1 && (
           <Stack spacing={2} sx={{ minWidth: 0, width: '100%' }}>
             {duplicates.length > 0 && (
-              <Alert severity="warning" icon={<WarningAmberIcon />}>
-                Identificadores duplicados encontrados: <strong>{duplicates.join(', ')}</strong>. Cada questão dentro da mesma prova deve possuir um número/identificador exclusivo.
-              </Alert>
+              <Paper
+                elevation={0}
+                sx={{
+                  p: 2.5,
+                  borderRadius: 2.5,
+                  border: `1.5px solid ${PALETTE_COLORS.primary}`,
+                  backgroundColor: isDark ? 'rgba(217, 183, 99, 0.08)' : 'rgba(217, 183, 99, 0.12)',
+                }}
+              >
+                <Stack spacing={2}>
+                  <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1.5 }}>
+                    <WarningAmberIcon sx={{ color: PALETTE_COLORS.primary, fontSize: 30, mt: 0.3 }} />
+                    <Box>
+                      <Typography variant="subtitle1" sx={{ fontWeight: 800, color: PALETTE_COLORS.primary, fontSize: '1rem' }}>
+                        Conflito de Questões com Mesmo Identificador ({duplicates.length} repetidas)
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5, lineHeight: 1.5 }}>
+                        Identificadores duplicados: <strong>{duplicates.join(', ')}</strong>. Comum em provas com múltiplos idiomas (ex: Inglês e Espanhol).
+                        Cada questão na prova deve possuir uma numeração única. Resolva em lote abaixo ou altere individualmente:
+                      </Typography>
+                    </Box>
+                  </Box>
+
+                  {conflictingSections.length > 1 && (
+                    <Box sx={{ pt: 0.5 }}>
+                      <Typography variant="caption" sx={{ fontWeight: 700, color: 'text.secondary', display: 'block', mb: 1, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                        Manter apenas questões da seção:
+                      </Typography>
+                      <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap' }}>
+                        {conflictingSections.map((sec) => (
+                          <Button
+                            key={sec}
+                            size="small"
+                            variant="contained"
+                            onClick={() => handleKeepOnlySection(sec)}
+                            sx={{
+                              backgroundColor: PALETTE_COLORS.primary,
+                              color: '#1a1e26',
+                              fontWeight: 700,
+                              fontSize: '0.8rem',
+                              textTransform: 'none',
+                              px: 2,
+                              py: 0.8,
+                              borderRadius: 2,
+                              boxShadow: 'none',
+                              '&:hover': {
+                                backgroundColor: '#c4a350',
+                                boxShadow: 'none',
+                              },
+                            }}
+                          >
+                            {sec}
+                          </Button>
+                        ))}
+                      </Box>
+                    </Box>
+                  )}
+
+                  <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap', alignItems: 'center', pt: 1, borderTop: isDark ? '1px solid rgba(255,255,255,0.08)' : '1px solid rgba(0,0,0,0.06)' }}>
+                    <Button
+                      size="small"
+                      variant="outlined"
+                      onClick={handleReindexDuplicatesSequentially}
+                      sx={{
+                        borderColor: PALETTE_COLORS.secondary,
+                        color: PALETTE_COLORS.secondary,
+                        fontWeight: 700,
+                        fontSize: '0.8rem',
+                        textTransform: 'none',
+                        px: 2,
+                        py: 0.6,
+                        borderRadius: 2,
+                        '&:hover': {
+                          borderColor: PALETTE_COLORS.secondary,
+                          backgroundColor: 'rgba(90, 166, 226, 0.08)',
+                        },
+                      }}
+                    >
+                      Reindexar Duplicadas ao Final
+                    </Button>
+
+                    <Button
+                      size="small"
+                      variant="outlined"
+                      onClick={handleDifferentiateWithSectionSuffix}
+                      sx={{
+                        borderColor: PALETTE_COLORS.secondary,
+                        color: PALETTE_COLORS.secondary,
+                        fontWeight: 700,
+                        fontSize: '0.8rem',
+                        textTransform: 'none',
+                        px: 2,
+                        py: 0.6,
+                        borderRadius: 2,
+                        '&:hover': {
+                          borderColor: PALETTE_COLORS.secondary,
+                          backgroundColor: 'rgba(90, 166, 226, 0.08)',
+                        },
+                      }}
+                    >
+                      Diferenciar com Sufixo da Seção
+                    </Button>
+
+                    <FormControlLabel
+                      control={
+                        <Switch
+                          size="small"
+                          checked={filterOnlyDuplicates}
+                          onChange={(e) => setFilterOnlyDuplicates(e.target.checked)}
+                          sx={{
+                            '& .MuiSwitch-switchBase.Mui-checked': {
+                              color: PALETTE_COLORS.secondary,
+                            },
+                            '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': {
+                              backgroundColor: PALETTE_COLORS.secondary,
+                            },
+                          }}
+                        />
+                      }
+                      label={
+                        <Typography variant="caption" sx={{ fontWeight: 700, color: 'text.secondary' }}>
+                          Exibir apenas conflitantes
+                        </Typography>
+                      }
+                      sx={{ ml: 'auto' }}
+                    />
+                  </Box>
+                </Stack>
+              </Paper>
             )}
 
             {/* Gerenciamento de Textos de Apoio / Referências Textuais */}
@@ -1023,7 +1274,11 @@ export const CreateTestWizardModal: React.FC<CreateTestWizardModalProps> = ({
               </Button>
             </Box>
 
-            {questions.map((q, qIndex) => {
+            {(filterOnlyDuplicates
+              ? questions.filter((q) => duplicates.includes((q.identifier || '').trim().toLowerCase()))
+              : questions
+            ).map((q) => {
+              const qIndex = questions.findIndex((item) => item.id === q.id);
               const isDuplicate = duplicates.includes((q.identifier || '').trim().toLowerCase());
               return (
                 <Accordion
@@ -1038,7 +1293,7 @@ export const CreateTestWizardModal: React.FC<CreateTestWizardModalProps> = ({
                   }}
                   onFocus={() => setActiveQuestionIndex(qIndex)}
                   sx={{
-                    border: isDuplicate ? '1px solid #f44336' : '1px solid',
+                    border: isDuplicate ? '1.5px solid #f44336' : '1px solid',
                     borderColor: isDuplicate ? 'error.main' : 'divider',
                     borderRadius: '8px !important',
                     mb: 1.5,
@@ -1091,12 +1346,40 @@ export const CreateTestWizardModal: React.FC<CreateTestWizardModalProps> = ({
                         sx={{
                           fontWeight: 700,
                           minWidth: 50,
-                          maxWidth: 65,
+                          maxWidth: 75,
                           height: 28,
                           justifyContent: 'center',
                           flexShrink: 0,
                         }}
                       />
+
+                      {q.section && (
+                        <Chip
+                          label={q.section}
+                          variant="outlined"
+                          size="small"
+                          sx={{
+                            fontWeight: 600,
+                            height: 24,
+                            fontSize: '0.72rem',
+                            flexShrink: 0,
+                          }}
+                        />
+                      )}
+
+                      {isDuplicate && (
+                        <Chip
+                          label="Duplicada"
+                          color="error"
+                          size="small"
+                          sx={{
+                            fontWeight: 700,
+                            height: 24,
+                            fontSize: '0.72rem',
+                            flexShrink: 0,
+                          }}
+                        />
+                      )}
 
                       {/* Truncated Enunciado */}
                       <Typography
@@ -1110,7 +1393,7 @@ export const CreateTestWizardModal: React.FC<CreateTestWizardModalProps> = ({
                           color: 'text.primary',
                         }}
                       >
-                        {q.enunciado ? q.enunciado.substring(0, 100) + '...' : 'Questão sem enunciado'}
+                        {q.enunciado ? stripRichTextMarkup(q.enunciado).substring(0, 100) + '...' : 'Questão sem enunciado'}
                       </Typography>
 
                       {/* Quick Textual Reference Selector in Header */}
