@@ -71,7 +71,8 @@ export const SearchBar: React.FC<SearchBarProps> = ({
     (filters.subjectId !== undefined && filters.subjectId !== '') ||
     filters.year !== '' ||
     filters.testId !== '' ||
-    Boolean(filters.difficulty);
+    Boolean(filters.difficulty) ||
+    Boolean(filters.standaloneOnly);
 
   const handleClear = () => {
     setSearchTerm('');
@@ -84,6 +85,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
       year: '',
       testId: '',
       difficulty: '',
+      standaloneOnly: false,
       sort: 'recent',
     });
   };
@@ -355,6 +357,15 @@ export const SearchBar: React.FC<SearchBarProps> = ({
                 size="small"
                 label={`Prova: ${tests.find((t) => t.id === filters.testId)?.name || filters.testId}`}
                 onDelete={() => onFilterChange({ ...filters, testId: '' })}
+                variant="outlined"
+              />
+            )}
+            {filters.standaloneOnly && (
+              <Chip
+                size="small"
+                label="Apenas Avulsas"
+                onDelete={() => onFilterChange({ ...filters, standaloneOnly: false })}
+                color="primary"
                 variant="outlined"
               />
             )}

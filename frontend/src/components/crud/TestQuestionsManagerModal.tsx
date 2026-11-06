@@ -34,6 +34,7 @@ import { PALETTE_COLORS } from '../../theme/theme';
 import { EditQuestionModal } from './EditQuestionModal';
 import { CreateQuestionModal } from './CreateQuestionModal';
 import { sortQuestionsByIdentifier } from '../../utils/questionUtils';
+import { stripRichTextMarkup } from '../common/FormattedText';
 
 interface TestQuestionsManagerModalProps {
   open: boolean;
@@ -234,7 +235,7 @@ export const TestQuestionsManagerModal: React.FC<TestQuestionsManagerModalProps>
                         mt: 0.5,
                       }}
                     >
-                      {q.enunciado}
+                      {stripRichTextMarkup(q.enunciado)}
                     </Typography>
                     <Typography variant="caption" color="text.disabled" sx={{ mt: 0.5, display: 'block' }}>
                       {q.alternatives?.length || 0} alternativas
@@ -365,7 +366,7 @@ export const TestQuestionsManagerModal: React.FC<TestQuestionsManagerModalProps>
                           mt: 0.5,
                         }}
                       >
-                        {eq.enunciado}
+                        {stripRichTextMarkup(eq.enunciado)}
                       </Typography>
                     </Box>
 

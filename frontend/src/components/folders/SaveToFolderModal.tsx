@@ -156,7 +156,7 @@ export const SaveToFolderModal: React.FC<SaveToFolderModalProps> = ({
       </DialogTitle>
       <DialogContent dividers>
         <Typography variant="body2" sx={{ color: 'text.secondary', mb: 2 }}>
-          Selecione uma ou mais pastas para guardar a **Questão {question.identifier}**.
+          Selecione uma ou mais pastas para guardar a <strong>Questão {question.identifier}</strong>.
         </Typography>
 
         {loading ? (

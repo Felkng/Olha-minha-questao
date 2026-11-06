@@ -17,13 +17,33 @@ import {
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import CheckIcon from '@mui/icons-material/Check';
 import { useAppTheme } from '../../theme/ThemeContext';
+import { ZoomableImage } from './ZoomableImage';
 
-interface FormattedTextProps {
+export interface FormattedTextProps {
   text: string;
   fontSize?: string | number;
   lineHeight?: string | number;
+  fontWeight?: string | number;
   color?: string;
+  inline?: boolean;
+  renderInlineImages?: boolean;
+  hideInlineImages?: boolean;
   sx?: SxProps<Theme>;
+}
+
+export interface RichTextStyle {
+  bold?: boolean;
+  italic?: boolean;
+  underline?: boolean;
+  strike?: boolean;
+  code?: boolean;
+  sup?: boolean;
+  sub?: boolean;
+  mark?: boolean;
+}
+
+export interface RichTextLeaf extends RichTextStyle {
+  text: string;
 }
 
 interface TableSegment {
@@ -37,6 +57,474 @@ type ContentSegment =
   | { type: 'text'; content: string }
   | { type: 'code'; language?: string; content: string }
   | TableSegment;
+
+const ALLOWED_HTML_TAGS = new Set([
+  'u',
+  'ins',
+  'b',
+  'strong',
+  'i',
+  'em',
+  's',
+  'del',
+  'strike',
+  'sup',
+  'sub',
+  'mark',
+  'code',
+]);
+
+const INLINE_IMAGE_REGEX = /!\s*\[([^\]]*)\]\((data:image\/[^)]+|https?:\/\/[^)\s]+|\/[^)\s]+)\)/g;
+
+/**
+ * Remove marcações Markdown e HTML inline para exibição em resumos curtos / prévias truncadas.
+ */
+export function stripRichTextMarkup(rawText?: string | null): string {
+  if (!rawText) return '';
+  return rawText
+    .replace(/```[a-zA-Z0-9_-]*\n([\s\S]*?)```/g, '$1')
+    .replace(INLINE_IMAGE_REGEX, (_, alt) => (alt ? `[${alt}]` : ''))
+    .replace(/<br\s*\/?>/gi, ' ')
+    .replace(/<\/?(u|ins|b|strong|i|em|s|del|strike|sup|sub|mark|code)\b[^>]*>/gi, '')
+    .replace(/\*\*\*(?!\s)([\s\S]+?)(?<!\s)\*\*\*/g, '$1')
+    .replace(/\*\*(?!\s)([\s\S]+?)(?<!\s)\*\*/g, '$1')
+    .replace(/(^|[^\w])__(?!\s)([\s\S]+?)(?<!\s)__(?![\w])/g, '$1$2')
+    .replace(/\*(?!\s|\*)([^*\n]+?)(?<!\s|\*)\*/g, '$1')
+    .replace(/(^|[^\w])_(?!\s|_)([^_\n]+?)(?<!\s|_)_(?![\w])/g, '$1$2')
+    .replace(/~~(?!\s)([\s\S]+?)(?<!\s)~~/g, '$1')
+    .replace(/`([^`\n]+)`/g, '$1')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+interface InlineTokenMatch {
+  index: number;
+  length: number;
+  kind:
+    | 'code'
+    | 'br'
+    | 'image'
+    | 'boldItalic'
+    | 'bold'
+    | 'italic'
+    | 'underline'
+    | 'strike'
+    | 'sup'
+    | 'sub'
+    | 'mark';
+  inner?: string;
+  alt?: string;
+  src?: string;
+}
+
+function findMatchingHtmlClose(str: string, tagName: string, contentStart: number): { innerEnd: number; fullEnd: number } | null {
+  const tagPattern = new RegExp(`<(\\/?)(${tagName})\\b[^>]*>`, 'gi');
+  tagPattern.lastIndex = contentStart;
+  let depth = 1;
+  let m: RegExpExecArray | null;
+  while ((m = tagPattern.exec(str)) !== null) {
+    const isClosing = m[1] === '/';
+    if (isClosing) {
+      depth -= 1;
+      if (depth === 0) {
+        return { innerEnd: m.index, fullEnd: tagPattern.lastIndex };
+      }
+    } else if (!m[0].endsWith('/>')) {
+      depth += 1;
+    }
+  }
+  return null;
+}
+
+function htmlTagToKind(tag: string): InlineTokenMatch['kind'] {
+  switch (tag.toLowerCase()) {
+    case 'u':
+    case 'ins':
+      return 'underline';
+    case 'b':
+    case 'strong':
+      return 'bold';
+    case 'i':
+    case 'em':
+      return 'italic';
+    case 's':
+    case 'del':
+    case 'strike':
+      return 'strike';
+    case 'sup':
+      return 'sup';
+    case 'sub':
+      return 'sub';
+    case 'mark':
+      return 'mark';
+    case 'code':
+      return 'code';
+    default:
+      return 'bold';
+  }
+}
+
+function findEarliestInlineToken(str: string, allowImages: boolean): InlineTokenMatch | null {
+  let best: InlineTokenMatch | null = null;
+
+  const consider = (candidate: InlineTokenMatch | null) => {
+    if (!candidate) return;
+    if (!best || candidate.index < best.index) {
+      best = candidate;
+    }
+  };
+
+  const getBestIndex = (): number => (best ? (best as InlineTokenMatch).index : Infinity);
+
+  // 1. Inline backtick code `...`
+  const codeMatch = /`([^`\n]+)`/.exec(str);
+  if (codeMatch) {
+    consider({
+      index: codeMatch.index,
+      length: codeMatch[0].length,
+      kind: 'code',
+      inner: codeMatch[1],
+    });
+  }
+
+  // 2. <br> / <br/>
+  const brMatch = /<br\s*\/?>/i.exec(str);
+  if (brMatch) {
+    consider({
+      index: brMatch.index,
+      length: brMatch[0].length,
+      kind: 'br',
+    });
+  }
+
+  // 3. Inline Markdown image ![alt](src)
+  if (allowImages) {
+    const imgRegex = /!\s*\[([^\]]*)\]\((data:image\/[^)]+|https?:\/\/[^)\s]+|\/[^)\s]+)\)/;
+    const imgMatch = imgRegex.exec(str);
+    if (imgMatch) {
+      consider({
+        index: imgMatch.index,
+        length: imgMatch[0].length,
+        kind: 'image',
+        alt: imgMatch[1],
+        src: imgMatch[2],
+      });
+    }
+  }
+
+  // 4. Allowed paired HTML inline tags: <u>, <b>, <strong>, <i>, <em>, <s>, <sup>, <sub>, <mark>, <code>
+  const htmlOpenRegex = /<([a-zA-Z]+)\b[^>]*>/g;
+  let htmlOpen: RegExpExecArray | null;
+  while ((htmlOpen = htmlOpenRegex.exec(str)) !== null) {
+    const tag = htmlOpen[1].toLowerCase();
+    if (!ALLOWED_HTML_TAGS.has(tag)) continue;
+    if (htmlOpen.index >= getBestIndex()) break;
+    const closeInfo = findMatchingHtmlClose(str, tag, htmlOpenRegex.lastIndex);
+    if (closeInfo) {
+      consider({
+        index: htmlOpen.index,
+        length: closeInfo.fullEnd - htmlOpen.index,
+        kind: htmlTagToKind(tag),
+        inner: str.slice(htmlOpenRegex.lastIndex, closeInfo.innerEnd),
+      });
+      break;
+    }
+  }
+
+  // 5. Bold + Italic ***...***
+  const boldItalicMatch = /\*\*\*(?!\s)([\s\S]+?)(?<!\s)\*\*\*/.exec(str);
+  if (boldItalicMatch) {
+    consider({
+      index: boldItalicMatch.index,
+      length: boldItalicMatch[0].length,
+      kind: 'boldItalic',
+      inner: boldItalicMatch[1],
+    });
+  }
+
+  // 6. Bold **...**
+  const boldAstMatch = /\*\*(?!\s)([\s\S]+?)(?<!\s)\*\*/.exec(str);
+  if (boldAstMatch) {
+    consider({
+      index: boldAstMatch.index,
+      length: boldAstMatch[0].length,
+      kind: 'bold',
+      inner: boldAstMatch[1],
+    });
+  }
+
+  // 7. Bold __...__ (word-boundary safe)
+  const boldUndRegex = /__(?!\s)([\s\S]+?)(?<!\s)__(?![a-zA-Z0-9_])/g;
+  let boldUnd: RegExpExecArray | null;
+  while ((boldUnd = boldUndRegex.exec(str)) !== null) {
+    if (boldUnd.index >= getBestIndex()) break;
+    const prevChar = boldUnd.index > 0 ? str[boldUnd.index - 1] : '';
+    if (!prevChar || !/[a-zA-Z0-9_]/.test(prevChar)) {
+      consider({
+        index: boldUnd.index,
+        length: boldUnd[0].length,
+        kind: 'bold',
+        inner: boldUnd[1],
+      });
+      break;
+    }
+  }
+
+  // 8. Italic *...*
+  const italicAstRegex = /\*(?!\s|\*)([^*\n]+?)(?<!\s|\*)\*(?!\*)/g;
+  let italicAst: RegExpExecArray | null;
+  while ((italicAst = italicAstRegex.exec(str)) !== null) {
+    if (italicAst.index >= getBestIndex()) break;
+    const prevChar = italicAst.index > 0 ? str[italicAst.index - 1] : '';
+    if (prevChar !== '*') {
+      consider({
+        index: italicAst.index,
+        length: italicAst[0].length,
+        kind: 'italic',
+        inner: italicAst[1],
+      });
+      break;
+    }
+  }
+
+  // 9. Italic _..._ (word-boundary safe so snake_case identifiers stay untouched)
+  const italicUndRegex = /_(?!\s|_)([^_\n]+?)(?<!\s|_)_(?![a-zA-Z0-9_])/g;
+  let italicUnd: RegExpExecArray | null;
+  while ((italicUnd = italicUndRegex.exec(str)) !== null) {
+    if (italicUnd.index >= getBestIndex()) break;
+    const prevChar = italicUnd.index > 0 ? str[italicUnd.index - 1] : '';
+    if (!prevChar || !/[a-zA-Z0-9_]/.test(prevChar)) {
+      consider({
+        index: italicUnd.index,
+        length: italicUnd[0].length,
+        kind: 'italic',
+        inner: italicUnd[1],
+      });
+      break;
+    }
+  }
+
+  // 10. Strikethrough ~~...~~
+  const strikeMatch = /~~(?!\s)([\s\S]+?)(?<!\s)~~/.exec(str);
+  if (strikeMatch) {
+    consider({
+      index: strikeMatch.index,
+      length: strikeMatch[0].length,
+      kind: 'strike',
+      inner: strikeMatch[1],
+    });
+  }
+
+  return best;
+}
+
+/**
+ * Converte texto com Markdown/HTML inline em folhas planas com estilo acumulado.
+ * Útil para componentes que aplicam seleção/grifo por offset de caractere (ex.: TextualReferenceDrawer).
+ */
+export function flattenRichTextLeaves(
+  input: string,
+  inheritedStyle: RichTextStyle = {},
+  depth = 0
+): RichTextLeaf[] {
+  if (!input) return [];
+  if (depth > 12) return [{ text: input, ...inheritedStyle }];
+
+  const leaves: RichTextLeaf[] = [];
+  let remaining = input;
+
+  while (remaining.length > 0) {
+    const token = findEarliestInlineToken(remaining, false);
+    if (!token) {
+      leaves.push({ text: remaining, ...inheritedStyle });
+      break;
+    }
+
+    if (token.index > 0) {
+      leaves.push({ text: remaining.slice(0, token.index), ...inheritedStyle });
+    }
+
+    if (token.kind === 'br') {
+      leaves.push({ text: '\n', ...inheritedStyle });
+    } else if (token.kind === 'code') {
+      leaves.push({ text: token.inner || '', ...inheritedStyle, code: true });
+    } else {
+      const nextStyle: RichTextStyle = { ...inheritedStyle };
+      if (token.kind === 'boldItalic') {
+        nextStyle.bold = true;
+        nextStyle.italic = true;
+      } else if (token.kind === 'bold') {
+        nextStyle.bold = true;
+      } else if (token.kind === 'italic') {
+        nextStyle.italic = true;
+      } else if (token.kind === 'underline') {
+        nextStyle.underline = true;
+      } else if (token.kind === 'strike') {
+        nextStyle.strike = true;
+      } else if (token.kind === 'sup') {
+        nextStyle.sup = true;
+      } else if (token.kind === 'sub') {
+        nextStyle.sub = true;
+      } else if (token.kind === 'mark') {
+        nextStyle.mark = true;
+      }
+      leaves.push(...flattenRichTextLeaves(token.inner || '', nextStyle, depth + 1));
+    }
+
+    remaining = remaining.slice(token.index + token.length);
+  }
+
+  return leaves;
+}
+
+function parseInlineRichText(
+  input: string,
+  options: { isDark: boolean; allowImages: boolean; inline: boolean },
+  keyPrefix = 'rt',
+  depth = 0
+): React.ReactNode[] {
+  if (!input) return [];
+  if (depth > 12) return [input];
+
+  const nodes: React.ReactNode[] = [];
+  let remaining = input;
+  let step = 0;
+
+  while (remaining.length > 0) {
+    const token = findEarliestInlineToken(remaining, options.allowImages);
+    if (!token) {
+      nodes.push(remaining);
+      break;
+    }
+
+    if (token.index > 0) {
+      nodes.push(remaining.slice(0, token.index));
+    }
+
+    const key = `${keyPrefix}_${step++}`;
+    const children =
+      token.inner !== undefined && token.kind !== 'code'
+        ? parseInlineRichText(token.inner, options, key, depth + 1)
+        : token.inner;
+
+    switch (token.kind) {
+      case 'br':
+        nodes.push(<br key={key} />);
+        break;
+      case 'image':
+        if (token.src) {
+          nodes.push(
+            <Box
+              key={key}
+              component="span"
+              sx={{
+                display: options.inline ? 'inline-flex' : 'flex',
+                justifyContent: options.inline ? 'flex-start' : 'center',
+                my: options.inline ? 0.5 : 1.5,
+                maxWidth: '100%',
+              }}
+            >
+              <ZoomableImage
+                src={token.src}
+                alt={token.alt || 'Figura'}
+                maxHeight={options.inline ? 260 : 420}
+              />
+            </Box>
+          );
+        }
+        break;
+      case 'code':
+        nodes.push(
+          <Box
+            key={key}
+            component="code"
+            sx={{
+              fontFamily: '"Fira Code", "Consolas", "Courier New", monospace',
+              fontSize: '0.9em',
+              px: 0.6,
+              py: 0.15,
+              borderRadius: 1,
+              backgroundColor: options.isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.06)',
+              border: '1px solid',
+              borderColor: options.isDark ? 'rgba(255, 255, 255, 0.14)' : 'rgba(0, 0, 0, 0.1)',
+            }}
+          >
+            {token.inner}
+          </Box>
+        );
+        break;
+      case 'boldItalic':
+        nodes.push(
+          <Box key={key} component="strong" sx={{ fontWeight: 700, fontStyle: 'italic' }}>
+            {children}
+          </Box>
+        );
+        break;
+      case 'bold':
+        nodes.push(
+          <Box key={key} component="strong" sx={{ fontWeight: 700 }}>
+            {children}
+          </Box>
+        );
+        break;
+      case 'italic':
+        nodes.push(
+          <Box key={key} component="em" sx={{ fontStyle: 'italic' }}>
+            {children}
+          </Box>
+        );
+        break;
+      case 'underline':
+        nodes.push(
+          <Box
+            key={key}
+            component="u"
+            sx={{
+              textDecoration: 'underline',
+              textUnderlineOffset: '3px',
+              textDecorationThickness: '1.5px',
+            }}
+          >
+            {children}
+          </Box>
+        );
+        break;
+      case 'strike':
+        nodes.push(
+          <Box key={key} component="s" sx={{ textDecoration: 'line-through' }}>
+            {children}
+          </Box>
+        );
+        break;
+      case 'sup':
+        nodes.push(<sup key={key}>{children}</sup>);
+        break;
+      case 'sub':
+        nodes.push(<sub key={key}>{children}</sub>);
+        break;
+      case 'mark':
+        nodes.push(
+          <Box
+            key={key}
+            component="mark"
+            sx={{
+              backgroundColor: options.isDark ? 'rgba(255, 230, 0, 0.28)' : 'rgba(255, 230, 0, 0.45)',
+              color: 'inherit',
+              px: 0.4,
+              borderRadius: 0.5,
+            }}
+          >
+            {children}
+          </Box>
+        );
+        break;
+    }
+
+    remaining = remaining.slice(token.index + token.length);
+  }
+
+  return nodes;
+}
 
 function isSeparatorRow(line: string): boolean {
   const trimmed = line.trim();
@@ -194,7 +682,11 @@ export const FormattedText: React.FC<FormattedTextProps> = ({
   text,
   fontSize = '1.05rem',
   lineHeight = 1.7,
+  fontWeight,
   color = 'text.primary',
+  inline = false,
+  renderInlineImages = true,
+  hideInlineImages = false,
   sx,
 }) => {
   const { mode } = useAppTheme();
@@ -203,15 +695,48 @@ export const FormattedText: React.FC<FormattedTextProps> = ({
 
   if (!text) return null;
 
+  const processedInput = hideInlineImages
+    ? text.replace(INLINE_IMAGE_REGEX, '').replace(/\n{3,}/g, '\n\n').trim()
+    : text;
+
+  if (!processedInput) return null;
+
+  const inlineOptions = {
+    isDark,
+    allowImages: renderInlineImages && !hideInlineImages,
+    inline,
+  };
+
+  if (inline && !processedInput.includes('```') && !processedInput.includes('\n|')) {
+    return (
+      <Typography
+        component="span"
+        sx={[
+          {
+            fontSize,
+            lineHeight,
+            fontWeight,
+            color,
+            whiteSpace: 'pre-wrap',
+            wordBreak: 'break-word',
+          },
+          ...(Array.isArray(sx) ? sx : [sx]),
+        ]}
+      >
+        {parseInlineRichText(processedInput, inlineOptions, 'inl')}
+      </Typography>
+    );
+  }
+
   // 1. Parse markdown code blocks ```lang\ncode\n```
   const rawSegments: ({ type: 'text'; content: string } | { type: 'code'; language?: string; content: string })[] = [];
   const codeBlockRegex = /```([a-zA-Z0-9_-]*)\n([\s\S]*?)```/g;
   let lastIndex = 0;
   let match: RegExpExecArray | null;
 
-  while ((match = codeBlockRegex.exec(text)) !== null) {
+  while ((match = codeBlockRegex.exec(processedInput)) !== null) {
     if (match.index > lastIndex) {
-      const textChunk = text.substring(lastIndex, match.index);
+      const textChunk = processedInput.substring(lastIndex, match.index);
       if (textChunk.trim()) {
         rawSegments.push({ type: 'text', content: textChunk });
       }
@@ -224,8 +749,8 @@ export const FormattedText: React.FC<FormattedTextProps> = ({
     lastIndex = codeBlockRegex.lastIndex;
   }
 
-  if (lastIndex < text.length) {
-    const textChunk = text.substring(lastIndex);
+  if (lastIndex < processedInput.length) {
+    const textChunk = processedInput.substring(lastIndex);
     if (textChunk.trim()) {
       rawSegments.push({ type: 'text', content: textChunk });
     }
@@ -251,7 +776,7 @@ export const FormattedText: React.FC<FormattedTextProps> = ({
   };
 
   return (
-    <Box sx={[{ display: 'flex', flexDirection: 'column', gap: 1.5 }, ...(Array.isArray(sx) ? sx : [sx])]}>
+    <Box sx={[{ display: 'flex', flexDirection: 'column', gap: inline ? 0.75 : 1.5 }, ...(Array.isArray(sx) ? sx : [sx])]}>
       {segments.map((seg, idx) => {
         if (seg.type === 'code') {
           return (
@@ -363,7 +888,7 @@ export const FormattedText: React.FC<FormattedTextProps> = ({
                           whiteSpace: 'nowrap',
                         }}
                       >
-                        {h}
+                        {parseInlineRichText(h, inlineOptions, `th_${idx}_${hIdx}`)}
                       </TableCell>
                     ))}
                   </TableRow>
@@ -399,7 +924,7 @@ export const FormattedText: React.FC<FormattedTextProps> = ({
                                 : `1px solid ${isDark ? 'rgba(255, 255, 255, 0.06)' : 'rgba(0, 0, 0, 0.06)'}`,
                           }}
                         >
-                          {cell}
+                          {parseInlineRichText(cell, inlineOptions, `td_${idx}_${rIdx}_${cIdx}`)}
                         </TableCell>
                       ))}
                     </TableRow>
@@ -417,11 +942,13 @@ export const FormattedText: React.FC<FormattedTextProps> = ({
             sx={{
               fontSize,
               lineHeight,
+              fontWeight,
               color,
               whiteSpace: 'pre-wrap',
+              wordBreak: 'break-word',
             }}
           >
-            {seg.content}
+            {parseInlineRichText(seg.content, inlineOptions, `p_${idx}`)}
           </Typography>
         );
       })}

@@ -55,6 +55,7 @@ import { CreateFlashcardModal } from '../components/crud/CreateFlashcardModal';
 import { EditFlashcardModal } from '../components/crud/EditFlashcardModal';
 import { EditFolderModal } from '../components/crud/EditFolderModal';
 import { SaveFlashcardToFolderModal } from '../components/folders/SaveFlashcardToFolderModal';
+import { FormattedText } from '../components/common/FormattedText';
 
 const COLOR_OPTIONS = [
   { hex: PALETTE_COLORS.primary, label: 'Ocre' },
@@ -878,19 +879,14 @@ export const FlashcardsPage: React.FC = () => {
                             {isFlipped ? 'VERSO (RESPOSTA):' : 'FRENTE (PERGUNTA):'}
                           </Typography>
 
-                          <Typography
-                            variant="body1"
-                            sx={{
-                              fontWeight: isFlipped ? 500 : 700,
-                              minHeight: 64,
-                              lineHeight: 1.5,
-                              wordBreak: 'break-word',
-                              overflowWrap: 'break-word',
-                              whiteSpace: 'pre-line',
-                            }}
-                          >
-                            {isFlipped ? card.back : card.front}
-                          </Typography>
+                          <Box sx={{ minHeight: 64 }}>
+                            <FormattedText
+                              text={isFlipped ? card.back : card.front}
+                              fontWeight={isFlipped ? 500 : 700}
+                              fontSize="1rem"
+                              lineHeight={1.5}
+                            />
+                          </Box>
                         </Box>
                       </Box>
 

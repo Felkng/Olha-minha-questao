@@ -154,7 +154,7 @@ export const SaveTestToFolderModal: React.FC<SaveTestToFolderModalProps> = ({
       </DialogTitle>
       <DialogContent dividers>
         <Typography variant="body2" sx={{ color: 'text.secondary', mb: 2 }}>
-          Selecione uma ou mais pastas exclusivas de provas para guardar a **Prova {test.name}**.
+          Selecione uma ou mais pastas exclusivas de provas para guardar a <strong>Prova {test.name}</strong>.
         </Typography>
 
         {loading ? (

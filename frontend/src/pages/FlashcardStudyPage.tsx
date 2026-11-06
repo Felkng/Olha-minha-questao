@@ -48,6 +48,7 @@ import {
 import { PALETTE_COLORS } from '../theme/theme';
 import { useAppTheme } from '../theme/ThemeContext';
 import { useAuth } from '../context/AuthContext';
+import { FormattedText } from '../components/common/FormattedText';
 
 const shuffleArray = <T,>(array: T[]): T[] => {
   const arr = [...array];
@@ -777,13 +778,22 @@ export const FlashcardStudyPage: React.FC = () => {
                 />
               </Box>
 
-              <Typography variant="body1" sx={{ fontWeight: 600, mb: 1 }}>
-                {card.front}
-              </Typography>
+              <FormattedText
+                text={card.front}
+                fontWeight={600}
+                fontSize="1rem"
+                sx={{ mb: 1 }}
+              />
               <Divider sx={{ my: 1 }} />
-              <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                <strong>Resposta:</strong> {card.back}
-              </Typography>
+              <Box sx={{ color: 'text.secondary', fontSize: '0.875rem' }}>
+                <strong>Resposta:</strong>{' '}
+                <FormattedText
+                  text={card.back}
+                  inline
+                  fontSize="0.875rem"
+                  color="text.secondary"
+                />
+              </Box>
             </Paper>
           ))}
         </Stack>
@@ -1120,21 +1130,14 @@ export const FlashcardStudyPage: React.FC = () => {
                 },
               }}
             >
-              <Typography
-                variant="h5"
-                sx={{
-                  fontWeight: 700,
-                  lineHeight: 1.55,
-                  fontSize: { xs: '1.08rem', sm: '1.35rem' },
-                  color: 'text.primary',
-                  wordBreak: 'break-word',
-                  overflowWrap: 'break-word',
-                  whiteSpace: 'pre-line',
-                  width: '100%',
-                }}
-              >
-                {currentCard.front}
-              </Typography>
+              <Box sx={{ width: '100%' }}>
+                <FormattedText
+                  text={currentCard.front}
+                  fontWeight={700}
+                  lineHeight={1.55}
+                  sx={{ fontSize: { xs: '1.08rem', sm: '1.35rem' } }}
+                />
+              </Box>
             </Box>
 
             {/* Bottom Hint */}
@@ -1233,21 +1236,14 @@ export const FlashcardStudyPage: React.FC = () => {
                 },
               }}
             >
-              <Typography
-                variant="h6"
-                sx={{
-                  fontWeight: 600,
-                  lineHeight: 1.6,
-                  fontSize: { xs: '1.02rem', sm: '1.25rem' },
-                  color: 'text.primary',
-                  wordBreak: 'break-word',
-                  overflowWrap: 'break-word',
-                  whiteSpace: 'pre-line',
-                  width: '100%',
-                }}
-              >
-                {currentCard.back}
-              </Typography>
+              <Box sx={{ width: '100%' }}>
+                <FormattedText
+                  text={currentCard.back}
+                  fontWeight={600}
+                  lineHeight={1.6}
+                  sx={{ fontSize: { xs: '1.02rem', sm: '1.25rem' } }}
+                />
+              </Box>
             </Box>
 
             {/* Bottom Hint */}

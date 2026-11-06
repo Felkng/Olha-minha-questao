@@ -600,6 +600,7 @@ export const QuestionCard: React.FC<QuestionCardProps> = ({
       {/* Question Statement (Enunciado) */}
       <FormattedText
         text={question.enunciado}
+        hideInlineImages={Boolean(question.images && question.images.length > 0)}
         sx={{
           fontSize: '1.05rem',
           lineHeight: 1.7,
@@ -737,17 +738,16 @@ export const QuestionCard: React.FC<QuestionCardProps> = ({
                   />
                 </Box>
               ) : (
-                <Typography
-                  variant="body2"
-                  sx={{
-                    fontSize: '0.95rem',
-                    color: 'text.primary',
-                    flexGrow: 1,
-                    lineHeight: 1.5,
-                  }}
-                >
-                  {alt.text}
-                </Typography>
+                <Box sx={{ flexGrow: 1, minWidth: 0 }}>
+                  <FormattedText
+                    text={alt.text}
+                    inline
+                    renderInlineImages
+                    fontSize="0.95rem"
+                    lineHeight={1.5}
+                    color="text.primary"
+                  />
+                </Box>
               )}
 
               {isAnswered && isCorrect && (

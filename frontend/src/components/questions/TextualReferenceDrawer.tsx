@@ -19,6 +19,7 @@ import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import { TextualReference } from '../../types';
 import { PALETTE_COLORS } from '../../theme/theme';
 import { useAppTheme } from '../../theme/ThemeContext';
+import { FormattedText, flattenRichTextLeaves, RichTextLeaf } from '../common/FormattedText';
 
 export interface TextAnnotation {
   id: string;
@@ -185,50 +186,72 @@ export const TextualReferenceDrawer: React.FC<TextualReferenceDrawerProps> = ({
     setFloatingMenuPos(null);
   };
 
-  // Render text with annotations using an interval-slicing algorithm
+  // Render text with rich inline formatting + user annotations using interval slicing over visible leaves
   const renderedText = useMemo(() => {
     const rawContent = reference?.content || '';
     if (!rawContent) return null;
 
-    if (annotations.length === 0) {
+    const hasBlockStructures = rawContent.includes('```') || /\n\s*\|.+\|\s*\n/.test(rawContent);
+    if (annotations.length === 0 && hasBlockStructures) {
       return (
-        <Typography
-          variant="body1"
-          sx={{
-            lineHeight: 1.85,
-            fontSize: '1rem',
-            whiteSpace: 'pre-line',
-            color: 'text.primary',
-            userSelect: 'text',
-          }}
-        >
-          {rawContent}
-        </Typography>
+        <FormattedText
+          text={rawContent}
+          fontSize="1rem"
+          lineHeight={1.85}
+          sx={{ userSelect: 'text' }}
+        />
       );
     }
 
-    // Collect all boundary points
-    const pointsSet = new Set<number>([0, rawContent.length]);
+    const leaves = flattenRichTextLeaves(rawContent);
+    const fullVisibleLength = leaves.reduce((acc, l) => acc + l.text.length, 0);
+
+    // Collect all boundary points in visible-text coordinates
+    const pointsSet = new Set<number>([0, fullVisibleLength]);
+    let cursor = 0;
+    const leafRanges = leaves.map((leaf) => {
+      const start = cursor;
+      const end = cursor + leaf.text.length;
+      cursor = end;
+      pointsSet.add(start);
+      pointsSet.add(end);
+      return { leaf, start, end };
+    });
+
     annotations.forEach((a) => {
-      if (a.start >= 0 && a.start <= rawContent.length) pointsSet.add(a.start);
-      if (a.end >= 0 && a.end <= rawContent.length) pointsSet.add(a.end);
+      if (a.start >= 0 && a.start <= fullVisibleLength) pointsSet.add(a.start);
+      if (a.end >= 0 && a.end <= fullVisibleLength) pointsSet.add(a.end);
     });
 
     const points = Array.from(pointsSet).sort((a, b) => a - b);
-    const slices: { text: string; isHighlight: boolean; isUnderline: boolean; key: string }[] = [];
+    const slices: {
+      text: string;
+      leaf: RichTextLeaf;
+      isHighlight: boolean;
+      isUnderline: boolean;
+      key: string;
+    }[] = [];
 
+    let leafIdx = 0;
     for (let i = 0; i < points.length - 1; i++) {
       const pStart = points[i];
       const pEnd = points[i + 1];
-      const sliceText = rawContent.slice(pStart, pEnd);
+      if (pStart === pEnd) continue;
 
-      // Check active annotations for this interval
+      while (leafIdx < leafRanges.length && leafRanges[leafIdx].end <= pStart) {
+        leafIdx += 1;
+      }
+      const lr = leafRanges[leafIdx];
+      if (!lr) continue;
+
+      const sliceText = lr.leaf.text.slice(pStart - lr.start, pEnd - lr.start);
       const activeAnns = annotations.filter((a) => a.start <= pStart && a.end >= pEnd);
       const isHighlight = activeAnns.some((a) => a.type === 'highlight');
       const isUnderline = activeAnns.some((a) => a.type === 'underline');
 
       slices.push({
         text: sliceText,
+        leaf: lr.leaf,
         isHighlight,
         isUnderline,
         key: `slice_${pStart}_${pEnd}`,
@@ -248,16 +271,48 @@ export const TextualReferenceDrawer: React.FC<TextualReferenceDrawerProps> = ({
         }}
       >
         {slices.map((s) => {
-          let style: React.CSSProperties = {};
-          if (s.isHighlight) {
+          const style: React.CSSProperties = {};
+          if (s.leaf.bold) style.fontWeight = 700;
+          if (s.leaf.italic) style.fontStyle = 'italic';
+          if (s.leaf.code) {
+            style.fontFamily = '"Fira Code", "Consolas", monospace';
+            style.fontSize = '0.9em';
+            style.backgroundColor = isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.06)';
+            style.padding = '1px 4px';
+            style.borderRadius = '3px';
+          }
+          if (s.leaf.mark || s.isHighlight) {
             style.backgroundColor = isDark ? 'rgba(255, 230, 0, 0.35)' : 'rgba(255, 230, 0, 0.45)';
             style.borderRadius = '3px';
             style.padding = '1px 2px';
           }
-          if (s.isUnderline) {
-            style.textDecoration = 'underline';
-            style.textDecorationThickness = '2.5px';
-            style.textDecorationColor = PALETTE_COLORS.secondary;
+
+          const decorations: string[] = [];
+          if (s.leaf.underline || s.isUnderline) decorations.push('underline');
+          if (s.leaf.strike) decorations.push('line-through');
+          if (decorations.length > 0) {
+            style.textDecoration = decorations.join(' ');
+            if (s.isUnderline) {
+              style.textDecorationThickness = '2.5px';
+              style.textDecorationColor = PALETTE_COLORS.secondary;
+            } else {
+              style.textUnderlineOffset = '3px';
+            }
+          }
+
+          if (s.leaf.sup) {
+            return (
+              <sup key={s.key} style={style}>
+                {s.text}
+              </sup>
+            );
+          }
+          if (s.leaf.sub) {
+            return (
+              <sub key={s.key} style={style}>
+                {s.text}
+              </sub>
+            );
           }
 
           return (

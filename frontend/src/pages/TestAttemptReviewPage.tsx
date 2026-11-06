@@ -344,7 +344,11 @@ export const TestAttemptReviewPage: React.FC = () => {
               </Box>
             )}
 
-            <FormattedText text={q.enunciado} sx={{ mb: 2.5, lineHeight: 1.6 }} />
+            <FormattedText
+              text={q.enunciado}
+              hideInlineImages={Boolean(q.images && q.images.length > 0)}
+              sx={{ mb: 2.5, lineHeight: 1.6 }}
+            />
 
             {q.images && q.images.length > 0 && (
               <Box
@@ -432,9 +436,15 @@ export const TestAttemptReviewPage: React.FC = () => {
                     >
                       {alt.identifier}
                     </Box>
-                    <Typography variant="body2" sx={{ flexGrow: 1 }}>
-                      {alt.text}
-                    </Typography>
+                    <Box sx={{ flexGrow: 1, minWidth: 0 }}>
+                      <FormattedText
+                        text={alt.text}
+                        inline
+                        renderInlineImages
+                        fontSize="0.875rem"
+                        lineHeight={1.5}
+                      />
+                    </Box>
                     {!isAnnulled && isCorrectAlt && (
                       <Chip size="small" label="Correta" color="success" sx={{ fontWeight: 600 }} />
                     )}
