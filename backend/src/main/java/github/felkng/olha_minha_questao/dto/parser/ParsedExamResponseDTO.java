@@ -1,6 +1,6 @@
 package github.felkng.olha_minha_questao.dto.parser;
 
-import github.felkng.olha_minha_questao.dto.reference.TextualReferenceResponseDTO;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -15,6 +15,7 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class ParsedExamResponseDTO {
 
     @Builder.Default
@@ -22,6 +23,9 @@ public class ParsedExamResponseDTO {
 
     @Builder.Default
     private List<ParsedTextualReferenceDTO> textualReferences = new ArrayList<>();
+
+    @Builder.Default
+    private List<DuplicateQuestionGroupDTO> duplicateGroups = new ArrayList<>();
 
     private String detectedTitle;
 }

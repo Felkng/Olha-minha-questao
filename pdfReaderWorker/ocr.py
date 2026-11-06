@@ -3,6 +3,7 @@ import os
 import re
 import base64
 import logging
+from difflib import SequenceMatcher
 from typing import List, Dict, Any, Optional, Tuple
 from concurrent.futures import ThreadPoolExecutor
 import pypdfium2 as pdfium
@@ -661,9 +662,10 @@ def extract_exam_from_scanned_pdf(
         if m_title:
             detected_title = clean_text(m_title.group(1))
 
-    def _ocr_page(p_idx: int) -> Tuple[int, List[Dict[str, Any]]]:
-        page = pdf[p_idx]
-        image = page.render(scale=scale).to_pil()
+    page_images = [pdf[i].render(scale=scale).to_pil() for i in range(total_pages)]
+
+    def _ocr_page(item: Tuple[int, Any]) -> Tuple[int, List[Dict[str, Any]]]:
+        p_idx, image = item
         W, H = image.size
 
         top_m = int(H * 0.03)
@@ -680,25 +682,97 @@ def extract_exam_from_scanned_pdf(
     # Process all pages in parallel
     workers = max_workers or min(8, max(2, (os.cpu_count() or 2)))
     with ThreadPoolExecutor(max_workers=workers) as executor:
-        page_results = list(executor.map(_ocr_page, range(total_pages)))
+        page_results = list(executor.map(_ocr_page, enumerate(page_images)))
 
     # Sort by page index
     page_results.sort(key=lambda x: x[0])
 
-    all_questions_map: Dict[str, Dict[str, Any]] = {}
+    def _is_same_ocr_question(q1: Dict[str, Any], q2: Dict[str, Any]) -> bool:
+        if q1.get("identifier") != q2.get("identifier"):
+            return False
+        s1, s2 = q1.get("section"), q2.get("section")
+        if s1 and s2 and s1 != s2:
+            return False
+        return True
+
+    deduped_questions: List[Dict[str, Any]] = []
     for _, qs in page_results:
         for q in qs:
-            qid = q["identifier"]
-            if qid not in all_questions_map or len(q["alternatives"]) > len(all_questions_map[qid]["alternatives"]):
-                all_questions_map[qid] = q
+            matched_idx = None
+            for idx, existing in enumerate(deduped_questions):
+                if _is_same_ocr_question(existing, q):
+                    matched_idx = idx
+                    break
+            if matched_idx is None:
+                deduped_questions.append(q)
+            else:
+                prev = deduped_questions[matched_idx]
+                if len(q.get("alternatives", [])) > len(prev.get("alternatives", [])):
+                    deduped_questions[matched_idx] = q
 
-    all_questions = list(all_questions_map.values())
-    all_questions.sort(key=lambda x: int(x["identifier"]) if x["identifier"].isdigit() else 999)
+    id_counts: Dict[str, int] = {}
+    for q in deduped_questions:
+        qid = q["identifier"]
+        id_counts[qid] = id_counts.get(qid, 0) + 1
+
+    has_duplicates = any(cnt > 1 for cnt in id_counts.values())
+    if not has_duplicates:
+        all_questions = sorted(
+            deduped_questions,
+            key=lambda x: int(x["identifier"]) if str(x.get("identifier", "")).isdigit() else 999
+        )
+    else:
+        blocks: List[List[Dict[str, Any]]] = []
+        curr_block: List[Dict[str, Any]] = []
+        seen_in_block: set = set()
+        curr_sec: Optional[str] = None
+        for q in deduped_questions:
+            qid = q["identifier"]
+            qsec = q.get("section")
+            if curr_block and (qsec != curr_sec or qid in seen_in_block):
+                blocks.append(curr_block)
+                curr_block = [q]
+                seen_in_block = {qid}
+                curr_sec = qsec
+            else:
+                curr_block.append(q)
+                seen_in_block.add(qid)
+                curr_sec = qsec
+        if curr_block:
+            blocks.append(curr_block)
+
+        indexed_blocks = []
+        for b_idx, blk in enumerate(blocks):
+            blk_sorted = sorted(blk, key=lambda x: int(x["identifier"]) if str(x.get("identifier", "")).isdigit() else 999)
+            min_id = min((int(x["identifier"]) for x in blk_sorted if str(x.get("identifier", "")).isdigit()), default=999)
+            indexed_blocks.append((min_id, b_idx, blk_sorted))
+        indexed_blocks.sort(key=lambda item: (item[0], item[1]))
+        all_questions = [q for _, _, blk_sorted in indexed_blocks for q in blk_sorted]
+
+    for q in all_questions:
+        q["isDuplicate"] = id_counts.get(q["identifier"], 0) > 1
+        q.setdefault("section", None)
+        q.setdefault("textualReferenceIndex", None)
+
+    duplicate_groups: List[Dict[str, Any]] = []
+    dup_ids = sorted(
+        [qid for qid, cnt in id_counts.items() if cnt > 1],
+        key=lambda x: int(x) if x.isdigit() else 999
+    )
+    for qid in dup_ids:
+        qs_for_id = [q for q in all_questions if q["identifier"] == qid]
+        sections = [q["section"] for q in qs_for_id if q.get("section")]
+        duplicate_groups.append({
+            "identifier": qid,
+            "count": len(qs_for_id),
+            "sections": sections,
+        })
 
     return {
         "questions": all_questions,
         "textualReferences": [],
-        "detectedTitle": detected_title
+        "detectedTitle": detected_title,
+        "duplicateGroups": duplicate_groups,
     }
 
 def extract_answer_key_from_scanned_pdf(
@@ -714,10 +788,10 @@ def extract_answer_key_from_scanned_pdf(
     """
     pdf = pdfium.PdfDocument(pdf_bytes)
     total_pages = len(pdf)
+    page_images = [pdf[i].render(scale=scale).to_pil() for i in range(total_pages)]
 
-    def _ocr_page_parts(p_idx: int) -> Dict[str, Any]:
-        page = pdf[p_idx]
-        image = page.render(scale=scale).to_pil()
+    def _ocr_page_parts(item: Tuple[int, Any]) -> Dict[str, Any]:
+        p_idx, image = item
         W, H = image.size
 
         # Full page text for header detection
@@ -755,7 +829,7 @@ def extract_answer_key_from_scanned_pdf(
 
     workers = max_workers or min(8, max(2, (os.cpu_count() or 2)))
     with ThreadPoolExecutor(max_workers=workers) as executor:
-        page_results = list(executor.map(_ocr_page_parts, range(total_pages)))
+        page_results = list(executor.map(_ocr_page_parts, enumerate(page_images)))
 
     page_results.sort(key=lambda x: x["p_idx"])
 
@@ -774,7 +848,7 @@ def extract_answer_key_from_scanned_pdf(
                     available_provas.append({"id": p_id, "name": p_name})
 
                 c_answers: Dict[str, str] = {}
-                matches = re.findall(r'([0-9]{1,3})\s*[\-\:\.]\s*([A-Ea-e]|Anulada|ANULADA|X)\b', c_text, re.I)
+                matches = re.findall(r'([0-9]{1,3})\s*[\-–—\:\.]\s*([A-Ea-e]|Anulada|ANULADA|X)\b', c_text, re.I)
                 for q_id, ans in matches:
                     q_num = str(int(q_id))
                     c_answers[q_num] = ans.upper() if len(ans) == 1 else "X"
@@ -785,7 +859,7 @@ def extract_answer_key_from_scanned_pdf(
                     seen_provas.add(pr)
                     available_provas.append({"id": pr, "name": pr})
                 pr_answers: Dict[str, str] = {}
-                for q_id, ans in re.findall(r'([0-9]{1,3})\s*[\-\:\.]\s*([A-Ea-e]|Anulada|ANULADA|X)\b', p["full_text"], re.I):
+                for q_id, ans in re.findall(r'([0-9]{1,3})\s*[\-–—\:\.]\s*([A-Ea-e]|Anulada|ANULADA|X)\b', p["full_text"], re.I):
                     pr_answers[str(int(q_id))] = ans.upper() if len(ans) == 1 else "X"
                 answers_by_prova[pr] = pr_answers
 
@@ -831,7 +905,7 @@ def extract_answer_key_from_scanned_pdf(
     else:
         # Fallback to all matches across full texts
         for p in page_results:
-            for q_id, ans in re.findall(r'(?:^|\s)([0-9]{1,3})\s*[\-\:\.]\s*([A-Ea-e]|Anulada|ANULADA|X)\b', p["full_text"], re.I):
+            for q_id, ans in re.findall(r'(?:^|\s)([0-9]{1,3})\s*[\-–—\:\.]\s*([A-Ea-e]|Anulada|ANULADA|X)\b', p["full_text"], re.I):
                 q_num = str(int(q_id))
                 if q_num not in selected_answers:
                     selected_answers[q_num] = ans.upper() if len(ans) == 1 else "X"
@@ -841,6 +915,7 @@ def extract_answer_key_from_scanned_pdf(
 
     return {
         "answers": result_answers,
+        "sectionAnswers": {},
         "availableProvas": available_provas,
         "selectedProva": target_id or target_name
     }

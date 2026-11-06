@@ -66,6 +66,20 @@ class TestRealPdfExtraction(unittest.TestCase):
         ]
         cls.scanned_pdf_path = next((p for p in possible_scanned_paths if os.path.exists(p)), None)
 
+        possible_bndes_exam_paths = [
+            os.path.join(base_dir, 'backend', 'src', 'test', 'prova_pdf', 'analista_de_sistemas_desenvolvimento.pdf'),
+            os.path.join(os.path.dirname(os.path.abspath(__file__)), 'prova_pdf', 'analista_de_sistemas_desenvolvimento.pdf'),
+            '/app/prova_pdf/analista_de_sistemas_desenvolvimento.pdf',
+        ]
+        cls.bndes_exam_pdf_path = next((p for p in possible_bndes_exam_paths if os.path.exists(p)), None)
+
+        possible_bndes_key_paths = [
+            os.path.join(base_dir, 'backend', 'src', 'test', 'prova_pdf', 'bndes0109_superior.pdf'),
+            os.path.join(os.path.dirname(os.path.abspath(__file__)), 'prova_pdf', 'bndes0109_superior.pdf'),
+            '/app/prova_pdf/bndes0109_superior.pdf',
+        ]
+        cls.bndes_key_pdf_path = next((p for p in possible_bndes_key_paths if os.path.exists(p)), None)
+
         possible_gab_final_paths = [
             os.path.join(base_dir, 'backend', 'src', 'test', 'prova_pdf', 'GabFinal_CP-T2024.pdf'),
             os.path.join(os.path.dirname(os.path.abspath(__file__)), 'prova_pdf', 'GabFinal_CP-T2024.pdf'),
@@ -113,6 +127,16 @@ class TestRealPdfExtraction(unittest.TestCase):
         if cls.scanned_pdf_path:
             with open(cls.scanned_pdf_path, 'rb') as f:
                 cls.scanned_bytes = f.read()
+
+        cls.bndes_exam_bytes = None
+        if cls.bndes_exam_pdf_path:
+            with open(cls.bndes_exam_pdf_path, 'rb') as f:
+                cls.bndes_exam_bytes = f.read()
+
+        cls.bndes_key_bytes = None
+        if cls.bndes_key_pdf_path:
+            with open(cls.bndes_key_pdf_path, 'rb') as f:
+                cls.bndes_key_bytes = f.read()
 
         cls.gab_final_bytes = None
         if cls.gab_final_pdf_path:
@@ -644,6 +668,39 @@ class TestRealPdfExtraction(unittest.TestCase):
         self.assertEqual(len(textual_references), 2)
         self.assertIn("LÍNGUA PORTUGUESA", textual_references[0]["title"])
         self.assertIn("LÍNGUA INGLESA", textual_references[1]["title"])
+
+    def test_extract_bndes_exam_with_foreign_languages_and_answer_key(self):
+        if not self.bndes_exam_bytes or not self.bndes_key_bytes:
+            self.skipTest("Arquivos BNDES não encontrados")
+
+        parsed_exam = parse_exam_pdf(self.bndes_exam_bytes)
+        questions = parsed_exam["questions"]
+        duplicate_groups = parsed_exam.get("duplicateGroups", [])
+
+        # 1. Total questions count should be 80 (20 Port + 10 Ing + 10 Esp + 40 Esp)
+        self.assertEqual(len(questions), 80)
+
+        # 2. Check duplicate groups for 21-30
+        self.assertEqual(len(duplicate_groups), 10)
+        self.assertEqual(duplicate_groups[0]["identifier"], "21")
+        self.assertEqual(duplicate_groups[0]["count"], 2)
+        self.assertIn("LÍNGUA ESTRANGEIRA - INGLÊS", duplicate_groups[0]["sections"])
+        self.assertIn("LÍNGUA ESTRANGEIRA - ESPANHOL", duplicate_groups[0]["sections"])
+
+        # 3. Check answer key with section answers and available provas
+        parsed_key = parse_answer_key_pdf(self.bndes_key_bytes, prova_name="ANÁL. DE SISTEMAS - DESENVOLVIMENTO")
+        self.assertEqual(len(parsed_key["answers"]), 70)
+        available_ids = [p["id"] for p in parsed_key.get("availableProvas", [])]
+        self.assertIn("ANÁL. DE SISTEMAS - DESENVOLVIMENTO", available_ids)
+        self.assertEqual(parsed_key["selectedProva"], "ANÁL. DE SISTEMAS - DESENVOLVIMENTO")
+
+        section_answers = parsed_key.get("sectionAnswers", {})
+        self.assertIn("LÍNGUA ESTRANGEIRA - INGLÊS", section_answers)
+        self.assertIn("LÍNGUA ESTRANGEIRA - ESPANHOL", section_answers)
+        self.assertIn("CONHECIMENTOS ESPECÍFICOS", section_answers)
+        self.assertEqual(len(section_answers["LÍNGUA ESTRANGEIRA - INGLÊS"]), 10)
+        self.assertEqual(len(section_answers["LÍNGUA ESTRANGEIRA - ESPANHOL"]), 10)
+        self.assertEqual(len(section_answers["CONHECIMENTOS ESPECÍFICOS"]), 40)
 
 if __name__ == '__main__':
     unittest.main()

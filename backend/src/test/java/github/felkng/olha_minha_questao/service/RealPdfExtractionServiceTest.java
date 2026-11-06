@@ -533,6 +533,122 @@ class RealPdfExtractionServiceTest {
         assertThat(evaluation.getQuestionCount()).isEqualTo(70);
         assertThat(evaluation.getQuestions()).hasSize(70);
     }
+
+    @Test
+    @DisplayName("Deve extrair prova BNDES com múltiplos idiomas, detectar duplicatas 21-30, extrair gabarito por seção e persistir")
+    void testExtractBndesExamWithForeignLanguagesAndAnswerKey() throws Exception {
+        Path examPath = Path.of("src", "test", "prova_pdf", "analista_de_sistemas_desenvolvimento.pdf");
+        Path keyPath = Path.of("src", "test", "prova_pdf", "bndes0109_superior.pdf");
+
+        assertThat(Files.exists(examPath))
+                .as("Arquivo da prova BNDES deve existir")
+                .isTrue();
+        assertThat(Files.exists(keyPath))
+                .as("Arquivo do gabarito BNDES deve existir")
+                .isTrue();
+
+        MockMultipartFile examMultipart = new MockMultipartFile(
+                "file",
+                "analista_de_sistemas_desenvolvimento.pdf",
+                "application/pdf",
+                Files.readAllBytes(examPath)
+        );
+
+        MockMultipartFile keyMultipart = new MockMultipartFile(
+                "file",
+                "bndes0109_superior.pdf",
+                "application/pdf",
+                Files.readAllBytes(keyPath)
+        );
+
+        // 1. Extração da prova via worker
+        github.felkng.olha_minha_questao.dto.parser.ParsedExamResponseDTO examResponse = examParserService.parseExamPdf(examMultipart);
+        List<ParsedQuestionDTO> parsedQuestions = examResponse.getQuestions();
+        assertThat(parsedQuestions).hasSize(80);
+        assertThat(examResponse.getDuplicateGroups()).hasSize(10);
+
+        // 2. Extração do gabarito via worker
+        github.felkng.olha_minha_questao.dto.parser.ParsedAnswerKeyResponseDTO keyResponse = examParserService.parseAnswerKeyPdf(keyMultipart, null);
+        assertThat(keyResponse.getAvailableProvas()).isNotEmpty();
+        assertThat(keyResponse.getSectionAnswers()).isNotNull();
+        assertThat(keyResponse.getSectionAnswers().keySet().stream()
+                .anyMatch(k -> k.toUpperCase().contains("INGL"))).isTrue();
+        assertThat(keyResponse.getSectionAnswers().keySet().stream()
+                .anyMatch(k -> k.toUpperCase().contains("ESPANH"))).isTrue();
+
+        // 3. Resolução das duplicatas: reindexar as duplicatas (Inglês 21-30 mantido, Espanhol reindexado 71-80)
+        Map<String, String> inglesKey = keyResponse.getSectionAnswers().entrySet().stream()
+                .filter(e -> e.getKey().toUpperCase().contains("INGL"))
+                .flatMap(e -> e.getValue().stream())
+                .collect(Collectors.toMap(ParsedAnswerKeyDTO::getIdentifier, ParsedAnswerKeyDTO::getCorrectAlternative, (a, b) -> a));
+
+        Map<String, String> espanholKey = keyResponse.getSectionAnswers().entrySet().stream()
+                .filter(e -> e.getKey().toUpperCase().contains("ESPANH"))
+                .flatMap(e -> e.getValue().stream())
+                .collect(Collectors.toMap(ParsedAnswerKeyDTO::getIdentifier, ParsedAnswerKeyDTO::getCorrectAlternative, (a, b) -> a));
+
+        int nextId = 71;
+        java.util.Set<String> seen = new java.util.HashSet<>();
+        List<QuestionRequestDTO> questionRequests = new ArrayList<>();
+
+        for (ParsedQuestionDTO pq : parsedQuestions) {
+            String idStr = pq.getIdentifier();
+            String origId = pq.getIdentifier();
+            String section = pq.getSection() != null ? pq.getSection().toUpperCase() : "";
+
+            if (seen.contains(idStr)) {
+                idStr = String.valueOf(nextId++);
+            } else {
+                seen.add(idStr);
+            }
+
+            String correctLetter = null;
+            if (section.contains("INGL")) {
+                correctLetter = inglesKey.get(origId);
+            } else if (section.contains("ESPANH")) {
+                correctLetter = espanholKey.get(origId);
+            } else {
+                correctLetter = keyResponse.getAnswers().stream()
+                        .filter(a -> a.getIdentifier().equals(origId))
+                        .map(ParsedAnswerKeyDTO::getCorrectAlternative)
+                        .findFirst()
+                        .orElse(null);
+            }
+
+            final String ansLetter = correctLetter;
+            List<AlternativeRequestDTO> altRequests = pq.getAlternatives().stream()
+                    .map(alt -> AlternativeRequestDTO.builder()
+                            .identifier(alt.getIdentifier())
+                            .text(alt.getText())
+                            .isCorrect(ansLetter != null && alt.getIdentifier().equalsIgnoreCase(ansLetter))
+                            .build())
+                    .toList();
+
+            questionRequests.add(QuestionRequestDTO.builder()
+                    .identifier(idStr)
+                    .enunciado(pq.getEnunciado())
+                    .year(2024)
+                    .alternatives(altRequests)
+                    .build());
+        }
+
+        assertThat(questionRequests).hasSize(80);
+
+        TestWithQuestionsRequestDTO wizardRequest = TestWithQuestionsRequestDTO.builder()
+                .name("BNDES 2024 - Analista de Sistemas Desenvolvimento")
+                .year(2024)
+                .description("Prova BNDES com questões em inglês e espanhol reindexadas")
+                .questions(questionRequests)
+                .build();
+
+        // 4. Criação atômica no banco
+        TestResponseDTO createdTest = testService.createWithQuestions(wizardRequest, null);
+        entityManager.flush();
+
+        assertThat(createdTest.getId()).isNotNull();
+        List<Question> savedDbQuestions = questionRepository.findByTestIdOrderByIdAsc(createdTest.getId());
+        assertThat(savedDbQuestions).hasSize(80);
+    }
 }
 
 
