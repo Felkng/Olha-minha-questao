@@ -71,11 +71,22 @@ public class QuestionService {
     @Transactional(readOnly = true)
     public Page<QuestionResponseDTO> findAll(Long originId, Long areaId, Long testId, Integer year,
                                              String difficulty, String search, String sort, Long createdByUserId, Long currentUserId, Pageable pageable) {
+        return findAll(null, originId, areaId, null, testId, year, difficulty, search, sort, null, createdByUserId, currentUserId, pageable);
+    }
+
+    @Transactional(readOnly = true)
+    public Page<QuestionResponseDTO> findAll(List<Long> ids, Long originId, Long areaId, Long subjectId, Long testId, Integer year,
+                                             String difficulty, String search, String sort, Boolean standaloneOnly,
+                                             Long createdByUserId, Long currentUserId, Pageable pageable) {
         User currentUser = currentUserId != null ? userRepository.findById(currentUserId).orElse(null) : null;
         boolean isAdmin = currentUser != null && currentUser.getRole() == github.felkng.olha_minha_questao.domain.entity.UserRole.ADMIN;
 
         Specification<Question> spec = (root, query, cb) -> {
             List<Predicate> predicates = new ArrayList<>();
+
+            if (ids != null && !ids.isEmpty()) {
+                predicates.add(root.get("id").in(ids));
+            }
 
             // Regra de Privacidade
             if (!isAdmin) {
@@ -102,8 +113,19 @@ public class QuestionService {
             if (areaId != null) {
                 predicates.add(cb.equal(root.get("area").get("id"), areaId));
             }
+            if (subjectId != null) {
+                predicates.add(cb.equal(root.get("subject").get("id"), subjectId));
+            }
             if (testId != null) {
                 predicates.add(cb.equal(root.get("test").get("id"), testId));
+            }
+            if (Boolean.TRUE.equals(standaloneOnly)) {
+                predicates.add(cb.isNull(root.get("test")));
+                jakarta.persistence.criteria.Subquery<Long> tqSubquery = query.subquery(Long.class);
+                jakarta.persistence.criteria.Root<github.felkng.olha_minha_questao.domain.entity.TestQuestion> tqRoot =
+                        tqSubquery.from(github.felkng.olha_minha_questao.domain.entity.TestQuestion.class);
+                tqSubquery.select(tqRoot.get("question").get("id"));
+                predicates.add(cb.not(root.get("id").in(tqSubquery)));
             }
             if (year != null) {
                 predicates.add(cb.equal(root.get("year"), year));

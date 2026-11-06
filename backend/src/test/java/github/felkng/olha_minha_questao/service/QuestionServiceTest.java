@@ -42,6 +42,9 @@ class QuestionServiceTest {
     private TestService testService;
 
     @Autowired
+    private SubjectService subjectService;
+
+    @Autowired
     private AlternativeRepository alternativeRepository;
 
     @Autowired
@@ -264,5 +267,94 @@ class QuestionServiceTest {
         assertThat(created).isNotNull();
         assertThat(created.getOrigin()).isNull();
         assertThat(created.getArea().getName()).isEqualTo("Física_SEM_BANCA");
+    }
+
+    @Test
+    @DisplayName("Deve filtrar questões por ids, subjectId e standaloneOnly (excluindo questões de provas e test_question)")
+    void testFilterByIdsSubjectIdAndStandaloneOnly() {
+        long suffix = System.nanoTime();
+        OriginResponseDTO origin = originService.create(OriginRequestDTO.builder().name("FILTER_ORIGIN_" + suffix).build());
+        AreaResponseDTO area = areaService.create(AreaRequestDTO.builder().name("FILTER_AREA_" + suffix).build());
+        var subjectA = subjectService.create(github.felkng.olha_minha_questao.dto.subject.SubjectRequestDTO.builder()
+                .name("Algoritmos_" + suffix)
+                .areaId(area.getId())
+                .build());
+        var subjectB = subjectService.create(github.felkng.olha_minha_questao.dto.subject.SubjectRequestDTO.builder()
+                .name("BancoDados_" + suffix)
+                .areaId(area.getId())
+                .build());
+        TestResponseDTO exam = testService.create(TestRequestDTO.builder()
+                .name("Prova Filtro " + suffix)
+                .year(2025)
+                .originId(origin.getId())
+                .areaId(area.getId())
+                .build());
+
+        List<AlternativeRequestDTO> alts = List.of(
+                AlternativeRequestDTO.builder().identifier("A").text("Alt A").isCorrect(true).build(),
+                AlternativeRequestDTO.builder().identifier("B").text("Alt B").isCorrect(false).build()
+        );
+
+        // Q1: pertence diretamente a uma prova (test_id != null)
+        QuestionResponseDTO qInTest = questionService.create(QuestionRequestDTO.builder()
+                .enunciado("Questão direta na prova")
+                .identifier("T1")
+                .year(2025)
+                .originId(origin.getId())
+                .areaId(area.getId())
+                .subjectId(subjectA.getId())
+                .testId(exam.getId())
+                .alternatives(alts)
+                .build());
+
+        // Q2: test_id == null, mas vinculada via N:N em test_question
+        QuestionResponseDTO qLinkedToTest = questionService.create(QuestionRequestDTO.builder()
+                .enunciado("Questão vinculada via N:N")
+                .identifier("T2")
+                .year(2025)
+                .originId(origin.getId())
+                .areaId(area.getId())
+                .subjectId(subjectA.getId())
+                .alternatives(alts)
+                .build());
+        testService.addQuestionToTest(exam.getId(), qLinkedToTest.getId());
+
+        // Q3: verdadeiramente avulsa (standalone), matéria B
+        QuestionResponseDTO qStandalone = questionService.create(QuestionRequestDTO.builder()
+                .enunciado("Questão genuinamente avulsa")
+                .identifier("S1")
+                .year(2025)
+                .originId(origin.getId())
+                .areaId(area.getId())
+                .subjectId(subjectB.getId())
+                .alternatives(alts)
+                .build());
+
+        entityManager.flush();
+
+        // 1. Filtro por ids
+        Page<QuestionResponseDTO> byIds = questionService.findAll(
+                List.of(qInTest.getId(), qStandalone.getId()),
+                null, null, null, null, null, null, null, null, null, null, null,
+                PageRequest.of(0, 10)
+        );
+        assertThat(byIds.getContent()).extracting(QuestionResponseDTO::getId)
+                .containsExactlyInAnyOrder(qInTest.getId(), qStandalone.getId());
+
+        // 2. Filtro por subjectId
+        Page<QuestionResponseDTO> bySubjectA = questionService.findAll(
+                null, origin.getId(), area.getId(), subjectA.getId(), null, null, null, null, null, null, null, null,
+                PageRequest.of(0, 10)
+        );
+        assertThat(bySubjectA.getContent()).extracting(QuestionResponseDTO::getId)
+                .containsExactlyInAnyOrder(qInTest.getId(), qLinkedToTest.getId());
+
+        // 3. Filtro por standaloneOnly = true (deve retornar APENAS qStandalone!)
+        Page<QuestionResponseDTO> standalonePage = questionService.findAll(
+                null, origin.getId(), area.getId(), null, null, null, null, null, null, true, null, null,
+                PageRequest.of(0, 10)
+        );
+        assertThat(standalonePage.getContent()).extracting(QuestionResponseDTO::getId)
+                .containsExactly(qStandalone.getId());
     }
 }

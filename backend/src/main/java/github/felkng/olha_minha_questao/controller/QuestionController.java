@@ -32,22 +32,70 @@ import java.util.List;
 public class QuestionController {
 
     private final QuestionService questionService;
+    private final github.felkng.olha_minha_questao.service.QuestionSessionService questionSessionService;
     private final StatisticsService statisticsService;
     private final github.felkng.olha_minha_questao.domain.repository.QuestionAttemptRepository questionAttemptRepository;
 
     @GetMapping
     public ResponseEntity<Page<QuestionResponseDTO>> findAll(
+            @RequestParam(required = false) List<Long> ids,
             @RequestParam(required = false) Long originId,
             @RequestParam(required = false) Long areaId,
+            @RequestParam(required = false) Long subjectId,
             @RequestParam(required = false) Long testId,
             @RequestParam(required = false) Integer year,
             @RequestParam(required = false) String difficulty,
             @RequestParam(required = false) String search,
             @RequestParam(required = false) String sort,
+            @RequestParam(required = false) Boolean standaloneOnly,
             @RequestParam(required = false) Long createdByUserId,
             @RequestHeader(value = "X-User-Id", required = false) Long currentUserId,
             @PageableDefault(size = 20) Pageable pageable) {
-        return ResponseEntity.ok(questionService.findAll(originId, areaId, testId, year, difficulty, search, sort, createdByUserId, currentUserId, pageable));
+        return ResponseEntity.ok(questionService.findAll(
+                ids, originId, areaId, subjectId, testId, year, difficulty, search, sort, standaloneOnly, createdByUserId, currentUserId, pageable
+        ));
+    }
+
+    @PostMapping("/sessions")
+    public ResponseEntity<github.felkng.olha_minha_questao.dto.question.QuestionSessionResponseDTO> saveSession(
+            @Valid @RequestBody github.felkng.olha_minha_questao.dto.question.QuestionSessionRequestDTO dto,
+            @RequestHeader(value = "X-User-Id") Long userId) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(questionSessionService.saveSession(dto, userId));
+    }
+
+    @GetMapping("/sessions/my")
+    public ResponseEntity<List<github.felkng.olha_minha_questao.dto.question.QuestionSessionResponseDTO>> getMySessions(
+            @RequestHeader(value = "X-User-Id") Long userId) {
+        return ResponseEntity.ok(questionSessionService.getUserSessions(userId));
+    }
+
+    @GetMapping("/sessions/user/{targetUserId}")
+    public ResponseEntity<List<github.felkng.olha_minha_questao.dto.question.QuestionSessionResponseDTO>> getUserSessionsByTarget(
+            @PathVariable Long targetUserId) {
+        return ResponseEntity.ok(questionSessionService.getUserSessions(targetUserId));
+    }
+
+    @GetMapping("/sessions/{id}")
+    public ResponseEntity<github.felkng.olha_minha_questao.dto.question.QuestionSessionResponseDTO> getSessionById(
+            @PathVariable Long id,
+            @RequestHeader(value = "X-User-Id", required = false) Long userId) {
+        return ResponseEntity.ok(questionSessionService.getSessionById(id, userId));
+    }
+
+    @PutMapping("/sessions/{id}")
+    public ResponseEntity<github.felkng.olha_minha_questao.dto.question.QuestionSessionResponseDTO> updateSession(
+            @PathVariable Long id,
+            @Valid @RequestBody github.felkng.olha_minha_questao.dto.question.QuestionSessionRequestDTO dto,
+            @RequestHeader(value = "X-User-Id") Long userId) {
+        return ResponseEntity.ok(questionSessionService.updateSession(id, dto, userId));
+    }
+
+    @DeleteMapping("/sessions/{id}")
+    public ResponseEntity<Void> deleteSession(
+            @PathVariable Long id,
+            @RequestHeader(value = "X-User-Id") Long userId) {
+        questionSessionService.deleteSession(id, userId);
+        return ResponseEntity.noContent().build();
     }
 
     @PostMapping("/{id}/attempts")
