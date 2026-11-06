@@ -67,6 +67,7 @@ interface CreateTestWizardModalProps {
 interface QuestionAltForm {
   identifier: string;
   text: string;
+  images?: string[];
   isCorrect?: boolean;
 }
 
@@ -116,6 +117,7 @@ export const CreateTestWizardModal: React.FC<CreateTestWizardModalProps> = ({
   const [activeQuestionIndex, setActiveQuestionIndex] = useState<number | null>(null);
   const [draggingQuestionIndex, setDraggingQuestionIndex] = useState<number | null>(null);
   const fileInputRefs = useRef<{ [key: number]: HTMLInputElement | null }>({});
+  const altFileInputRefs = useRef<{ [key: string]: HTMLInputElement | null }>({});
 
   // Step 2: Answer key
   const [answerKeyPdfFile, setAnswerKeyPdfFile] = useState<File | null>(null);
@@ -307,17 +309,28 @@ export const CreateTestWizardModal: React.FC<CreateTestWizardModalProps> = ({
           images: pq.images || [],
           textualReferenceIndex: pq.textualReferenceIndex !== undefined && pq.textualReferenceIndex !== null ? pq.textualReferenceIndex : null,
           alternatives: (pq.alternatives && pq.alternatives.length > 0)
-            ? pq.alternatives.map((alt) => ({
-                identifier: alt.identifier,
-                text: alt.text,
-                isCorrect: false,
-              }))
+            ? pq.alternatives.map((alt) => {
+                const extractedImages: string[] = [];
+                const cleanText = (alt.text || '')
+                  .replace(/!\[.*?\]\((data:image\/[^)]+|https?:\/\/[^)]+)\)/g, (_, url) => {
+                    extractedImages.push(url);
+                    return '';
+                  })
+                  .trim();
+                const combinedImages = [...((alt as any).images || []), ...extractedImages];
+                return {
+                  identifier: alt.identifier,
+                  text: cleanText,
+                  images: combinedImages,
+                  isCorrect: false,
+                };
+              })
             : [
-                { identifier: 'A', text: '', isCorrect: false },
-                { identifier: 'B', text: '', isCorrect: false },
-                { identifier: 'C', text: '', isCorrect: false },
-                { identifier: 'D', text: '', isCorrect: false },
-                { identifier: 'E', text: '', isCorrect: false },
+                { identifier: 'A', text: '', images: [], isCorrect: false },
+                { identifier: 'B', text: '', images: [], isCorrect: false },
+                { identifier: 'C', text: '', images: [], isCorrect: false },
+                { identifier: 'D', text: '', images: [], isCorrect: false },
+                { identifier: 'E', text: '', images: [], isCorrect: false },
               ],
         }));
 
@@ -347,11 +360,11 @@ export const CreateTestWizardModal: React.FC<CreateTestWizardModalProps> = ({
       enunciado: '',
       images: [],
       alternatives: [
-        { identifier: 'A', text: '', isCorrect: false },
-        { identifier: 'B', text: '', isCorrect: false },
-        { identifier: 'C', text: '', isCorrect: false },
-        { identifier: 'D', text: '', isCorrect: false },
-        { identifier: 'E', text: '', isCorrect: false },
+        { identifier: 'A', text: '', images: [], isCorrect: false },
+        { identifier: 'B', text: '', images: [], isCorrect: false },
+        { identifier: 'C', text: '', images: [], isCorrect: false },
+        { identifier: 'D', text: '', images: [], isCorrect: false },
+        { identifier: 'E', text: '', images: [], isCorrect: false },
       ],
     };
     setQuestions((prev) => [...prev, newQ]);
@@ -452,10 +465,103 @@ export const CreateTestWizardModal: React.FC<CreateTestWizardModalProps> = ({
     }
   };
 
+  // Remove alternative image
+  const handleRemoveAlternativeImage = (qIndex: number, altIndex: number, imgIndex: number) => {
+    setQuestions((prev) => {
+      const copy = [...prev];
+      if (!copy[qIndex] || !copy[qIndex].alternatives[altIndex]) return prev;
+      const alts = [...copy[qIndex].alternatives];
+      const currentImgs = [...(alts[altIndex].images || [])];
+      currentImgs.splice(imgIndex, 1);
+      alts[altIndex] = { ...alts[altIndex], images: currentImgs };
+      copy[qIndex] = { ...copy[qIndex], alternatives: alts };
+      return copy;
+    });
+  };
+
+  // Add images to alternative
+  const handleAddAlternativeImages = (qIndex: number, altIndex: number, files: FileList | File[]) => {
+    const fileList = Array.from(files).filter((f) => f.type.startsWith('image/'));
+    if (fileList.length === 0) return;
+
+    fileList.forEach((file) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        if (e.target?.result) {
+          const dataUrl = e.target.result as string;
+          setQuestions((prev) => {
+            const copy = [...prev];
+            if (!copy[qIndex] || !copy[qIndex].alternatives[altIndex]) return prev;
+            const alts = [...copy[qIndex].alternatives];
+            const currentImages = alts[altIndex].images || [];
+            alts[altIndex] = {
+              ...alts[altIndex],
+              images: [...currentImages, dataUrl],
+            };
+            copy[qIndex] = { ...copy[qIndex], alternatives: alts };
+            return copy;
+          });
+        }
+      };
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const extractAndAddAlternativeImages = (qIndex: number, altIndex: number, data: DataTransfer | null): boolean => {
+    if (!data) return false;
+    const imageFiles: File[] = [];
+
+    if (data.files && data.files.length > 0) {
+      for (let i = 0; i < data.files.length; i++) {
+        const file = data.files[i];
+        if (file.type.startsWith('image/')) {
+          imageFiles.push(file);
+        }
+      }
+    }
+
+    if (imageFiles.length === 0 && data.items && data.items.length > 0) {
+      for (let i = 0; i < data.items.length; i++) {
+        const item = data.items[i];
+        if (item.type.startsWith('image/')) {
+          const file = item.getAsFile();
+          if (file) {
+            imageFiles.push(file);
+          }
+        }
+      }
+    }
+
+    if (imageFiles.length > 0) {
+      handleAddAlternativeImages(qIndex, altIndex, imageFiles);
+      return true;
+    }
+    return false;
+  };
+
+  const handleAlternativePaste = (qIndex: number, altIndex: number, e: React.ClipboardEvent) => {
+    const hadImages = extractAndAddAlternativeImages(qIndex, altIndex, e.clipboardData);
+    if (hadImages) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+  };
+
   useEffect(() => {
     if (!open || activeStep !== 1) return;
 
     const handleWindowPaste = (e: ClipboardEvent) => {
+      // Don't intercept paste if active element is an input, textarea or contentEditable
+      const activeEl = document.activeElement;
+      if (
+        activeEl &&
+        (activeEl.tagName === 'INPUT' ||
+          activeEl.tagName === 'TEXTAREA' ||
+          (activeEl as HTMLElement).isContentEditable)
+      ) {
+        return;
+      }
+
       const targetIndex =
         activeQuestionIndex !== null && activeQuestionIndex >= 0 && activeQuestionIndex < questions.length
           ? activeQuestionIndex
@@ -492,7 +598,7 @@ export const CreateTestWizardModal: React.FC<CreateTestWizardModalProps> = ({
     const updated = [...questions];
     const alts = [...updated[qIndex].alternatives];
     const nextIdentifier = String.fromCharCode(65 + alts.length); // A, B, C...
-    alts.push({ identifier: nextIdentifier, text: '', isCorrect: false });
+    alts.push({ identifier: nextIdentifier, text: '', images: [], isCorrect: false });
     updated[qIndex] = { ...updated[qIndex], alternatives: alts };
     setQuestions(updated);
   };
@@ -702,11 +808,25 @@ export const CreateTestWizardModal: React.FC<CreateTestWizardModalProps> = ({
             q.textualReferenceIndex !== undefined && q.textualReferenceIndex !== null
               ? Number(q.textualReferenceIndex)
               : null,
-          alternatives: q.alternatives.map((alt) => ({
-            identifier: alt.identifier.trim(),
-            text: alt.text?.trim() || `[Opção ${alt.identifier.trim()}]`,
-            isCorrect: Boolean(alt.isCorrect),
-          })),
+          alternatives: q.alternatives.map((alt) => {
+            const cleanText = (alt.text || '').trim();
+            const existingImages = new Set<string>();
+            const regex = /!\[.*?\]\((data:image\/[^)]+|https?:\/\/[^)]+)\)/g;
+            let match;
+            while ((match = regex.exec(cleanText)) !== null) {
+              existingImages.add(match[1]);
+            }
+            const newMdImages = (alt.images || [])
+              .filter((img) => !existingImages.has(img))
+              .map((img) => `![Imagem](${img})`)
+              .join('\n');
+            const combined = [cleanText, newMdImages].filter(Boolean).join('\n');
+            return {
+              identifier: alt.identifier.trim(),
+              text: combined || (alt.images && alt.images.length > 0 ? '[Imagem]' : `[Opção ${alt.identifier.trim()}]`),
+              isCorrect: Boolean(alt.isCorrect),
+            };
+          }),
         })),
       });
 
@@ -1680,29 +1800,132 @@ export const CreateTestWizardModal: React.FC<CreateTestWizardModalProps> = ({
                           Alternativas (mínimo 2):
                         </Typography>
                         <Stack spacing={1}>
-                          {q.alternatives.map((alt, aIndex) => (
-                            <Stack key={aIndex} direction="row" spacing={1} alignItems="center">
-                              <Chip
-                                label={alt.identifier}
-                                size="small"
-                                sx={{ minWidth: 32, fontWeight: 700 }}
-                              />
-                              <TextField
-                                value={alt.text}
-                                onChange={(e) => handleUpdateAltText(qIndex, aIndex, e.target.value)}
-                                placeholder={`Texto da alternativa ${alt.identifier}`}
-                                size="small"
-                                fullWidth
-                              />
-                              <IconButton
-                                size="small"
-                                disabled={q.alternatives.length <= 2}
-                                onClick={() => handleRemoveAlternative(qIndex, aIndex)}
+                          {q.alternatives.map((alt, aIndex) => {
+                            const fileInputKey = `${qIndex}_${aIndex}`;
+                            return (
+                              <Paper
+                                key={aIndex}
+                                variant="outlined"
+                                sx={{
+                                  p: 1,
+                                  borderRadius: 1.5,
+                                  bgcolor: 'background.paper',
+                                  borderColor: 'divider',
+                                  transition: 'border-color 0.2s',
+                                  '&:focus-within': {
+                                    borderColor: PALETTE_COLORS.primary,
+                                  },
+                                }}
+                                onDragOver={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                }}
+                                onDrop={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+                                    handleAddAlternativeImages(qIndex, aIndex, e.dataTransfer.files);
+                                  }
+                                }}
                               >
-                                <DeleteOutlineIcon fontSize="small" />
-                              </IconButton>
-                            </Stack>
-                          ))}
+                                <Stack direction="row" spacing={1} alignItems="center">
+                                  <Chip
+                                    label={alt.identifier}
+                                    size="small"
+                                    sx={{ minWidth: 32, fontWeight: 700 }}
+                                  />
+                                  <TextField
+                                    value={alt.text}
+                                    onChange={(e) => handleUpdateAltText(qIndex, aIndex, e.target.value)}
+                                    onPaste={(e) => handleAlternativePaste(qIndex, aIndex, e)}
+                                    placeholder={`Texto da alternativa ${alt.identifier} (ou cole imagem com Ctrl+V)`}
+                                    size="small"
+                                    fullWidth
+                                  />
+                                  <input
+                                    type="file"
+                                    accept="image/*"
+                                    multiple
+                                    ref={(el) => {
+                                      altFileInputRefs.current[fileInputKey] = el;
+                                    }}
+                                    style={{ display: 'none' }}
+                                    onClick={(e) => {
+                                      (e.target as HTMLInputElement).value = '';
+                                    }}
+                                    onChange={(e) => {
+                                      if (e.target.files && e.target.files.length > 0) {
+                                        handleAddAlternativeImages(qIndex, aIndex, e.target.files);
+                                      }
+                                    }}
+                                  />
+                                  <Tooltip title="Anexar imagem (ou cole com Ctrl+V)">
+                                    <IconButton
+                                      size="small"
+                                      color={alt.images && alt.images.length > 0 ? 'primary' : 'default'}
+                                      onClick={() => {
+                                        altFileInputRefs.current[fileInputKey]?.click();
+                                      }}
+                                    >
+                                      <ImageIcon fontSize="small" />
+                                    </IconButton>
+                                  </Tooltip>
+                                  <IconButton
+                                    size="small"
+                                    disabled={q.alternatives.length <= 2}
+                                    onClick={() => handleRemoveAlternative(qIndex, aIndex)}
+                                  >
+                                    <DeleteOutlineIcon fontSize="small" />
+                                  </IconButton>
+                                </Stack>
+
+                                {alt.images && alt.images.length > 0 && (
+                                  <Box sx={{ mt: 1, pl: 5 }}>
+                                    <Stack direction="row" spacing={1} flexWrap="wrap">
+                                      {alt.images.map((imgUrl, imgIdx) => (
+                                        <Box
+                                          key={imgIdx}
+                                          sx={{
+                                            position: 'relative',
+                                            display: 'inline-block',
+                                            borderRadius: 1,
+                                            overflow: 'hidden',
+                                            border: '1px solid',
+                                            borderColor: 'divider',
+                                            bgcolor: 'background.default',
+                                          }}
+                                        >
+                                          <ZoomableImage
+                                            src={imgUrl}
+                                            alt={`Figura ${imgIdx + 1} da Alternativa ${alt.identifier}`}
+                                            maxHeight={80}
+                                            maxWidth={160}
+                                          />
+                                          <IconButton
+                                            size="small"
+                                            onClick={() => handleRemoveAlternativeImage(qIndex, aIndex, imgIdx)}
+                                            sx={{
+                                              position: 'absolute',
+                                              top: 2,
+                                              right: 2,
+                                              bgcolor: 'rgba(0,0,0,0.65)',
+                                              color: '#fff',
+                                              p: 0.3,
+                                              zIndex: 2,
+                                              '&:hover': { bgcolor: 'error.main' },
+                                            }}
+                                            title="Remover imagem da alternativa"
+                                          >
+                                            <DeleteOutlineIcon sx={{ fontSize: '0.85rem' }} />
+                                          </IconButton>
+                                        </Box>
+                                      ))}
+                                    </Stack>
+                                  </Box>
+                                )}
+                              </Paper>
+                            );
+                          })}
                         </Stack>
                         <Button
                           size="small"
@@ -1975,14 +2198,18 @@ export const CreateTestWizardModal: React.FC<CreateTestWizardModalProps> = ({
                       <Typography variant="body2" sx={{ flex: 1 }} noWrap>
                         {q.enunciado ? q.enunciado.substring(0, 100) + '...' : 'Sem enunciado'}
                       </Typography>
-                      {q.images && q.images.length > 0 && (
-                        <Chip
-                          icon={<ImageIcon fontSize="small" />}
-                          label={`${q.images.length} fig.`}
-                          size="small"
-                          variant="outlined"
-                        />
-                      )}
+                      {(() => {
+                        const totalAltImgs = q.alternatives.reduce((acc, a) => acc + (a.images?.length || 0), 0);
+                        const totalImgs = (q.images?.length || 0) + totalAltImgs;
+                        return totalImgs > 0 ? (
+                          <Chip
+                            icon={<ImageIcon fontSize="small" />}
+                            label={`${totalImgs} fig.`}
+                            size="small"
+                            variant="outlined"
+                          />
+                        ) : null;
+                      })()}
                       {q.textualReferenceIndex !== undefined && q.textualReferenceIndex !== null && textualReferences[q.textualReferenceIndex] && (
                         <Chip
                           icon={<MenuBookIcon fontSize="small" />}
