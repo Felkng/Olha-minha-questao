@@ -105,6 +105,10 @@ import {
   deleteFlashcard,
   getUserFlashcardSessions,
   deleteFlashcardSession,
+  getUserTestSessions,
+  deleteTestSession,
+  getUserQuestionSessions,
+  deleteQuestionSession,
 } from '../services/api';
 import {
   Area,
@@ -117,15 +121,18 @@ import {
   Origin,
   Question,
   QuestionAttemptHistory,
+  QuestionSession,
   Subject,
   Test,
   TestCard,
   TestAttemptSummary,
   TestAttemptDetail,
   TestEvaluation,
+  TestSession,
   UserProfile,
   UserSummary,
 } from '../types';
+import { stripRichTextMarkup } from '../components/common/FormattedText';
 import { PALETTE_COLORS } from '../theme/theme';
 import { useAuth } from '../context/AuthContext';
 import { ShareResultsModal } from '../components/simulations/ShareResultsModal';
@@ -963,6 +970,10 @@ export const UserProfilePage: React.FC = () => {
   const [loadingFlashcardFolders, setLoadingFlashcardFolders] = useState(false);
   const [flashcardSessions, setFlashcardSessions] = useState<FlashcardSession[]>([]);
   const [loadingFlashcardSessions, setLoadingFlashcardSessions] = useState(false);
+  const [testSessions, setTestSessions] = useState<TestSession[]>([]);
+  const [, setLoadingTestSessions] = useState(false);
+  const [questionSessions, setQuestionSessions] = useState<QuestionSession[]>([]);
+  const [, setLoadingQuestionSessions] = useState(false);
   const [selectedSessionDetail, setSelectedSessionDetail] = useState<FlashcardSession | null>(null);
   const [sessionToDiscard, setSessionToDiscard] = useState<FlashcardSession | null>(null);
   const [flashcardSearch, setFlashcardSearch] = useState('');
@@ -1107,8 +1118,10 @@ export const UserProfilePage: React.FC = () => {
       loadMyQuestionAttempts();
     } else if (activeNavTab === 'meus_simulados') {
       loadMyTestAttempts();
+      loadMyTestSessions();
     } else if (activeNavTab === 'sessoes_estudo') {
       loadMyFlashcardSessions();
+      loadMyQuestionSessions();
     } else if (activeNavTab === 'minhas_questoes') {
       loadMyQuestions();
     } else if (activeNavTab === 'minhas_provas') {
@@ -1229,6 +1242,30 @@ export const UserProfilePage: React.FC = () => {
       console.error('Erro ao carregar histórico de sessões de flashcards:', err);
     } finally {
       setLoadingFlashcardSessions(false);
+    }
+  };
+
+  const loadMyTestSessions = async () => {
+    setLoadingTestSessions(true);
+    try {
+      const res = await getUserTestSessions(userId || undefined);
+      setTestSessions(res);
+    } catch (err) {
+      console.error('Erro ao carregar sessões de simulado:', err);
+    } finally {
+      setLoadingTestSessions(false);
+    }
+  };
+
+  const loadMyQuestionSessions = async () => {
+    setLoadingQuestionSessions(true);
+    try {
+      const res = await getUserQuestionSessions(userId || undefined);
+      setQuestionSessions(res);
+    } catch (err) {
+      console.error('Erro ao carregar sessões de estudo de questões:', err);
+    } finally {
+      setLoadingQuestionSessions(false);
     }
   };
 
@@ -2825,7 +2862,7 @@ export const UserProfilePage: React.FC = () => {
                               lineHeight: 1.6,
                             }}
                           >
-                            {att.questionEnunciado}
+                            {stripRichTextMarkup(att.questionEnunciado)}
                           </Typography>
 
                           {/* Comparativo de Resposta */}
@@ -2853,7 +2890,7 @@ export const UserProfilePage: React.FC = () => {
                                   {att.selectedAlternativeLetter
                                     ? `Alternativa (${att.selectedAlternativeLetter})`
                                     : 'Nenhuma selecionada'}{' '}
-                                  {att.selectedAlternativeText && `— ${att.selectedAlternativeText}`}
+                                  {att.selectedAlternativeText && `— ${stripRichTextMarkup(att.selectedAlternativeText)}`}
                                 </Typography>
                               </Box>
 
@@ -2864,7 +2901,7 @@ export const UserProfilePage: React.FC = () => {
                                   </Typography>
                                   <Typography variant="body2" sx={{ fontWeight: 600, color: PALETTE_COLORS.success }}>
                                     Alternativa ({att.correctAlternativeLetter})
-                                    {att.correctAlternativeText && ` — ${att.correctAlternativeText}`}
+                                    {att.correctAlternativeText && ` — ${stripRichTextMarkup(att.correctAlternativeText)}`}
                                   </Typography>
                                 </Box>
                               )}
@@ -2927,6 +2964,99 @@ export const UserProfilePage: React.FC = () => {
                   Fazer Novo Simulado
                 </Button>
               </Box>
+
+              {/* Simulados em Andamento */}
+              {(() => {
+                const incompleteTestSessions = testSessions.filter((s) => !s.completed);
+                if (incompleteTestSessions.length === 0) return null;
+                return (
+                  <Stack spacing={2} sx={{ mb: 3 }}>
+                    <Typography variant="subtitle1" fontWeight={800} sx={{ color: PALETTE_COLORS.primary }}>
+                      Simulados em Andamento ({incompleteTestSessions.length})
+                    </Typography>
+                    {incompleteTestSessions.map((session) => {
+                      const answered = session.items?.filter((i) => i.selectedAlternativeId != null).length || 0;
+                      const total = session.totalQuestions || (session.items?.length || 0);
+                      const percent = total > 0 ? Math.round((answered / total) * 100) : 0;
+                      return (
+                        <Paper
+                          key={session.id}
+                          elevation={2}
+                          sx={{
+                            p: 2.5,
+                            borderRadius: 2.5,
+                            border: '1.5px solid',
+                            borderColor: PALETTE_COLORS.primary,
+                            background: isDark
+                              ? 'linear-gradient(90deg, rgba(217, 183, 99, 0.12) 0%, rgba(26, 30, 36, 0.95) 100%)'
+                              : 'linear-gradient(90deg, rgba(217, 183, 99, 0.15) 0%, rgba(255, 255, 255, 0.95) 100%)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            flexWrap: 'wrap',
+                            gap: 2,
+                          }}
+                        >
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                            <Box
+                              sx={{
+                                p: 1.2,
+                                borderRadius: '50%',
+                                bgcolor: 'rgba(217, 183, 99, 0.2)',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                              }}
+                            >
+                              <AccessTimeIcon sx={{ color: PALETTE_COLORS.primary, fontSize: 28 }} />
+                            </Box>
+                            <Box>
+                              <Typography variant="subtitle1" fontWeight={800}>
+                                {session.testName || `Simulado #${session.testId}`}
+                              </Typography>
+                              <Typography variant="body2" color="text.secondary">
+                                {answered} de {total} questões respondidas ({percent}%) • Tempo decorrido: {formatStudyDuration(session.timeSpentSeconds, true)}
+                              </Typography>
+                            </Box>
+                          </Box>
+                          <Stack direction="row" spacing={1.5} alignItems="center">
+                            <Button
+                              variant="contained"
+                              startIcon={<PlayArrowIcon />}
+                              onClick={() => navigate(`/provas/${session.testId}/avaliacao?sessionId=${session.id}`)}
+                              sx={{
+                                fontWeight: 700,
+                                backgroundColor: PALETTE_COLORS.primary,
+                                color: '#1a1e24',
+                              }}
+                            >
+                              Continuar Simulado
+                            </Button>
+                            <Button
+                              variant="outlined"
+                              color="error"
+                              startIcon={<DeleteOutlineIcon />}
+                              onClick={async () => {
+                                if (window.confirm('Deseja realmente descartar este simulado em andamento?')) {
+                                  try {
+                                    await deleteTestSession(session.id);
+                                    loadMyTestSessions();
+                                  } catch (e) {
+                                    console.error('Erro ao descartar sessão de simulado:', e);
+                                  }
+                                }
+                              }}
+                              sx={{ fontWeight: 700 }}
+                            >
+                              Descartar
+                            </Button>
+                          </Stack>
+                        </Paper>
+                      );
+                    })}
+                  </Stack>
+                );
+              })()}
 
               <TextField
                 placeholder="Buscar por prova, banca ou ano..."
@@ -3113,27 +3243,123 @@ export const UserProfilePage: React.FC = () => {
                     Sessões de Estudo
                   </Typography>
                   <Typography variant="body2" color="text.secondary">
-                    Histórico completo de sessões de flashcards, com acertos, erros, tempo respondido, área e matéria.
+                    Histórico completo de sessões de estudo de questões e flashcards, com tempo decorrido e desempenho.
                   </Typography>
                 </Box>
-                <Button
-                  variant="contained"
-                  startIcon={<PlayArrowIcon />}
-                  onClick={() => navigate('/flashcards')}
-                  sx={{
-                    fontWeight: 700,
-                    backgroundColor: PALETTE_COLORS.primary,
-                    color: '#1a1e24',
-                    textTransform: 'none',
-                    borderRadius: 2,
-                    '&:hover': {
-                      backgroundColor: '#c4a251',
-                    },
-                  }}
-                >
-                  Praticar Flashcards
-                </Button>
+                <Stack direction="row" spacing={1.5} flexWrap="wrap">
+                  <Button
+                    variant="contained"
+                    startIcon={<PlayArrowIcon />}
+                    onClick={() => navigate('/questoes/estudo')}
+                    sx={{
+                      fontWeight: 700,
+                      backgroundColor: PALETTE_COLORS.primary,
+                      color: '#1a1e24',
+                      textTransform: 'none',
+                      borderRadius: 2,
+                    }}
+                  >
+                    Estudar Questões
+                  </Button>
+                  <Button
+                    variant="outlined"
+                    startIcon={<FlipCameraAndroidIcon />}
+                    onClick={() => navigate('/flashcards')}
+                    sx={{
+                      fontWeight: 700,
+                      textTransform: 'none',
+                      borderRadius: 2,
+                    }}
+                  >
+                    Praticar Flashcards
+                  </Button>
+                </Stack>
               </Box>
+
+              {/* Banner de Sessão de Questões em Andamento */}
+              {(() => {
+                const incompleteQ = questionSessions.filter((s) => !s.completed);
+                if (incompleteQ.length === 0) return null;
+                const latest = incompleteQ[0];
+                const answered = (latest.correctCount || 0) + (latest.wrongCount || 0) + (latest.skippedCount || 0);
+                return (
+                  <Paper
+                    elevation={3}
+                    sx={{
+                      p: 2.5,
+                      mb: 3,
+                      borderRadius: 2.5,
+                      border: '1.5px solid',
+                      borderColor: PALETTE_COLORS.primary,
+                      background: isDark
+                        ? 'linear-gradient(90deg, rgba(217, 183, 99, 0.15) 0%, rgba(26, 30, 36, 0.95) 100%)'
+                        : 'linear-gradient(90deg, rgba(217, 183, 99, 0.2) 0%, rgba(255, 255, 255, 0.95) 100%)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      flexWrap: 'wrap',
+                      gap: 2,
+                    }}
+                  >
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                      <Box
+                        sx={{
+                          p: 1.2,
+                          borderRadius: '50%',
+                          bgcolor: 'rgba(217, 183, 99, 0.2)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                        }}
+                      >
+                        <QuizOutlinedIcon sx={{ color: PALETTE_COLORS.primary, fontSize: 28 }} />
+                      </Box>
+                      <Box>
+                        <Typography variant="subtitle1" fontWeight={800}>
+                          {incompleteQ.length === 1
+                            ? 'Você possui 1 sessão de estudo de questões em andamento!'
+                            : `Você possui ${incompleteQ.length} sessões de estudo de questões em andamento!`}
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary">
+                          {latest.title || 'Estudo de Questões'} • {answered} de {latest.totalQuestions} questões praticadas ({formatStudyDuration(latest.timeSpentSeconds, true)})
+                        </Typography>
+                      </Box>
+                    </Box>
+                    <Stack direction="row" spacing={1.5} alignItems="center">
+                      <Button
+                        variant="contained"
+                        startIcon={<PlayArrowIcon />}
+                        onClick={() => navigate(`/questoes/estudo?sessionId=${latest.id}`)}
+                        sx={{
+                          fontWeight: 700,
+                          backgroundColor: PALETTE_COLORS.primary,
+                          color: '#1a1e24',
+                        }}
+                      >
+                        Continuar Estudo
+                      </Button>
+                      <Button
+                        variant="outlined"
+                        color="error"
+                        startIcon={<DeleteOutlineIcon />}
+                        onClick={async () => {
+                          if (window.confirm('Deseja descartar esta sessão de estudo de questões?')) {
+                            try {
+                              await deleteQuestionSession(latest.id);
+                              loadMyQuestionSessions();
+                            } catch (e) {
+                              console.error('Erro ao descartar sessão de questões:', e);
+                            }
+                          }
+                        }}
+                        sx={{ fontWeight: 700 }}
+                      >
+                        Descartar
+                      </Button>
+                    </Stack>
+                  </Paper>
+                );
+              })()}
 
               {/* Banner de Sessão em Andamento */}
               {(() => {
@@ -4076,7 +4302,7 @@ export const UserProfilePage: React.FC = () => {
                               fontWeight: 500,
                             }}
                           >
-                            {q.enunciado}
+                            {stripRichTextMarkup(q.enunciado)}
                           </Typography>
 
                           <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>

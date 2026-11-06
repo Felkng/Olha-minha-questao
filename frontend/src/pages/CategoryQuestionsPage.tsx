@@ -10,6 +10,8 @@ import {
 } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import WhatshotIcon from '@mui/icons-material/Whatshot';
+import PlayArrowIcon from '@mui/icons-material/PlayArrow';
+import ShuffleIcon from '@mui/icons-material/Shuffle';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { Question } from '../types';
 import { getOriginQuestions, getAreaQuestions, getOrigins, getAreas } from '../services/api';
@@ -119,24 +121,49 @@ export const CategoryQuestionsPage: React.FC<CategoryQuestionsPageProps> = ({
         {backLabel}
       </Button>
 
-      <Box sx={{ mb: 4 }}>
-        <Stack direction="row" spacing={1.5} alignItems="center" sx={{ mb: 1 }}>
-          <Typography variant="h4" sx={{ fontWeight: 800 }}>
-            {titlePrefix}: {categoryName}
+      <Box sx={{ mb: 4, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 2 }}>
+        <Box>
+          <Stack direction="row" spacing={1.5} alignItems="center" sx={{ mb: 1 }}>
+            <Typography variant="h4" sx={{ fontWeight: 800 }}>
+              {titlePrefix}: {categoryName}
+            </Typography>
+            <Chip
+              icon={<WhatshotIcon sx={{ color: `${PALETTE_COLORS.danger} !important` }} />}
+              label="Mais Respondidas"
+              sx={{
+                backgroundColor: 'rgba(250, 66, 75, 0.12)',
+                color: PALETTE_COLORS.danger,
+                fontWeight: 700,
+              }}
+            />
+          </Stack>
+          <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+            Exibindo {questions.length} questões ordenadas pelo maior número de resoluções e data decrescente.
           </Typography>
-          <Chip
-            icon={<WhatshotIcon sx={{ color: `${PALETTE_COLORS.danger} !important` }} />}
-            label="Mais Respondidas"
-            sx={{
-              backgroundColor: 'rgba(250, 66, 75, 0.12)',
-              color: PALETTE_COLORS.danger,
-              fontWeight: 700,
-            }}
-          />
+        </Box>
+
+        <Stack direction="row" spacing={1.5} flexWrap="wrap">
+          <Button
+            variant="contained"
+            color="primary"
+            startIcon={<PlayArrowIcon />}
+            onClick={() => navigate(`/questoes/estudo?${type === 'origin' ? `originId=${id}` : `areaId=${id}`}`)}
+            disabled={questions.length === 0}
+            sx={{ fontWeight: 700 }}
+          >
+            Estudar Questões
+          </Button>
+          <Button
+            variant="outlined"
+            color="primary"
+            startIcon={<ShuffleIcon />}
+            onClick={() => navigate(`/questoes/estudo?${type === 'origin' ? `originId=${id}` : `areaId=${id}`}&random=true`)}
+            disabled={questions.length === 0}
+            sx={{ fontWeight: 700 }}
+          >
+            Estudo Aleatório
+          </Button>
         </Stack>
-        <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-          Exibindo {questions.length} questões ordenadas pelo maior número de resoluções e data decrescente.
-        </Typography>
       </Box>
 
       {questions.length === 0 ? (

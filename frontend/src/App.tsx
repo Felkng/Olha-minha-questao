@@ -4,6 +4,7 @@ import { MainLayout } from './layouts/MainLayout';
 import { LandingPage } from './pages/LandingPage';
 import { QuestionsPage } from './pages/QuestionsPage';
 import { QuestionDetailPage } from './pages/QuestionDetailPage';
+import { QuestionStudyPage } from './pages/QuestionStudyPage';
 import { TestsPage } from './pages/TestsPage';
 import { TestDetailPage } from './pages/TestDetailPage';
 import { TestEvaluationPage } from './pages/TestEvaluationPage';
@@ -39,6 +40,14 @@ export const App: React.FC = () => {
             <Route
               path="/questoes"
               element={<QuestionsPage onBookmarkClick={handleOpenSaveModal} />}
+            />
+            <Route
+              path="/questoes/estudo"
+              element={<QuestionStudyPage onBookmarkClick={handleOpenSaveModal} />}
+            />
+            <Route
+              path="/questoes/estudar"
+              element={<QuestionStudyPage onBookmarkClick={handleOpenSaveModal} />}
             />
             <Route
               path="/questoes/:id"

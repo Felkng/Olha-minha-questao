@@ -32,6 +32,10 @@ import {
   FlashcardRequest,
   FlashcardSession,
   FlashcardSessionRequest,
+  QuestionSession,
+  QuestionSessionRequest,
+  TestSession,
+  TestSessionRequest,
   QuestionAttemptHistory,
 } from '../types';
 
@@ -180,12 +184,14 @@ const normalizeQuestion = (q: any): Question => ({
 });
 
 export const getQuestions = async (params?: {
+  ids?: number[];
   originId?: number | '';
   areaId?: number | '';
   subjectId?: number | '';
   testId?: number | '';
   year?: number | '';
   difficulty?: string;
+  standaloneOnly?: boolean;
   search?: string;
   sort?: string;
   createdByUserId?: number | '';
@@ -197,11 +203,14 @@ export const getQuestions = async (params?: {
     const size = params?.size ?? 5;
     const queryParams: Record<string, any> = { page, size };
 
+    if (params?.ids && params.ids.length > 0) queryParams.ids = params.ids.join(',');
     if (params?.originId) queryParams.originId = params.originId;
     if (params?.areaId) queryParams.areaId = params.areaId;
+    if (params?.subjectId) queryParams.subjectId = params.subjectId;
     if (params?.testId) queryParams.testId = params.testId;
     if (params?.year) queryParams.year = params.year;
     if (params?.difficulty) queryParams.difficulty = params.difficulty;
+    if (params?.standaloneOnly) queryParams.standaloneOnly = true;
     if (params?.search) queryParams.search = params.search;
     if (params?.sort && params.sort !== 'recent') queryParams.sort = params.sort;
     if (params?.createdByUserId) queryParams.createdByUserId = params.createdByUserId;
@@ -469,6 +478,7 @@ export const parseExamPdf = async (file: File): Promise<ParsedExamResponse> => {
     questions: Array.isArray(response.data?.questions) ? response.data.questions : [],
     textualReferences: Array.isArray(response.data?.textualReferences) ? response.data.textualReferences : [],
     detectedTitle: response.data?.detectedTitle,
+    duplicateGroups: Array.isArray(response.data?.duplicateGroups) ? response.data.duplicateGroups : [],
   };
 };
 
@@ -489,6 +499,7 @@ export const parseAnswerKeyPdf = async (file: File, provaName?: string): Promise
     answers: Array.isArray(response.data?.answers) ? response.data.answers : [],
     availableProvas: Array.isArray(response.data?.availableProvas) ? response.data.availableProvas : [],
     selectedProva: response.data?.selectedProva,
+    sectionAnswers: response.data?.sectionAnswers || undefined,
   };
 };
 
@@ -878,5 +889,96 @@ export const getTestIdsForQuestion = async (questionId: number): Promise<number[
     return [];
   }
 };
+
+// ==========================================
+// Sessões de Simulado Persistentes (Cross-Hardware)
+// ==========================================
+
+export const startOrGetTestSession = async (
+  testId: number,
+  data?: TestSessionRequest
+): Promise<TestSession> => {
+  const response = await apiClient.post<TestSession>(`/tests/${testId}/sessions`, data || {});
+  return response.data;
+};
+
+export const getActiveTestSession = async (testId: number): Promise<TestSession | null> => {
+  try {
+    const response = await apiClient.get<TestSession>(`/tests/${testId}/sessions/active`);
+    if (response.status === 204 || !response.data) return null;
+    return response.data;
+  } catch (err) {
+    console.warn(`API /tests/${testId}/sessions/active error:`, err);
+    return null;
+  }
+};
+
+export const getTestSessionById = async (sessionId: number): Promise<TestSession> => {
+  const response = await apiClient.get<TestSession>(`/tests/sessions/${sessionId}`);
+  return response.data;
+};
+
+export const updateTestSession = async (
+  sessionId: number,
+  data: TestSessionRequest
+): Promise<TestSession> => {
+  const response = await apiClient.put<TestSession>(`/tests/sessions/${sessionId}`, data);
+  return response.data;
+};
+
+export const deleteTestSession = async (sessionId: number): Promise<void> => {
+  await apiClient.delete(`/tests/sessions/${sessionId}`);
+};
+
+export const getUserTestSessions = async (userId?: number): Promise<TestSession[]> => {
+  try {
+    const url = userId ? `/tests/sessions/user/${userId}` : '/tests/sessions/my';
+    const response = await apiClient.get<TestSession[]>(url);
+    return Array.isArray(response.data) ? response.data : [];
+  } catch (err) {
+    console.warn('API test sessions error:', err);
+    return [];
+  }
+};
+
+// ==========================================
+// Sessões de Estudo de Questões (Avulsas ou Filtradas)
+// ==========================================
+
+export const createQuestionSession = async (
+  data: QuestionSessionRequest
+): Promise<QuestionSession> => {
+  const response = await apiClient.post<QuestionSession>('/questions/sessions', data);
+  return response.data;
+};
+
+export const getQuestionSession = async (id: number): Promise<QuestionSession> => {
+  const response = await apiClient.get<QuestionSession>(`/questions/sessions/${id}`);
+  return response.data;
+};
+
+export const updateQuestionSession = async (
+  id: number,
+  data: QuestionSessionRequest
+): Promise<QuestionSession> => {
+  const response = await apiClient.put<QuestionSession>(`/questions/sessions/${id}`, data);
+  return response.data;
+};
+
+export const deleteQuestionSession = async (id: number): Promise<void> => {
+  await apiClient.delete(`/questions/sessions/${id}`);
+};
+
+export const getUserQuestionSessions = async (userId?: number): Promise<QuestionSession[]> => {
+  try {
+    const url = userId ? `/questions/sessions/user/${userId}` : '/questions/sessions/my';
+    const response = await apiClient.get<QuestionSession[]>(url);
+    return Array.isArray(response.data) ? response.data : [];
+  } catch (err) {
+    console.warn('API question sessions error:', err);
+    return [];
+  }
+};
+
 
 

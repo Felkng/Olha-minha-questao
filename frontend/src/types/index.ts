@@ -186,6 +186,7 @@ export interface FilterState {
   year: number | '';
   testId: number | '';
   difficulty?: string;
+  standaloneOnly?: boolean;
   sort?: string;
 }
 
@@ -275,6 +276,100 @@ export interface FlashcardSession {
   items: FlashcardSessionItem[];
 }
 
+export type QuestionSessionItemStatus = 'CORRECT' | 'WRONG' | 'SKIPPED';
+
+export interface QuestionSessionItem {
+  id?: number;
+  questionId: number;
+  questionIdentifier?: string;
+  questionEnunciado?: string;
+  selectedAlternativeId?: number;
+  selectedAlternativeIdentifier?: string;
+  correctAlternativeIdentifier?: string;
+  areaName?: string;
+  subjectName?: string;
+  status: QuestionSessionItemStatus;
+}
+
+export interface QuestionSessionRequest {
+  folderId?: number;
+  originId?: number;
+  areaId?: number;
+  subjectId?: number;
+  title?: string;
+  questionIds: number[];
+  totalQuestions: number;
+  timeSpentSeconds?: number;
+  completed?: boolean;
+  items: {
+    questionId: number;
+    selectedAlternativeId?: number;
+    status: QuestionSessionItemStatus;
+  }[];
+}
+
+export interface QuestionSession {
+  id: number;
+  user?: UserSummary;
+  folderId?: number;
+  folderName?: string;
+  originId?: number;
+  originName?: string;
+  areaId?: number;
+  areaName?: string;
+  subjectId?: number;
+  subjectName?: string;
+  title?: string;
+  questionIds: number[];
+  totalQuestions: number;
+  correctCount: number;
+  wrongCount: number;
+  skippedCount: number;
+  timeSpentSeconds: number;
+  accuracyPercentage: number;
+  completed: boolean;
+  createdAt: string;
+  updatedAt?: string;
+  items: QuestionSessionItem[];
+}
+
+export interface TestSessionItem {
+  id?: number;
+  questionId: number;
+  selectedAlternativeId?: number;
+  timeSpentSeconds?: number;
+}
+
+export interface TestSessionRequest {
+  questionIds?: number[];
+  timerMinutes?: number;
+  timeSpentSeconds?: number;
+  activeQuestionIndex?: number;
+  completed?: boolean;
+  items?: TestSessionItem[];
+}
+
+export interface TestSession {
+  id: number;
+  userId?: number;
+  testId: number;
+  testName: string;
+  testYear?: number;
+  originName?: string;
+  areaName?: string;
+  totalQuestions: number;
+  answeredCount: number;
+  questionIds: number[];
+  timerMinutes: number;
+  timeSpentSeconds: number;
+  activeQuestionIndex: number;
+  completed: boolean;
+  testAttemptId?: number;
+  createdAt: string;
+  updatedAt?: string;
+  items: TestSessionItem[];
+}
+
 export interface SavedQuestion {
   id: number;
   folderId: number;
@@ -358,6 +453,7 @@ export interface TestSubmissionRequest {
   userId?: number;
   timeSpentSeconds: number;
   sessionId?: string;
+  testSessionId?: number;
   answers: {
     questionId: number;
     selectedAlternativeId?: number;
@@ -431,10 +527,12 @@ export interface TestAttemptDetail {
 }
 
 export interface ActiveTestSession {
+  sessionId?: number;
   testId: number;
   testName: string;
   answers: Record<number, number>;
   timeSpent: number;
+  timerMinutes?: number;
   activeQuestionIndex: number;
   totalQuestions: number;
   lastUpdatedTimestamp: number;
@@ -554,12 +652,22 @@ export interface ParsedQuestion {
   enunciado: string;
   alternatives: ParsedAlternative[];
   images?: string[];
+  section?: string;
+  textualReferenceIndex?: number | null;
+  isDuplicate?: boolean;
+}
+
+export interface DuplicateQuestionGroup {
+  identifier: string;
+  count: number;
+  sections: string[];
 }
 
 export interface ParsedExamResponse {
   questions: ParsedQuestion[];
   textualReferences: TextualReference[];
   detectedTitle?: string;
+  duplicateGroups?: DuplicateQuestionGroup[];
 }
 
 export interface ParsedAnswerKey {
@@ -576,6 +684,7 @@ export interface ParsedAnswerKeyResponse {
   answers: ParsedAnswerKey[];
   availableProvas: AvailableProvaOption[];
   selectedProva?: string;
+  sectionAnswers?: Record<string, ParsedAnswerKey[]>;
 }
 
 export interface TestWithQuestionsRequest {

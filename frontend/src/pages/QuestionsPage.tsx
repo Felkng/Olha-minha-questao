@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import {
   Box,
   Typography,
@@ -10,6 +10,8 @@ import {
 } from '@mui/material';
 import SearchOffIcon from '@mui/icons-material/SearchOff';
 import AddIcon from '@mui/icons-material/Add';
+import PlayArrowIcon from '@mui/icons-material/PlayArrow';
+import ShuffleIcon from '@mui/icons-material/Shuffle';
 import { SearchBar } from '../components/search/SearchBar';
 import { QuestionCard } from '../components/questions/QuestionCard';
 import { QuestionSkeleton } from '../components/questions/QuestionSkeleton';
@@ -28,6 +30,7 @@ export const QuestionsPage: React.FC<QuestionsPageProps> = ({
   savedQuestionIds = new Set(),
 }) => {
   const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
 
   const [questions, setQuestions] = useState<Question[]>([]);
   const [totalPages, setTotalPages] = useState<number>(1);
@@ -52,6 +55,7 @@ export const QuestionsPage: React.FC<QuestionsPageProps> = ({
       year: searchParams.get('year') ? Number(searchParams.get('year')) : '',
       testId: searchParams.get('testId') ? Number(searchParams.get('testId')) : '',
       difficulty: searchParams.get('difficulty') || '',
+      standaloneOnly: searchParams.get('standaloneOnly') === 'true',
       sort: searchParams.get('sort') || 'recent',
     };
   }, [searchParams]);
@@ -115,6 +119,7 @@ export const QuestionsPage: React.FC<QuestionsPageProps> = ({
           testId: filters.testId,
           year: filters.year,
           difficulty: filters.difficulty,
+          standaloneOnly: filters.standaloneOnly,
           search: filters.search,
           sort: filters.sort,
           page: page - 1, // API is 0-indexed
@@ -149,6 +154,7 @@ export const QuestionsPage: React.FC<QuestionsPageProps> = ({
     filters.testId,
     filters.year,
     filters.difficulty,
+    filters.standaloneOnly,
     filters.search,
     filters.sort,
   ]);
@@ -164,6 +170,7 @@ export const QuestionsPage: React.FC<QuestionsPageProps> = ({
     if (newFilters.year !== '') params.year = String(newFilters.year);
     if (newFilters.testId !== '') params.testId = String(newFilters.testId);
     if (newFilters.difficulty) params.difficulty = newFilters.difficulty;
+    if (newFilters.standaloneOnly) params.standaloneOnly = 'true';
     if (newFilters.sort && newFilters.sort !== 'recent') params.sort = newFilters.sort;
 
     setSearchParams(params, { replace: true });
@@ -196,14 +203,39 @@ export const QuestionsPage: React.FC<QuestionsPageProps> = ({
           </Typography>
         </Box>
 
-        <Button
-          variant="contained"
-          startIcon={<AddIcon />}
-          onClick={() => setCreateModalOpen(true)}
-          sx={{ fontWeight: 700, backgroundColor: PALETTE_COLORS.primary }}
-        >
-          Nova Questão
-        </Button>
+        <Stack direction="row" spacing={1.5} flexWrap="wrap">
+          <Button
+            variant="contained"
+            color="primary"
+            startIcon={<PlayArrowIcon />}
+            onClick={() => navigate(`/questoes/estudo?${searchParams.toString()}`)}
+            disabled={totalElements === 0}
+            sx={{ fontWeight: 700 }}
+          >
+            Estudar Questões
+          </Button>
+          <Button
+            variant="outlined"
+            color="primary"
+            startIcon={<ShuffleIcon />}
+            onClick={() => {
+              const current = searchParams.toString();
+              navigate(`/questoes/estudo?${current ? current + '&' : ''}random=true`);
+            }}
+            disabled={totalElements === 0}
+            sx={{ fontWeight: 700 }}
+          >
+            Estudo Aleatório
+          </Button>
+          <Button
+            variant="contained"
+            startIcon={<AddIcon />}
+            onClick={() => setCreateModalOpen(true)}
+            sx={{ fontWeight: 700, backgroundColor: PALETTE_COLORS.primary }}
+          >
+            Nova Questão
+          </Button>
+        </Stack>
       </Box>
 
       {isLoading ? (

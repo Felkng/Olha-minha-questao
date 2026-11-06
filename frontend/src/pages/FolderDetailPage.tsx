@@ -351,6 +351,42 @@ export const FolderDetailPage: React.FC<FolderDetailPageProps> = ({
             </Stack>
           )}
 
+          {!isTestFolder && !isFlashcardFolder && (
+            <Stack direction="row" spacing={1} alignItems="center" sx={{ flexGrow: { xs: 1, sm: 0 } }}>
+              <Button
+                variant="contained"
+                startIcon={<PlayArrowIcon />}
+                onClick={() => navigate(`/questoes/estudo?folderId=${folder.id}`)}
+                disabled={questions.length === 0}
+                sx={{
+                  flexGrow: 1,
+                  borderRadius: 2,
+                  fontWeight: 700,
+                  backgroundColor: PALETTE_COLORS.primary,
+                }}
+              >
+                Praticar Questões ({questions.length})
+              </Button>
+
+              <Tooltip title="Praticar em ordem aleatória">
+                <span>
+                  <Button
+                    variant="outlined"
+                    startIcon={<ShuffleIcon />}
+                    onClick={() => navigate(`/questoes/estudo?folderId=${folder.id}&random=true`)}
+                    disabled={questions.length === 0}
+                    sx={{
+                      borderRadius: 2,
+                      fontWeight: 700,
+                    }}
+                  >
+                    Aleatório
+                  </Button>
+                </span>
+              </Tooltip>
+            </Stack>
+          )}
+
           {(isAdmin || (user && folder.createdByUser?.id === user.id)) && (
             <Button
               variant="outlined"
