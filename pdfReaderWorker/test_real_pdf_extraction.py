@@ -702,5 +702,18 @@ class TestRealPdfExtraction(unittest.TestCase):
         self.assertEqual(len(section_answers["LÍNGUA ESTRANGEIRA - ESPANHOL"]), 10)
         self.assertEqual(len(section_answers["CONHECIMENTOS ESPECÍFICOS"]), 40)
 
+        # 4. Verify no header/footer banner images leaked into questions or alternatives (e.g. Q30)
+        q30_esp = next(q for q in questions if q["identifier"] == "30" and "ESPANHOL" in (q.get("section") or ""))
+        self.assertEqual(len(q30_esp.get("images", [])), 0, "Questão 30-ESP não deve ter imagem de cabeçalho")
+        for alt in q30_esp.get("alternatives", []):
+            self.assertNotIn("![Figura]", alt["text"], f"Alternativa ({alt['identifier']}) de Q30 não deve conter imagem de cabeçalho")
+
+        q39 = next(q for q in questions if q["identifier"] == "39")
+        self.assertEqual(len(q39.get("images", [])), 0, "Questão 39 de cálculo não deve ter imagem de cabeçalho")
+
+        # Question 50 should retain its 3 genuine ER/database diagrams
+        q50 = next(q for q in questions if q["identifier"] == "50")
+        self.assertEqual(len(q50.get("images", [])), 3, "Questão 50 deve conter exatamente os 3 diagramas legítimos do enunciado")
+
 if __name__ == '__main__':
     unittest.main()

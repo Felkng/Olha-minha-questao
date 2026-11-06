@@ -280,6 +280,9 @@ def extract_rich_text_from_crop(crop: Any) -> str:
     crop_h = getattr(crop, 'height', 1000)
     crop_w = getattr(crop, 'width', 1000)
     crop_bbox = getattr(crop, 'bbox', (0, 0, crop_w, crop_h))
+    root_page = getattr(crop, 'root_page', None) or crop
+    page_h = float(getattr(root_page, 'height', crop_h))
+    page_w = float(getattr(root_page, 'width', crop_w))
 
     # 1. Detect Structured Data Tables (pdfplumber find_tables)
     found_tables = []
@@ -443,10 +446,16 @@ def extract_rich_text_from_crop(crop: Any) -> str:
                 top = img.get("top", 0)
                 x1 = img.get("x1", 0)
                 bottom = img.get("bottom", 0)
-                # Filter bottom-left background watermarks and top-margin clipped header logos
-                if x0 <= 5 and bottom >= crop_h - 10:
+                # Filter bottom-left background watermarks and large margin watermarks
+                if x0 <= 5 and bottom >= page_h - 15:
                     continue
-                if crop_bbox[1] >= 20 and top <= crop_bbox[1] + 1.5 and bottom <= crop_bbox[1] + 55:
+                if top >= page_h * 0.65 and w >= page_w * 0.35 and h >= page_h * 0.20:
+                    continue
+                # Filter header band images (logos, exam banners)
+                if top <= 85 or bottom <= 85:
+                    continue
+                # Filter footer band images (logos, page markings)
+                if bottom >= page_h - 65 or top >= page_h - 75:
                     continue
                 if w < 25 or h < 25:
                     continue
@@ -470,7 +479,10 @@ def extract_rich_text_from_crop(crop: Any) -> str:
             h = abs(l.get('bottom', 0) - l.get('top', 0))
             top = l.get('top', 0)
             bot = l.get('bottom', 0)
-            if top <= 10 or bot >= crop_h - 10:
+            # Filter header and footer bands
+            if top <= 85 or bot <= 85:
+                continue
+            if bot >= page_h - 65 or top >= page_h - 75:
                 continue
             if w > crop_w * 0.75 or h > crop_h * 0.75:
                 continue
@@ -485,7 +497,10 @@ def extract_rich_text_from_crop(crop: Any) -> str:
             h = r.get('height', 0)
             top = r.get('top', 0)
             bot = r.get('bottom', 0)
-            if top <= 10 or bot >= crop_h - 10:
+            # Filter header and footer bands
+            if top <= 85 or bot <= 85:
+                continue
+            if bot >= page_h - 65 or top >= page_h - 75:
                 continue
             if w >= 8 and h >= 8 and w < crop_w * 0.75 and h < crop_h * 0.75:
                 diag_rects.append(r)
@@ -526,6 +541,10 @@ def extract_rich_text_from_crop(crop: Any) -> str:
             alt_words = [w for w in words if re.match(r'^\([A-E]\)$', w.get('text', ''))]
 
             for c in clusters:
+                # Discard cluster if within header or footer margin
+                if c['y0'] <= 85 or c['y1'] <= 85 or c['y1'] >= page_h - 65 or c['y0'] >= page_h - 75:
+                    continue
+
                 overlaps = False
                 for tb in valid_table_bboxes + valid_image_bboxes:
                     if not (c['x1'] < tb[0] or c['x0'] > tb[2] or c['y1'] < tb[1] or c['y0'] > tb[3]):
@@ -739,7 +758,7 @@ def get_page_crops(p: Any, width: float, height: float) -> List[str]:
     and hybrid layouts (where top is single-column full-width and bottom is 2-column).
     """
     top_m = 35
-    bot_m = height - 55
+    bot_m = height - 65
     mid = width / 2
     if not hasattr(p, 'extract_words'):
         return [extract_rich_text_from_crop(p)]
@@ -868,7 +887,7 @@ def parse_column_text(text: str, ref_starts: Optional[Dict[int, int]] = None) ->
         r'(?:\(([A-Ea-e])\)|\[([A-Ea-e])\]|(?:\b|\s|^)([A-Ea-e])[\.\-\)])'
     )
     noise_pattern = re.compile(
-        r'(?i)^(?:pcimarkpci.*|transpetro|enem\s+\d{4}|vestibular|caderno\s+de\s+quest.*|confidencial|www\.pciconcursos.*|terra\s+prova|petro|transp|terra|prova\s*\d+\s*[-–].*|.*(?:analista|t[ée]cnico|engenheiro|m[ée]dico|administrador|advogado|contador|economista|enfermeiro|profissional)\s+.*prova\s*\d+.*|[-–—\s]*infraestrutura|[-–—\s]*[áa]rea\s+infraestrutura)$'
+        r'(?i)^(?:pcimarkpci.*|transpetro|enem\s+\d{4}|vestibular|caderno\s+de\s+quest.*|confidencial|www\.pciconcursos.*|terra\s+prova|petro|transp|terra|bndes|concurso\s+p[úu]blico.*|folha\s+de\s+respostas.*|gabarito.*|prova\s*\d+\s*[-–].*|.*(?:analista|t[ée]cnico|engenheiro|m[ée]dico|administrador|advogado|contador|economista|enfermeiro|profissional)\s+.*prova\s*\d+.*|[-–—\s]*infraestrutura|[-–—\s]*[áa]rea\s+infraestrutura)$'
     )
     continuation_pattern = re.compile(r'(?i)^\(?continua[çc][ãa]o\s+da\s+quest[ãa]o\s*\d+\)?$')
 
@@ -946,9 +965,10 @@ def parse_column_text(text: str, ref_starts: Optional[Dict[int, int]] = None) ->
             continue
 
         imgs_in_line = re.findall(r'!\[.*?\]\((data:image/[^)]+)\)', line)
-        for img_url in imgs_in_line:
-            if img_url not in current_q["images"]:
-                current_q["images"].append(img_url)
+        if state == "ENUNCIADO":
+            for img_url in imgs_in_line:
+                if img_url not in current_q["images"]:
+                    current_q["images"].append(img_url)
 
         # Check inline horizontal alternatives (must form a strictly ascending sequence without duplicates: A < B < C or A < D, etc.)
         raw_matches = list(alt_inline_pattern.finditer(line))
@@ -1454,7 +1474,7 @@ def extract_textual_references_from_pdf(pdf: pdfplumber.PDF) -> List[Dict[str, A
     with rich markup (bold, underline, tables) and extracting title, subtitle, author, and citation sources.
     """
     noise_pattern = re.compile(
-        r'(?i)^(?:pcimarkpci.*|transpetro|enem\s+\d{4}|vestibular|caderno\s+de\s+quest.*|confidencial|www\.pciconcursos.*|terra\s+prova|petro|transp|terra|prova\s*\d+\s*[-–].*|.*(?:analista|t[ée]cnico|engenheiro|m[ée]dico|administrador|advogado|contador|economista|enfermeiro|profissional)\s+.*prova\s*\d+.*|[-–—\s]*infraestrutura|[-–—\s]*[áa]rea\s+infraestrutura)$'
+        r'(?i)^(?:pcimarkpci.*|transpetro|enem\s+\d{4}|vestibular|caderno\s+de\s+quest.*|confidencial|www\.pciconcursos.*|terra\s+prova|petro|transp|terra|bndes|concurso\s+p[úu]blico.*|folha\s+de\s+respostas.*|gabarito.*|prova\s*\d+\s*[-–].*|.*(?:analista|t[ée]cnico|engenheiro|m[ée]dico|administrador|advogado|contador|economista|enfermeiro|profissional)\s+.*prova\s*\d+.*|[-–—\s]*infraestrutura|[-–—\s]*[áa]rea\s+infraestrutura)$'
     )
 
     flat_lines: List[str] = []
