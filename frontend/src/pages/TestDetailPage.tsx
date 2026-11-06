@@ -39,8 +39,15 @@ import EditIcon from '@mui/icons-material/Edit';
 import ListAltIcon from '@mui/icons-material/ListAlt';
 import PersonOutlineIcon from '@mui/icons-material/PersonOutline';
 import { Link, useParams, useNavigate, useSearchParams } from 'react-router-dom';
-import { Question, Test, TestAttemptSummary } from '../types';
-import { getTestById, getTestEvaluation, getTestAttempts, deleteTest, toggleTestVisibility } from '../services/api';
+import { Question, Test, TestAttemptSummary, TestSession } from '../types';
+import {
+  getTestById,
+  getTestEvaluation,
+  getTestAttempts,
+  getActiveTestSession,
+  deleteTest,
+  toggleTestVisibility,
+} from '../services/api';
 import { QuestionCard } from '../components/questions/QuestionCard';
 import { QuestionWhiteboard } from '../components/whiteboard/QuestionWhiteboard';
 import { TestQuestionsNavigator } from '../components/questions/TestQuestionsNavigator';
@@ -72,6 +79,7 @@ export const TestDetailPage: React.FC<TestDetailPageProps> = ({
   const [test, setTest] = useState<Test | null>(null);
   const [questions, setQuestions] = useState<Question[]>([]);
   const [attempts, setAttempts] = useState<TestAttemptSummary[]>([]);
+  const [activeSession, setActiveSession] = useState<TestSession | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [activeQuestionIndex, setActiveQuestionIndex] = useState<number>(
     initialQ > 0 ? initialQ - 1 : 0
@@ -102,14 +110,16 @@ export const TestDetailPage: React.FC<TestDetailPageProps> = ({
     setLoading(true);
     try {
       const userId = user?.id || 1;
-      const [testData, evalData, attemptsData] = await Promise.all([
+      const [testData, evalData, attemptsData, activeSess] = await Promise.all([
         getTestById(tId),
         getTestEvaluation(tId),
         getTestAttempts(tId, userId).catch(() => []),
+        user?.id ? getActiveTestSession(tId).catch(() => null) : Promise.resolve(null),
       ]);
       setTest(testData);
       setQuestions(sortQuestionsByIdentifier(evalData.questions || []));
       setAttempts(attemptsData || []);
+      setActiveSession(activeSess && !activeSess.completed ? activeSess : null);
     } catch (err) {
       console.error('Erro ao carregar dados da prova:', err);
     } finally {
@@ -321,10 +331,22 @@ export const TestDetailPage: React.FC<TestDetailPageProps> = ({
             <Button
               variant="contained"
               startIcon={<PlayArrowIcon />}
-              onClick={() => navigate(`/provas/${test.id}/avaliacao`)}
-              sx={{ fontWeight: 800, borderRadius: 2, backgroundColor: PALETTE_COLORS.primary }}
+              onClick={() =>
+                navigate(
+                  activeSession
+                    ? `/provas/${test.id}/avaliacao?sessionId=${activeSession.id}`
+                    : `/provas/${test.id}/avaliacao`
+                )
+              }
+              sx={{
+                fontWeight: 800,
+                borderRadius: 2,
+                backgroundColor: PALETTE_COLORS.primary,
+                color: '#1a1e24',
+                '&:hover': { backgroundColor: '#c4a251' },
+              }}
             >
-              Iniciar Simulado
+              {activeSession ? 'Continuar Simulado' : 'Iniciar Simulado'}
             </Button>
           </Stack>
         </Box>
